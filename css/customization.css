@@ -1,0 +1,34 @@
+/* Density */
+[data-density="compact"] {
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --topbar-h: 44px;
+  --mobile-nav-h: 52px;
+}
+[data-density="compact"] .tree-row { padding: 3px 8px; font-size: 13px; }
+[data-density="compact"] .btn { padding: 5px 10px; }
+[data-density="compact"] .note-editor, [data-density="compact"] .note-preview { padding: var(--space-4); }
+[data-density="compact"] .sidebar-actions { padding: var(--space-2); }
+
+/* Editor font family override (independent of theme's default editor font) */
+[data-editor-font="mono"] .note-editor { font-family: var(--font-mono) !important; }
+[data-editor-font="sans"] .note-editor { font-family: var(--font-ui) !important; }
+[data-editor-font="serif"] .note-editor { font-family: var(--font-serif) !important; }
+
+/* Feature-visibility: hide chrome for views/tabs the user has switched off */
+[data-hide-graph="1"] .view-tab[data-view="graph"],
+[data-hide-graph="1"] .mobile-nav-btn[data-view="graph"] { display: none !important; }
+[data-hide-canvas="1"] .view-tab[data-view="canvas"],
+[data-hide-canvas="1"] .mobile-nav-btn[data-view="canvas"] { display: none !important; }
+[data-hide-database="1"] .view-tab[data-view="database"] { display: none !important; }
+[data-hide-database="1"] #mobile-more-sheet button[data-view="database"] { display: none !important; }
+
+/* Accent swatches used in the customization panel */
+.accent-swatch {
+  width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer;
+  display: inline-block; transition: transform var(--transition-fast);
+}
+.accent-swatch:hover { transform: scale(1.12); }
+.accent-swatch.active { border-color: var(--text-0); box-shadow: 0 0 0 2px var(--bg-0), 0 0 0 4px var(--text-0); }
+.accent-swatch-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }

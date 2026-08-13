@@ -1,0 +1,76 @@
+/* Selection & misc theme polish */
+::selection { background: var(--accent-soft); color: var(--accent); }
+
+body {
+  transition: background-color var(--transition-med), color var(--transition-med);
+  background: var(--page-bg, var(--bg-1));
+}
+
+.sidebar, .right-panel, .topbar, .note-preview, .palette, .bottom-sheet, .canvas-card, .kanban-col, .db-table, .settings-container {
+  transition: background-color var(--transition-med), border-color var(--transition-med);
+}
+
+/* Subtle focus ring across interactive elements for accessibility */
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------- Glass theme: frosted translucent panels over a soft gradient ---------- */
+[data-style="glass"] .topbar,
+[data-style="glass"] .sidebar,
+[data-style="glass"] .right-panel,
+[data-style="glass"] .mobile-nav,
+[data-style="glass"] .palette,
+[data-style="glass"] .bottom-sheet,
+[data-style="glass"] .canvas-card,
+[data-style="glass"] .toast,
+[data-style="glass"] .kanban-col,
+[data-style="glass"] #note-preview,
+[data-style="glass"] .note-editor,
+[data-style="glass"] .db-table,
+[data-style="glass"] .icon-btn.active {
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
+}
+[data-style="glass"] .topbar,
+[data-style="glass"] .sidebar,
+[data-style="glass"] .right-panel,
+[data-style="glass"] .mobile-nav { border-color: var(--border); }
+[data-style="glass"] .btn, [data-style="glass"] input, [data-style="glass"] select, [data-style="glass"] textarea {
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
+  background: var(--bg-1);
+}
+[data-style="glass"] .btn-primary { background: var(--accent); }
+
+/* ---------- Nothing theme: dot-matrix grid + monochrome ---------- */
+[data-style="nothing"] body,
+[data-style="nothing"] .sidebar,
+[data-style="nothing"] .main-view {
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+[data-style="nothing"] .topbar,
+[data-style="nothing"] .sidebar,
+[data-style="nothing"] .right-panel,
+[data-style="nothing"] .mobile-nav { background-color: var(--bg-0); }
+[data-style="nothing"] .btn-primary,
+[data-style="nothing"] .view-tab.active,
+[data-style="nothing"] .sidebar-tab.active,
+[data-style="nothing"] .icon-btn.active { color: var(--accent); }
+[data-style="nothing"] .btn-primary { background: var(--accent); color: #fff; }
+[data-style="nothing"] .note-title-input,
+[data-style="nothing"] .brand-name,
+[data-style="nothing"] h1, [data-style="nothing"] h2, [data-style="nothing"] h3 {
+  font-family: 'DotGothic16', var(--font-mono);
+  letter-spacing: 0.02em;
+}
+[data-style="nothing"] .tag-pill, [data-style="nothing"] .tag-chip { border-radius: 2px; }
+[data-style="nothing"] .canvas-card, [data-style="nothing"] .kanban-card, [data-style="nothing"] .btn, [data-style="nothing"] input, [data-style="nothing"] select, [data-style="nothing"] textarea {
+  border-radius: 2px !important;
+}
+
+/* ---------- Notion theme: no shadows, hairline borders, tighter radii ---------- */
+[data-style="notion"] .btn, [data-style="notion"] input, [data-style="notion"] select, [data-style="notion"] textarea { box-shadow: none; }
+[data-style="notion"] .canvas-card, [data-style="notion"] .toast, [data-style="notion"] .palette { box-shadow: var(--shadow-md); }

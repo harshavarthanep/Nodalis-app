@@ -1,0 +1,143 @@
+@font-face {
+  font-family: 'DotGothic16';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../vendor/fonts/dotgothic16-latin-400-normal.woff2') format('woff2'),
+       url('../vendor/fonts/dotgothic16-latin-400-normal.woff') format('woff');
+}
+
+:root {
+  --accent: #6c5ce7;
+  --accent-hover: #5a4bd4;
+  --accent-soft: rgba(108, 92, 231, 0.12);
+  --danger: #e0245e;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --topbar-h: 52px;
+  --mobile-nav-h: 58px;
+  --sidebar-w: 260px;
+  --right-panel-w: 280px;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+  --font-editor: var(--font-mono);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.18);
+  --transition-fast: 120ms ease;
+  --transition-med: 220ms ease;
+  --transition-bouncy: 320ms cubic-bezier(.34,1.56,.64,1);
+  --panel-blur: none;
+  --panel-alpha: 1;
+}
+
+/* ---------- Nodalis (default) — warm "paper" light + rich dark ---------- */
+[data-style="nodalis"][data-mode="light"] {
+  --bg-0: #fdfbf6;
+  --bg-1: #f7f3ea;
+  --bg-2: #f0ebdd;
+  --bg-3: #e6ddc8;
+  --text-0: #2b2620;
+  --text-1: #55503f;
+  --text-2: #8d8672;
+  --border: #e4dcc7;
+  --code-bg: #f1ebda;
+}
+[data-style="nodalis"][data-mode="dark"] {
+  --bg-0: #15151d;
+  --bg-1: #1b1b25;
+  --bg-2: #23232f;
+  --bg-3: #2c2c3a;
+  --text-0: #f1f1f7;
+  --text-1: #c3c3d1;
+  --text-2: #86869a;
+  --border: #2f2f3d;
+  --code-bg: #1e1e2a;
+}
+
+/* ---------- Notion-inspired — near-white / near-black, minimal ---------- */
+[data-style="notion"][data-mode="light"] {
+  --bg-0: #ffffff;
+  --bg-1: #f7f7f5;
+  --bg-2: #efeeec;
+  --bg-3: #e9e8e5;
+  --text-0: #37352f;
+  --text-1: #5a5854;
+  --text-2: #9b9a97;
+  --border: #e9e8e5;
+  --code-bg: #f4f4f2;
+  --font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --radius-sm: 4px; --radius-md: 6px; --radius-lg: 10px;
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
+}
+[data-style="notion"][data-mode="dark"] {
+  --bg-0: #191919;
+  --bg-1: #202020;
+  --bg-2: #2a2a2a;
+  --bg-3: #333333;
+  --text-0: #e9e9e7;
+  --text-1: #b8b8b6;
+  --text-2: #82817e;
+  --border: #333333;
+  --code-bg: #2a2a2a;
+  --font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --radius-sm: 4px; --radius-md: 6px; --radius-lg: 10px;
+}
+
+/* ---------- Nothing-inspired — monochrome, dot-matrix, red accent ---------- */
+[data-style="nothing"] {
+  --bg-0: #050505;
+  --bg-1: #0e0e0e;
+  --bg-2: #191919;
+  --bg-3: #262626;
+  --text-0: #f5f5f5;
+  --text-1: #c9c9c9;
+  --text-2: #7a7a7a;
+  --border: #2a2a2a;
+  --code-bg: #121212;
+  --accent: #e63c2f;
+  --accent-hover: #ff4c3c;
+  --accent-soft: rgba(230, 60, 47, 0.16);
+  --font-ui: 'DotGothic16', var(--font-mono);
+  --font-editor: 'DotGothic16', var(--font-mono);
+  --radius-sm: 2px; --radius-md: 3px; --radius-lg: 4px;
+}
+
+/* ---------- Glass — iOS-26-style frosted translucency ---------- */
+[data-style="glass"] {
+  --panel-blur: blur(22px) saturate(180%);
+  --shadow-md: 0 8px 32px rgba(0,0,0,0.14);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.22);
+}
+[data-style="glass"][data-glass-shade="clear"] {
+  --bg-0: rgba(255,255,255,0.62);
+  --bg-1: rgba(255,255,255,0.48);
+  --bg-2: rgba(255,255,255,0.65);
+  --bg-3: rgba(255,255,255,0.8);
+  --text-0: #1c1c22;
+  --text-1: #45454f;
+  --text-2: #7a7a86;
+  --border: rgba(255,255,255,0.5);
+  --code-bg: rgba(255,255,255,0.55);
+  --page-bg: linear-gradient(135deg, #d7e0ff 0%, #f3d9f5 45%, #ffe4d6 100%);
+}
+[data-style="glass"][data-glass-shade="dark"] {
+  --bg-0: rgba(20,20,26,0.55);
+  --bg-1: rgba(20,20,26,0.42);
+  --bg-2: rgba(30,30,38,0.6);
+  --bg-3: rgba(40,40,50,0.72);
+  --text-0: #f2f2f6;
+  --text-1: #cfcfda;
+  --text-2: #93939f;
+  --border: rgba(255,255,255,0.1);
+  --code-bg: rgba(10,10,14,0.5);
+  --page-bg: linear-gradient(135deg, #14141c 0%, #1c1424 45%, #201418 100%);
+}
