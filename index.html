@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nodalis — your knowledge, connected</title>
+<meta name="description" content="Nodalis is a local-first, offline-capable notes, canvas and knowledge-graph app inspired by Obsidian and AFFiNE.">
+<meta name="theme-color" content="#6c5ce7">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/themes.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body data-theme="auto">
+<div id="app" class="app">
+
+  <header class="topbar">
+    <button id="btn-toggle-sidebar" class="icon-btn only-mobile-tablet" title="Toggle sidebar" aria-label="Toggle sidebar">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="brand">
+      <img src="icons/icon.svg" alt="" class="brand-logo">
+      <span class="brand-name">Nodalis</span>
+    </div>
+    <button id="btn-search" class="search-trigger" title="Search (Ctrl+K)">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <span>Search or jump to…</span>
+      <kbd>Ctrl K</kbd>
+    </button>
+    <div class="topbar-actions">
+      <button id="btn-view-editor" class="icon-btn view-tab active" data-view="editor" title="Editor">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      </button>
+      <button id="btn-view-graph" class="icon-btn view-tab" data-view="graph" title="Graph view">
+        <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="7" r="2.5"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="17" r="2.5"/><path d="M8 7l8 -0.5M7.5 8.5l7 7.5M15.5 8.5l-6.5 7.5"/></svg>
+      </button>
+      <button id="btn-view-canvas" class="icon-btn view-tab" data-view="canvas" title="Canvas / whiteboard">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 14l5-4 4 3 4-5 5 4"/></svg>
+      </button>
+      <button id="btn-view-database" class="icon-btn view-tab" data-view="database" title="Database / table / kanban">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4"/><rect x="3" y="10" width="18" height="4"/><rect x="3" y="16" width="18" height="4"/></svg>
+      </button>
+      <button id="btn-theme" class="icon-btn" title="Toggle theme">
+        <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 109 9 7 7 0 01-9-9z"/></svg>
+      </button>
+      <button id="btn-install" class="icon-btn hidden" title="Install app">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>
+      </button>
+      <button id="btn-toggle-right" class="icon-btn only-desktop" title="Toggle right panel">
+        <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z"/><path d="M15 3v18"/></svg>
+      </button>
+      <button id="btn-settings" class="icon-btn" title="Settings" data-view="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.9 2.9l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.9-2.9l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.9-2.9l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.9 2.9l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1h.1a2 2 0 010 4h-.1a1.7 1.7 0 00-1.6 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="app-body">
+
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-actions">
+        <button id="btn-new-note" class="btn btn-primary btn-block">+ New note</button>
+        <div class="sidebar-actions-row">
+          <button id="btn-new-folder" class="btn btn-ghost" title="New folder">📁+</button>
+          <button id="btn-new-canvas" class="btn btn-ghost" title="New canvas">🖼️+</button>
+          <button id="btn-daily-note" class="btn btn-ghost" title="Today's daily note">🗓️</button>
+        </div>
+      </div>
+      <div class="sidebar-section-tabs">
+        <button class="sidebar-tab active" data-tab="files">Files</button>
+        <button class="sidebar-tab" data-tab="tags">Tags</button>
+        <button class="sidebar-tab" data-tab="canvases">Canvases</button>
+      </div>
+      <div id="sidebar-files" class="sidebar-panel active">
+        <div id="file-tree" class="file-tree"></div>
+      </div>
+      <div id="sidebar-tags" class="sidebar-panel">
+        <div id="tag-list" class="tag-list"></div>
+      </div>
+      <div id="sidebar-canvases" class="sidebar-panel">
+        <div id="canvas-list" class="canvas-list"></div>
+      </div>
+      <div class="sidebar-footer">
+        <div id="sync-status" class="sync-status" title="Sync status">
+          <span class="sync-dot"></span><span class="sync-label">Local only</span>
+        </div>
+      </div>
+    </aside>
+
+    <main id="main-view" class="main-view">
+
+      <section id="view-editor" class="view active">
+        <div class="editor-toolbar">
+          <input id="note-title-input" class="note-title-input" placeholder="Untitled" />
+          <div class="editor-toolbar-actions">
+            <button id="btn-toggle-preview" class="btn btn-ghost small" title="Toggle live preview">Preview</button>
+            <button id="btn-toggle-split" class="btn btn-ghost small only-desktop-tablet" title="Split view">Split</button>
+            <button id="btn-delete-note" class="btn btn-ghost small danger" title="Delete note">Delete</button>
+          </div>
+        </div>
+        <div id="editor-split" class="editor-split mode-split">
+          <textarea id="note-editor" class="note-editor" placeholder="Start writing… use [[Note Name]] to link, #tag to tag." spellcheck="false"></textarea>
+          <div id="note-preview" class="note-preview"></div>
+        </div>
+        <div id="empty-state" class="empty-state hidden">
+          <p>Select a note from the sidebar, or create a new one to get started.</p>
+        </div>
+      </section>
+
+      <section id="view-graph" class="view">
+        <div class="view-header">
+          <h2>Knowledge graph</h2>
+          <div class="view-header-actions">
+            <button id="btn-graph-reset" class="btn btn-ghost small">Reset view</button>
+          </div>
+        </div>
+        <canvas id="graph-canvas" class="graph-canvas"></canvas>
+      </section>
+
+      <section id="view-canvas" class="view">
+        <div class="view-header">
+          <select id="canvas-select" class="canvas-select"></select>
+          <div class="view-header-actions">
+            <button id="btn-canvas-add-card" class="btn btn-ghost small">+ Card</button>
+            <button id="btn-canvas-add-sticky" class="btn btn-ghost small">+ Sticky</button>
+            <button id="btn-canvas-add-shape" class="btn btn-ghost small">+ Shape</button>
+            <button id="btn-canvas-zoom-reset" class="btn btn-ghost small">Reset zoom</button>
+          </div>
+        </div>
+        <div id="canvas-board" class="canvas-board">
+          <div id="canvas-board-inner" class="canvas-board-inner"></div>
+        </div>
+      </section>
+
+      <section id="view-database" class="view">
+        <div class="view-header">
+          <div class="db-controls">
+            <select id="db-scope" class="db-scope"></select>
+            <div class="db-mode-toggle">
+              <button class="db-mode-btn active" data-mode="table">Table</button>
+              <button class="db-mode-btn" data-mode="kanban">Kanban</button>
+            </div>
+            <select id="db-group-by" class="db-group-by"></select>
+          </div>
+        </div>
+        <div id="database-container" class="database-container"></div>
+      </section>
+
+      <section id="view-settings" class="view">
+        <div class="view-header"><h2>Settings</h2></div>
+        <div id="settings-container" class="settings-container"></div>
+      </section>
+
+    </main>
+
+    <aside id="right-panel" class="right-panel">
+      <div class="right-panel-tabs">
+        <button class="right-tab active" data-rtab="backlinks">Backlinks</button>
+        <button class="right-tab" data-rtab="outline">Outline</button>
+        <button class="right-tab" data-rtab="properties">Properties</button>
+      </div>
+      <div id="right-backlinks" class="right-tab-panel active"></div>
+      <div id="right-outline" class="right-tab-panel"></div>
+      <div id="right-properties" class="right-tab-panel"></div>
+    </aside>
+
+  </div>
+
+  <nav id="mobile-nav" class="mobile-nav">
+    <button class="mobile-nav-btn active" data-view="editor"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Notes</span></button>
+    <button class="mobile-nav-btn" data-mobile-action="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><span>Search</span></button>
+    <button class="mobile-nav-btn" data-view="graph"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="7" r="2.5"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="17" r="2.5"/></svg><span>Graph</span></button>
+    <button class="mobile-nav-btn" data-view="canvas"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/></svg><span>Canvas</span></button>
+    <button class="mobile-nav-btn" data-mobile-action="more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>More</span></button>
+  </nav>
+
+</div>
+
+<div id="modal-backdrop" class="modal-backdrop hidden"></div>
+
+<div id="command-palette" class="palette hidden" role="dialog" aria-label="Command palette">
+  <input id="palette-input" class="palette-input" placeholder="Type a command or search notes…" />
+  <div id="palette-results" class="palette-results"></div>
+</div>
+
+<div id="quick-switcher" class="palette hidden" role="dialog" aria-label="Quick switcher">
+  <input id="switcher-input" class="palette-input" placeholder="Jump to note…" />
+  <div id="switcher-results" class="palette-results"></div>
+</div>
+
+<div id="mobile-more-sheet" class="bottom-sheet hidden">
+  <button data-view="database">📊 Database / Kanban</button>
+  <button data-view="settings">⚙️ Settings</button>
+  <button id="sheet-daily-note">🗓️ Today's daily note</button>
+  <button id="sheet-new-folder">📁 New folder</button>
+  <button id="sheet-new-canvas">🖼️ New canvas</button>
+  <button id="sheet-toggle-right">📌 Backlinks / Outline</button>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
