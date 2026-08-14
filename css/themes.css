@@ -1,0 +1,505 @@
+/* =========================================================================
+ * Nodalis — themes.css
+ * Four complete themes. Each defines the same colour contract:
+ *
+ *   --bg-canvas   the page behind everything
+ *   --bg-0..3     surfaces, ascending in prominence
+ *   --text-0..3   primary -> disabled
+ *   --border, --border-strong
+ *   --accent, --accent-hover, --accent-soft, --accent-on
+ *
+ * Anything a theme does not set inherits the token defaults, so a partial
+ * theme can never leave the UI unreadable.
+ * ========================================================================= */
+
+/* =========================================================================
+ * 1. NODALIS — the default. Warm paper in light, ink-blue depth in dark.
+ * ========================================================================= */
+
+[data-style='nodalis'][data-mode='light'] {
+  --accent: #6c5ce7;
+  --accent-hover: #5a4bd6;
+  --accent-soft: rgba(108, 92, 231, 0.14);
+  --bg-canvas: #f6f2e9;
+  --bg-0: #fffdf8;
+  --bg-1: #faf6ed;
+  --bg-2: #f2ecdf;
+  --bg-3: #e8e0cd;
+  --text-0: #241f18;
+  --text-1: #4a4438;
+  --text-2: #7d7561;
+  --text-3: #a89e88;
+  --border: #e5dcc7;
+  --border-strong: #d3c7ab;
+  --code-bg: #f2ecdc;
+  --code-text: #7a3e2f;
+  --accent-on: #ffffff;
+  --shadow-color: 38 30% 30%;
+  --selection-bg: color-mix(in srgb, var(--accent) 22%, transparent);
+  --mark-bg: #ffe9a8;
+  --mark-text: #4a3a10;
+}
+
+[data-style='nodalis'][data-mode='dark'] {
+  --accent: #6c5ce7;
+  --accent-hover: #5a4bd6;
+  --accent-soft: rgba(108, 92, 231, 0.14);
+  --bg-canvas: #101018;
+  --bg-0: #16161f;
+  --bg-1: #1c1c27;
+  --bg-2: #242431;
+  --bg-3: #2f2f3e;
+  --text-0: #f2f2f8;
+  --text-1: #c6c6d4;
+  --text-2: #8b8b9e;
+  --text-3: #62627a;
+  --border: #2b2b3a;
+  --border-strong: #3d3d50;
+  --code-bg: #1e1e2b;
+  --code-text: #f0a893;
+  --accent-on: #ffffff;
+  --shadow-color: 240 40% 3%;
+  --selection-bg: color-mix(in srgb, var(--accent) 34%, transparent);
+  --mark-bg: #5c4a17;
+  --mark-text: #ffeab8;
+}
+
+/* A faint warm paper grain — the thing that stops light mode reading as "white div". */
+body[data-style='nodalis'][data-mode='light']::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(196, 168, 108, 0.10) 0, transparent 42%),
+    radial-gradient(circle at 82% 78%, rgba(178, 148, 190, 0.08) 0, transparent 46%);
+}
+body[data-style='nodalis'][data-mode='dark']::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--accent) 12%, transparent) 0, transparent 40%),
+    radial-gradient(circle at 88% 92%, rgba(60, 120, 190, 0.10) 0, transparent 44%);
+}
+
+/* =========================================================================
+ * 2. NOTION — quiet, near-neutral, hairline borders, almost no elevation.
+ * ========================================================================= */
+
+[data-style='notion'] { --font-ui: var(--font-inter); --font-display: var(--font-inter); }
+
+[data-style='notion'][data-mode='light'] {
+  --accent: #2f7cd6;
+  --accent-hover: #2569b8;
+  --accent-soft: rgba(47, 124, 214, 0.13);
+  --bg-canvas: #ffffff;
+  --bg-0: #ffffff;
+  --bg-1: #f7f7f5;
+  --bg-2: #efeeec;
+  --bg-3: #e6e4e0;
+  --text-0: #37352f;
+  --text-1: #5f5b53;
+  --text-2: #918d87;
+  --text-3: #b4b0a9;
+  --border: #eae9e6;
+  --border-strong: #dcdad5;
+  --code-bg: #f4f3f1;
+  --code-text: #c0533f;
+  --accent-on: #ffffff;
+  --shadow-color: 40 6% 40%;
+  --mark-bg: #fdecc8;
+  --mark-text: #402c1b;
+  --r-xs: 3px; --r-sm: 4px; --r-md: 6px; --r-lg: 8px; --r-xl: 12px;
+}
+
+[data-style='notion'][data-mode='dark'] {
+  --accent: #2f7cd6;
+  --accent-hover: #2569b8;
+  --accent-soft: rgba(47, 124, 214, 0.13);
+  --bg-canvas: #191919;
+  --bg-0: #1f1f1f;
+  --bg-1: #252525;
+  --bg-2: #2d2d2d;
+  --bg-3: #383838;
+  --text-0: #ededeb;
+  --text-1: #bcbbb8;
+  --text-2: #8a8987;
+  --text-3: #66655f;
+  --border: #303030;
+  --border-strong: #3f3f3f;
+  --code-bg: #2a2a2a;
+  --code-text: #ff8f7d;
+  --accent-on: #ffffff;
+  --shadow-color: 0 0% 0%;
+  --mark-bg: #59452a;
+  --mark-text: #ffe3ae;
+  --r-xs: 3px; --r-sm: 4px; --r-md: 6px; --r-lg: 8px; --r-xl: 12px;
+}
+
+/* Notion's signature: elevation comes from borders, not shadows. */
+[data-style='notion'] {
+  --shadow-xs: none;
+  --shadow-sm: 0 1px 2px hsl(var(--shadow-color) / 0.06);
+  --shadow-md: 0 2px 8px hsl(var(--shadow-color) / 0.09);
+  --shadow-lg: 0 8px 24px hsl(var(--shadow-color) / 0.12);
+  --shadow-inset: none;
+}
+[data-style='notion'] .btn,
+[data-style='notion'] .field,
+[data-style='notion'] .icon-btn { box-shadow: none; }
+
+/* =========================================================================
+ * 3. NOTHING — monochrome, dot-matrix, one red. Following the real system:
+ *    no gradients, no shadows, no blur, no filled icons, hairline rules.
+ *    Red (#D71921) is reserved for state and emphasis, never decoration.
+ * ========================================================================= */
+
+[data-style='nothing'] {
+  --accent: #d71921;
+  --accent-hover: #f0242d;
+  --accent-soft: rgba(215, 25, 33, 0.12);
+  --accent-on: #ffffff;
+
+  --font-ui: var(--font-grotesk);
+  --font-display: var(--font-dot);
+  --font-editor: var(--font-grotesk);
+  --font-code: var(--font-mono);
+
+  --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 8px; --r-xl: 16px; --r-2xl: 16px; --r-pill: 999px;
+
+  /* the system has no elevation model — everything is flat and ruled */
+  --shadow-xs: none; --shadow-sm: none; --shadow-md: none;
+  --shadow-lg: none; --shadow-xl: none; --shadow-inset: none;
+
+  --tracking-caps: 0.14em;
+}
+
+[data-style='nothing'][data-mode='dark'] {
+  --bg-canvas: #000000;
+  --bg-0: #000000;
+  --bg-1: #0a0a0a;
+  --bg-2: #141414;
+  --bg-3: #1e1e1e;
+  --text-0: #ffffff;
+  --text-1: #e6e6e6;
+  --text-2: #999999;
+  --text-3: #666666;
+  --border: #262626;
+  --border-strong: #3d3d3d;
+  --code-bg: #0f0f0f;
+  --code-text: #ffffff;
+  --dot-color: rgba(255, 255, 255, 0.10);
+  --mark-bg: rgba(215, 25, 33, 0.28);
+  --mark-text: #ffffff;
+}
+
+[data-style='nothing'][data-mode='light'] {
+  --bg-canvas: #f5f4f1;
+  --bg-0: #ffffff;
+  --bg-1: #faf9f7;
+  --bg-2: #f0efec;
+  --bg-3: #e4e2de;
+  --text-0: #0a0a0a;
+  --text-1: #262626;
+  --text-2: #6b6b6b;
+  --text-3: #9a9a9a;
+  --border: #dedcd7;
+  --border-strong: #c4c1ba;
+  --code-bg: #f2f1ee;
+  --code-text: #0a0a0a;
+  --dot-color: rgba(0, 0, 0, 0.09);
+  --mark-bg: rgba(215, 25, 33, 0.16);
+  --mark-text: #0a0a0a;
+}
+
+/* The dot matrix. It sits behind content on the canvas, never on panels. */
+[data-style='nothing'] .main-view,
+[data-style='nothing'] .view-body,
+body[data-style='nothing'] {
+  background-image: radial-gradient(var(--dot-color) 1px, transparent 1.1px);
+  background-size: 14px 14px;
+  background-position: 0 0;
+}
+[data-style='nothing'] .topbar,
+[data-style='nothing'] .sidebar,
+[data-style='nothing'] .right-panel,
+[data-style='nothing'] .mobile-nav,
+[data-style='nothing'] .panel,
+[data-style='nothing'] .sheet,
+[data-style='nothing'] .modal { background-image: none; }
+
+/* Hero numerals and headings use the dot font — this is the Nothing signature. */
+[data-style='nothing'] .brand-name,
+[data-style='nothing'] .stat-value,
+[data-style='nothing'] .streak-count,
+[data-style='nothing'] .loader-word,
+[data-style='nothing'] h1,
+[data-style='nothing'] .note-title-input {
+  font-family: var(--font-dot);
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+
+/* Labels are mono, uppercase, widely tracked. */
+[data-style='nothing'] .section-label,
+[data-style='nothing'] .sidebar-tab,
+[data-style='nothing'] .field-label,
+[data-style='nothing'] .kbd,
+[data-style='nothing'] .chip,
+[data-style='nothing'] .tab {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-size: var(--text-xs);
+}
+
+[data-style='nothing'] .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+[data-style='nothing'] .glass-only { display: none !important; }
+
+/* =========================================================================
+ * 4. GLASS — iOS 26 Liquid Glass.
+ *    Real translucency: blurred + saturated backdrop, a bright specular
+ *    top edge, a darker bottom edge for thickness, and a soft outer shadow
+ *    that lifts the panel off the wallpaper. Where backdrop-filter is
+ *    unavailable we fall back to opaque surfaces rather than muddy ones.
+ * ========================================================================= */
+
+[data-style='glass'] {
+  --glass-blur: 28px;
+  --glass-saturate: 1.9;
+  --glass-brightness: 1.06;
+  --shadow-color: 235 40% 20%;
+  --shadow-md: 0 6px 24px hsl(var(--shadow-color) / 0.13);
+  --shadow-lg: 0 18px 48px hsl(var(--shadow-color) / 0.20);
+  --shadow-xl: 0 32px 80px hsl(var(--shadow-color) / 0.28);
+  --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 22px; --r-xl: 28px; --r-2xl: 36px;
+}
+
+[data-style='glass'][data-glass-intensity='subtle'] { --glass-blur: 16px; --glass-saturate: 1.4; }
+[data-style='glass'][data-glass-intensity='vivid']  { --glass-blur: 40px; --glass-saturate: 2.4; }
+
+[data-style='glass'][data-mode='light'] {
+  --accent: #6c5ce7;
+  --accent-hover: #5a4bd6;
+  --accent-soft: rgba(108, 92, 231, 0.14);
+  --bg-canvas: #cfd9f2;
+  --bg-0: rgba(255, 255, 255, 0.42);
+  --bg-1: rgba(255, 255, 255, 0.28);
+  --bg-2: rgba(255, 255, 255, 0.50);
+  --bg-3: rgba(255, 255, 255, 0.68);
+  --text-0: #14141c;
+  --text-1: #3c3c4a;
+  --text-2: #6e6e80;
+  --text-3: #9a9aac;
+  --border: rgba(255, 255, 255, 0.55);
+  --border-strong: rgba(255, 255, 255, 0.85);
+  --code-bg: rgba(255, 255, 255, 0.5);
+  --code-text: #a63c28;
+  --accent-on: #ffffff;
+  --glass-tint: rgba(255, 255, 255, 0.16);
+  --glass-edge: rgba(255, 255, 255, 0.9);
+  --glass-edge-low: rgba(120, 130, 170, 0.22);
+  --glass-specular: rgba(255, 255, 255, 0.75);
+  --mark-bg: rgba(255, 224, 130, 0.7);
+  --mark-text: #3f3110;
+}
+
+[data-style='glass'][data-mode='dark'] {
+  --accent: #6c5ce7;
+  --accent-hover: #5a4bd6;
+  --accent-soft: rgba(108, 92, 231, 0.14);
+  --bg-canvas: #090a11;
+  --bg-0: rgba(26, 26, 38, 0.40);
+  --bg-1: rgba(20, 20, 30, 0.30);
+  --bg-2: rgba(38, 38, 54, 0.48);
+  --bg-3: rgba(54, 54, 74, 0.60);
+  --text-0: #f4f4fa;
+  --text-1: #cfcfdd;
+  --text-2: #9494a8;
+  --text-3: #6b6b80;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.24);
+  --code-bg: rgba(10, 10, 16, 0.5);
+  --code-text: #ffab95;
+  --accent-on: #ffffff;
+  --glass-tint: rgba(255, 255, 255, 0.05);
+  --glass-edge: rgba(255, 255, 255, 0.34);
+  --glass-edge-low: rgba(0, 0, 0, 0.4);
+  --glass-specular: rgba(255, 255, 255, 0.30);
+  --mark-bg: rgba(255, 196, 90, 0.28);
+  --mark-text: #ffe7bd;
+}
+
+/* The wallpaper the glass refracts. Slow, ambient, never distracting. */
+body[data-style='glass']::before {
+  content: '';
+  position: fixed; inset: -20%;
+  z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(46% 52% at 16% 20%, color-mix(in srgb, var(--accent) 78%, transparent) 0%, transparent 66%),
+    radial-gradient(44% 50% at 84% 16%, rgba(72, 190, 255, 0.72) 0%, transparent 64%),
+    radial-gradient(52% 56% at 74% 86%, rgba(255, 122, 168, 0.62) 0%, transparent 68%),
+    radial-gradient(46% 46% at 20% 84%, rgba(126, 250, 205, 0.55) 0%, transparent 64%),
+    radial-gradient(38% 40% at 50% 50%, rgba(255, 214, 140, 0.40) 0%, transparent 70%);
+  filter: blur(34px);
+  opacity: 0.95;
+  animation: glass-drift 42s var(--ease-in-out) infinite alternate;
+}
+body[data-style='glass'][data-mode='dark']::before { opacity: 0.62; }
+body[data-style='glass'][data-ambient='off']::before { animation: none; }
+
+@keyframes glass-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  33%  { transform: translate3d(-3%, 2.5%, 0) scale(1.06); }
+  66%  { transform: translate3d(2.5%, -2%, 0) scale(1.03); }
+  100% { transform: translate3d(-1.5%, -3%, 0) scale(1.08); }
+}
+
+/* The app shell must not sit on top of the wallpaper, or the panels would be
+   blurring a flat colour instead of the scene behind them. Everything that is
+   only a container becomes transparent; only real surfaces carry a fill. */
+[data-style='glass'] .app,
+[data-style='glass'] .app-body,
+[data-style='glass'] .main-view,
+[data-style='glass'] .view,
+[data-style='glass'] .view-body,
+[data-style='glass'] .editor-surface,
+[data-style='glass'] .split-editor,
+[data-style='glass'] .split-preview,
+[data-style='glass'] .canvas-wrap,
+[data-style='glass'] .graph-wrap,
+[data-style='glass'] .sidebar-body,
+[data-style='glass'] .right-body {
+  background: transparent;
+}
+
+/* Content sits on its own faint sheet so long text stays readable over the
+   wallpaper, without going fully opaque and killing the effect. */
+[data-style='glass'] .editor-surface,
+[data-style='glass'] .view-body {
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.42)) saturate(1.3) brightness(1.02);
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.42)) saturate(1.3) brightness(1.02);
+  background: color-mix(in srgb, var(--bg-0) 40%, transparent);
+}
+
+/* The header, foot and dividers read as thin glass ledges. */
+[data-style='glass'] .editor-head,
+[data-style='glass'] .editor-foot,
+[data-style='glass'] .view-header,
+[data-style='glass'] .sidebar-head,
+[data-style='glass'] .sidebar-tabs,
+[data-style='glass'] .sidebar-foot,
+[data-style='glass'] .right-tabs {
+  background: transparent;
+  border-color: var(--border);
+}
+
+/* Glass is a light material: text needs a touch more weight to hold up on it. */
+[data-style='glass'] .prose,
+[data-style='glass'] .note-editor { color: var(--text-0); }
+[data-style='glass'][data-mode='light'] .prose { text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
+
+/* --- the material itself ------------------------------------------------ */
+
+[data-style='glass'] .glass,
+[data-style='glass'] .topbar,
+[data-style='glass'] .sidebar,
+[data-style='glass'] .right-panel,
+[data-style='glass'] .mobile-nav,
+[data-style='glass'] .panel,
+[data-style='glass'] .modal,
+[data-style='glass'] .sheet,
+[data-style='glass'] .menu,
+[data-style='glass'] .palette,
+[data-style='glass'] .toast,
+[data-style='glass'] .sticky-note,
+[data-style='glass'] .kanban-col,
+[data-style='glass'] .card {
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
+  background-color: var(--bg-0);
+  background-image: linear-gradient(160deg, var(--glass-tint) 0%, transparent 46%);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-edge),
+    inset 0 -1px 0 0 var(--glass-edge-low),
+    var(--shadow-lg);
+  position: relative;
+}
+
+/* Specular sheen: a thin bright arc across the top-left corner, exactly
+   where a curved glass edge would catch the light. */
+[data-style='glass'] .glass::after,
+[data-style='glass'] .panel::after,
+[data-style='glass'] .modal::after,
+[data-style='glass'] .palette::after,
+[data-style='glass'] .sheet::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(135deg, var(--glass-specular) 0%, transparent 22%, transparent 78%, color-mix(in srgb, var(--glass-specular) 40%, transparent) 100%);
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+}
+
+[data-style='glass'] .btn,
+[data-style='glass'] .field,
+[data-style='glass'] .icon-btn,
+[data-style='glass'] .chip {
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  background-color: var(--bg-1);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 0 var(--glass-edge);
+}
+[data-style='glass'] .btn-primary {
+  background-color: color-mix(in srgb, var(--accent) 88%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 60%, white 40%);
+  color: var(--accent-on);
+}
+
+/* Interactive glass reacts like a physical surface. */
+[data-style='glass'] .btn:active,
+[data-style='glass'] .icon-btn:active { --glass-brightness: 0.94; transform: scale(0.97); }
+
+/* Honest fallback: no backdrop-filter means opaque panels, not smeared ones. */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  [data-style='glass'][data-mode='light'] {
+    --bg-0: #f4f5fb; --bg-1: #eceef7; --bg-2: #ffffff; --bg-3: #ffffff;
+    --border: #dcdfee;
+  }
+  [data-style='glass'][data-mode='dark'] {
+    --bg-0: #1b1c26; --bg-1: #16171f; --bg-2: #24252f; --bg-3: #2f3040;
+    --border: #303243;
+  }
+  body[data-style='glass']::before { filter: blur(60px); opacity: 0.35; }
+}
+
+/* =========================================================================
+ * Shared theme polish
+ * ========================================================================= */
+
+::selection { background: var(--selection-bg, color-mix(in srgb, var(--accent) 26%, transparent)); color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* Colour-scheme hint so native controls (scrollbars, date pickers) match. */
+[data-mode='dark'] { color-scheme: dark; }
+[data-mode='light'] { color-scheme: light; }
+
+/* Scrollbars, themed rather than default. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--r-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: content-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
