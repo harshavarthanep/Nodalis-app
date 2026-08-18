@@ -645,98 +645,163 @@ body[data-style='nothing']::before {
   --mark-text: #fde68a;
 }
 
-/* --- 5. AURORA — deep and colourful, with a slow wash. No blur anywhere. -- */
+/* =========================================================================
+ * NODALIS — "SCHEMATIC" THEME  (replaces the old AURORA theme)
+ * -------------------------------------------------------------------------
+ * Matches the Nodalis waiting-list site exactly: cream paper + hard ink
+ * rules in light, pure black + white rules in dark. Monospace everywhere,
+ * sharp 5px corners, no elevation — the page is drawn, not floated.
+ *
+ * The theme KEY stays 'aurora' on purpose, so every existing reference
+ * (settings, commands, saved preferences, the RETIRED glass->aurora alias)
+ * keeps working. Only the look changes. See INSTALL.md step 1b to rename
+ * the visible label from "Aurora" to "Schematic".
+ *
+ * WHERE THIS GOES
+ * Replace the whole block that starts at:
+ *     /* --- 5. AURORA — deep and colourful, with a slow wash. ... --- *\/
+ * and ends immediately BEFORE:
+ *     /* --- 6. TERMINAL — monospace, phosphor, ... --- *\/
+ * That old block also contains  body[data-style='aurora']::before,
+ * @keyframes aurora-drift  and a prefers-reduced-motion rule — delete all
+ * of them; everything needed is re-declared below.
+ * ========================================================================= */
+
+/* --- 5. SCHEMATIC — drawn, not floated. Paper, ink and a blueprint grid. -- */
 
 [data-style='aurora'] {
-  --r-xs: 6px; --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 24px; --r-2xl: 30px;
+  /* Sharp corners. The waiting-list site uses a single 5px radius. */
+  --r-xs: 3px; --r-sm: 4px; --r-md: 5px; --r-lg: 5px;
+  --r-xl: 6px; --r-2xl: 8px; --r-pill: 999px;
+
+  /* Monospace for everything, one geometric face for headlines.
+     (Terminal already sets a mono editor, so this is an established
+     convention in the app rather than a new one.) */
+  --font-ui: var(--font-mono);
+  --font-editor: var(--font-mono);
+  --font-code: var(--font-mono);
   --font-display: var(--font-grotesk);
+
+  /* No elevation model at all — depth comes from rules, not shadows. */
+  --shadow-xs: none; --shadow-sm: none; --shadow-md: none;
+  --shadow-lg: none; --shadow-xl: none; --shadow-inset: none;
+
+  --tracking-caps: 0.11em;
 }
 
+/* ---------------------------- LIGHT ------------------------------------- */
 [data-style='aurora'][data-mode='light'] {
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-soft: rgba(124, 58, 237, 0.12);
+  --accent: #6c5ce7;
+  --accent-hover: #5a4bd6;
+  --accent-soft: rgba(108, 92, 231, 0.14);
   --accent-on: #ffffff;
-  --bg-canvas: #eef0fb;
-  --bg-0: #ffffff;
-  --bg-panel: #ffffff;
-  --bg-1: #f6f5ff;
-  --bg-2: #eeecfd;
-  --bg-3: #ddd9f8;
-  --bg-editor: #ffffff;
-  --text-0: #1a1035;
-  --text-1: #3d3163;
-  --text-2: #6c5f92;
-  --text-3: #7a6f96;
-  --border: #e3dffa;
-  --border-strong: #cdc5f0;
-  --code-bg: #f2effd;
-  --code-text: #ab2f6d;
-  --shadow-color: 262 40% 40%;
-  --mark-bg: #ffe4a3;
-  --mark-text: #46300a;
-  /* Derived from the accent, so choosing a colour changes the whole scene
-     rather than only the buttons. */
-  --aurora-1: color-mix(in srgb, var(--accent) 18%, transparent);
-  --aurora-2: color-mix(in srgb, var(--accent) 12%, rgba(56, 189, 248, 0.14));
-  --aurora-3: color-mix(in srgb, var(--accent) 10%, rgba(244, 114, 182, 0.12));
+
+  --bg-canvas: #f2efe6;   /* the cream page */
+  --bg-0:      #f2efe6;
+  --bg-panel:  #eeeade;   /* sidebar / right panel, a shade down from canvas */
+  --bg-1:      #e9e5d8;   /* hover */
+  --bg-2:      #e2ddcd;   /* active / selected */
+  --bg-3:      #d9d3c0;
+  --bg-editor: #ffffff;   /* the writing surface is the white .box */
+
+  --text-0: #12100b;      /* ink */
+  --text-1: #3a3730;
+  --text-2: #6b6555;      /* muted */
+  --text-3: #8e8877;
+
+  --border:        #cfc9b8;  /* hairline */
+  --border-strong: #12100b;  /* the signature hard ink rule */
+
+  --code-bg:   #ffffff;
+  --code-text: #12100b;
+
+  --shadow-color: rgba(18, 16, 11, 0.18);
+
+  --mark-bg:   #fff3a3;
+  --mark-text: #12100b;
 }
 
+/* ---------------------------- DARK -------------------------------------- */
 [data-style='aurora'][data-mode='dark'] {
-  --accent: #a78bfa;
-  --accent-hover: #9575f5;
-  --accent-soft: rgba(167, 139, 250, 0.18);
-  --accent-on: #16092e;
-  --bg-canvas: #0a0616;
-  --bg-0: #150e28;
-  --bg-panel: #150e28;
-  --bg-1: #1b1233;
-  --bg-2: #241941;
-  --bg-3: #322353;
-  --bg-editor: #100a20;
-  --text-0: #f2ecff;
-  --text-1: #cfc4e8;
-  --text-2: #9b8dbb;
-  --text-3: #8d80ad;
-  --border: #2a1e47;
-  --border-strong: #3d2d63;
-  --code-bg: #180f2d;
-  --code-text: #ffa7d1;
-  --shadow-color: 265 70% 3%;
-  --mark-bg: rgba(255, 210, 120, 0.22);
-  --mark-text: #ffe0a3;
-  --aurora-1: color-mix(in srgb, var(--accent) 34%, transparent);
-  --aurora-2: color-mix(in srgb, var(--accent) 20%, rgba(56, 189, 248, 0.22));
-  --aurora-3: color-mix(in srgb, var(--accent) 16%, rgba(244, 114, 182, 0.20));
+  --accent: #8b7bf5;         /* lifted slightly so it reads on pure black */
+  --accent-hover: #9c8ef8;
+  --accent-soft: rgba(139, 123, 245, 0.18);
+  --accent-on: #0b0a14;
+
+  --bg-canvas: #000000;      /* true black, like the site's dark mode */
+  --bg-0:      #000000;
+  --bg-panel:  #070707;
+  --bg-1:      #0e0e0e;
+  --bg-2:      #151515;
+  --bg-3:      #1e1e1e;
+  --bg-editor: #000000;
+
+  --text-0: #f4f4f2;
+  --text-1: #d5d5d0;
+  --text-2: #9b9b93;
+  --text-3: #6f6f68;
+
+  --border:        #2a2a2a;
+  --border-strong: #f4f4f2;  /* white hard rule */
+
+  --code-bg:   #0a0a0a;
+  --code-text: #f4f4f2;
+
+  --shadow-color: rgba(0, 0, 0, 0.7);
+
+  --mark-bg:   #4a4520;
+  --mark-text: #ffe9a3;
 }
 
-/*
- * The wash. One fixed layer at z-index -1 — behind the app, never composited
- * against scrolling text, and no filter on it. It is a static gradient that
- * drifts; that costs one transform per frame and nothing else.
- */
-body[data-style='aurora']::before {
-  content: '';
-  position: fixed; inset: -20%;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(42% 46% at 16% 18%, var(--aurora-1) 0%, transparent 62%),
-    radial-gradient(40% 44% at 84% 22%, var(--aurora-2) 0%, transparent 60%),
-    radial-gradient(46% 50% at 70% 84%, var(--aurora-3) 0%, transparent 64%);
-  animation: aurora-drift 60s var(--ease-in-out) infinite alternate;
-}
-body[data-style='aurora'][data-ambient='off']::before { animation: none; }
-
-@keyframes aurora-drift {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(-2.5%, 2%, 0) scale(1.05); }
-  100% { transform: translate3d(2%, -2.5%, 0) scale(1.03); }
+/* -------------------------------------------------------------------------
+ * The blueprint grid.
+ *
+ * NOTE: this is painted on .main-view, not on body::before. The app's
+ * .main-view has its own opaque background (--bg-canvas), so a layer behind
+ * the body would never be visible. Painting the grid as a background-IMAGE
+ * on the same element layers it directly over that colour. It is a static
+ * image — no animation, no extra layer, nothing per frame.
+ * ------------------------------------------------------------------------- */
+[data-style='aurora'] .main-view {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 26px 26px;
+  background-position: -1px -1px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  body[data-style='aurora']::before { animation: none; }
+[data-style='aurora'][data-mode='light'] { --grid-line: rgba(18, 16, 11, 0.055); }
+[data-style='aurora'][data-mode='dark']  { --grid-line: rgba(244, 244, 242, 0.05); }
+
+/* Respect the app's own ambient switch: grid off when ambience is off. */
+body[data-style='aurora'][data-ambient='off'] .main-view { background-image: none; }
+
+/* -------------------------------------------------------------------------
+ * Headline treatment.
+ *
+ * .view-title and .empty-state-title are the app's real heading classes
+ * (verified against the running app). They already inherit --font-display,
+ * which this theme points at Space Grotesk; here we add the site's uppercase
+ * + tight-tracking treatment. The site sets headlines in a heavy condensed
+ * face, but the app embeds its fonts as base64 to stay fully offline and
+ * ships nothing above weight 700 — so 700 uppercase is the honest match
+ * rather than adding an external font request.
+ * ------------------------------------------------------------------------- */
+[data-style='aurora'] .view-title,
+[data-style='aurora'] .empty-state-title {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.005em;
 }
+
+/* The site's "// LABEL" eyebrow convention, on the app's view titles.
+   Delete this one rule if you would rather keep plain titles. */
+[data-style='aurora'] .view-title::before {
+  content: '// ';
+  color: var(--accent);
+  font-weight: 700;
+}
+
 
 /* --- 6. TERMINAL — monospace, phosphor, unapologetically high contrast. --- */
 
@@ -4845,6 +4910,133 @@ body[data-content-width='full']        { --content-max: 100%; }
 body[data-animations='reduced'] { --motion-scale: 0.5; }
 body[data-animations='none']    { --motion-scale: 0; }
 
+/* New Code   */
+
+/* =========================================================================
+ * NODALIS — MOTION TUNING  (optional, ~40 lines, drop-in)
+ * -------------------------------------------------------------------------
+ * READ THIS FIRST — it will save you time.
+ *
+ * Nodalis is ALREADY heavily animated. Auditing the source turned up:
+ *   - 52 @keyframes animations (view-slide, palette-in, modal-in, toast-in,
+ *     check-draw, confetti-fall, ripple, skeleton-sweep, row-settle, ...)
+ *   - 77 :hover rules, including lift-on-hover for cards
+ *   - press feedback already on buttons  (.btn:active { transform: scale(.975) })
+ *   - a full motion-scale system with a user-facing setting
+ *     (body[data-animations='reduced'|'none'])
+ *
+ * So adding a second animation library would DUPLICATE and FIGHT what is
+ * already there — two systems animating the same element is exactly how an
+ * app starts to feel janky. The high-leverage move instead is to retune the
+ * timing tokens every one of those 52 animations already reads from.
+ *
+ * Change these five numbers and the whole app gets faster at once.
+ *
+ * WHERE THIS GOES
+ *   Paste immediately BEFORE the FIRST closing style tag in index.html.
+ *   IMPORTANT: the file contains TWO occurrences of the closing style tag. The second
+ *   one is inside a JavaScript string (the print/export template) — pasting
+ *   there breaks the app and NODALIS never loads. Find the correct spot by
+ *   searching for:      body[data-animations='none']
+ *   The closing style tag a couple of lines below that is the right one.
+ * ========================================================================= */
+
+:root {
+  /* Snappier than stock. Stock is in the comment beside each value.
+     Interface motion under ~200ms reads as instant; above ~300ms it starts
+     to read as waiting. These pull the mid-range down without making the
+     app feel abrupt. */
+  --dur-instant: 70ms;    /* was  90ms */
+  --dur-fast:    120ms;   /* was 150ms */
+  --dur-base:    190ms;   /* was 240ms */
+  --dur-slow:    300ms;   /* was 380ms */
+  --dur-slower:  430ms;   /* was 560ms */
+
+  /* A touch more "arrival" on the easing: fast out of the gate, soft landing.
+     Applied to the token the app's own animations already use. */
+  --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-snap: cubic-bezier(0.2, 0.9, 0.22, 1);
+}
+
+/* -------------------------------------------------------------------------
+ * OPTIONAL: two extra speed presets, in the same style as the app's own
+ * data-animations switch. Set from the console or wire to a setting:
+ *     document.body.dataset.speed = 'turbo';     // very fast
+ *     document.body.dataset.speed = 'cinematic'; // slower, more deliberate
+ *     delete document.body.dataset.speed;        // back to the values above
+ * ------------------------------------------------------------------------- */
+body[data-speed='turbo'] {
+  --dur-instant: 50ms; --dur-fast: 90ms; --dur-base: 140ms;
+  --dur-slow: 210ms;   --dur-slower: 300ms;
+}
+body[data-speed='cinematic'] {
+  --dur-instant: 110ms; --dur-fast: 190ms; --dur-base: 300ms;
+  --dur-slow: 460ms;    --dur-slower: 680ms;
+}
+
+/* -------------------------------------------------------------------------
+ * The one thing genuinely missing: momentum on the scrollers, so long
+ * lists feel native on touch, plus a scroll-end snap for the sticky wall.
+ * ------------------------------------------------------------------------- */
+.sidebar, .main-view, .right-panel, .kbody {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;   /* stops a scroll at the end of a panel
+                                     from dragging the whole page with it */
+}
+
+/* =========================================================================
+ * RELATED NOTES panel  (styles for 03-related-notes.js)
+ * Uses only the app's own tokens, so it inherits every theme automatically —
+ * including the Schematic theme above.
+ * ========================================================================= */
+.related-panel {
+  border-top: 1px solid var(--border);
+  margin-top: var(--sp-4, 12px);
+  padding: var(--sp-4, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.related-head {
+  font-size: var(--text-xs, 11px);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps, 0.08em);
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+.related-empty {
+  font-size: var(--text-sm, 12.5px);
+  color: var(--text-3);
+  line-height: 1.6;
+}
+.related-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              transform var(--dur-instant) var(--ease-snap);
+}
+.related-item:hover { background: var(--bg-1); border-color: var(--border-strong); }
+.related-item:active { transform: translateY(1px); }
+.related-title {
+  font-size: var(--text-sm, 12.5px);
+  font-weight: 600;
+  color: var(--text-0);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.related-meta { font-size: 10.5px; color: var(--text-3); }
+  
+  
 </style>
 </head>
 
@@ -21443,7 +21635,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       { id: 'notion', name: 'Notion', colors: ['#f7f7f5', '#ffffff', '#37352f', '#eae9e6'] },
       { id: 'nothing', name: 'Nothing', colors: ['#0a0a0a', '#000000', '#d71921', '#262626'] },
       { id: 'slate', name: 'Slate', colors: ['#f1f3f7', '#ffffff', '#4f46e5', '#e2e6ef'] },
-      { id: 'aurora', name: 'Aurora', colors: ['#1b1233', '#150e28', '#a78bfa', '#322353'] },
+      { id: 'aurora', name: 'Schematic', colors: ['#f2efe6', '#ffffff', '#6c5ce7', '#12100b'] },
       { id: 'terminal', name: 'Terminal', colors: ['#0a0f12', '#070c0f', '#35d07f', '#1d282f'] },
     ].forEach(function (theme) {
       const card = el('button.theme-card' + (s().themeStyle === theme.id ? '.is-active' : ''), { type: 'button' });
@@ -25203,6 +25395,363 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   };
 })(window.NODALIS = window.NODALIS || {});
 
+// New Code
+
+/* =========================================================================
+ * Nodalis — features/related.js
+ * "Notes you have not linked yet."
+ *
+ * WHY THIS AND NOT SOMETHING ELSE
+ *
+ * Nodalis already shows you the links you MADE (backlinks, unlinked mentions,
+ * the graph). Nothing in it shows you the links you SHOULD have made. That is
+ * the gap this fills, and it is the difference between a graph that documents
+ * your thinking and a graph that adds to it: the vault gets more useful the
+ * more you write, instead of just bigger.
+ *
+ * HOW IT SCORES  (all local, no network, no dependencies)
+ *   term overlap   TF-IDF cosine over the note bodies. Rare shared words
+ *                  ("perovskite") count for far more than common ones
+ *                  ("project"), which is what makes the results feel smart.
+ *   tag overlap    a shared #tag is a deliberate signal, weighted above prose.
+ *   folder         same folder is a weak nudge, not a decision.
+ *   already linked EXCLUDED. If you already linked it, the Links panel has
+ *                  it covered and repeating it here is noise.
+ *
+ * PERFORMANCE
+ *   The index is built once, off the main thread's critical path (idle
+ *   callback), cached, and rebuilt at most once every few seconds after a
+ *   vault change. Scoring a note is then a walk over the posting lists of
+ *   only the terms that note contains — not a scan of the vault. This stays
+ *   responsive at the ~2,000 notes the graph is already built to handle.
+ *
+ * SAFETY
+ *   Every integration point is feature-detected. If an API it expects is
+ *   missing, the module logs once and no-ops — it can never take the app
+ *   down with it. app.js already wraps module init in try/catch as well.
+ * ========================================================================= */
+(function (N) {
+  'use strict';
+
+  const U = N && N.util;
+  if (!U || typeof U.el !== 'function') {
+    console.warn('[nodalis] related: util.el unavailable, feature disabled');
+    return;
+  }
+  const el = U.el;
+
+  const MAX_RESULTS   = 5;
+  const MIN_SCORE     = 0.045;  // below this the "match" is coincidence
+  const REBUILD_DEBOUNCE = 2500;
+
+  let index = null;       // { df: Map(term -> docCount), docs: Map(id -> Map(term -> tf)), n }
+  let building = false;
+  let rebuildTimer = null;
+  let mounted = null;     // the DOM node we own inside the right panel
+
+  /* ---------------------------------------------------------------- text */
+
+  // Deliberately small stopword list: enough to stop "the" dominating,
+  // short enough that domain words are never accidentally dropped.
+  const STOP = new Set(('a about above after again against all am an and any are as at be because been before being ' +
+    'below between both but by can cannot could did do does doing down during each few for from further had has have ' +
+    'having he her here hers him his how i if in into is it its itself just me more most my no nor not of off on once ' +
+    'only or other our out over own same she should so some such than that the their them then there these they this ' +
+    'those through to too under until up very was we were what when where which while who whom why will with you your ' +
+    'yours it\'s i\'m don\'t was were be been').split(/\s+/));
+
+  function titleOf(note) {
+    if (!note) return 'Untitled';
+    return note.title ||
+      String(note.path || '').split('/').pop().replace(/\.md$/i, '') ||
+      'Untitled';
+  }
+
+  function tokenize(text) {
+    if (!text) return [];
+    return String(text)
+      .toLowerCase()
+      // strip fenced code, inline code, urls and wiki/link syntax first —
+      // none of it is prose and all of it creates false matches
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`[^`]*`/g, ' ')
+      .replace(/https?:\/\/\S+/g, ' ')
+      .replace(/\[\[([^\]]*)\]\]/g, ' $1 ')
+      .replace(/[^a-z0-9À-ɏ'\s-]/g, ' ')
+      .split(/\s+/)
+      .filter(function (w) {
+        return w.length > 2 && w.length < 32 && !STOP.has(w) && !/^\d+$/.test(w);
+      });
+  }
+
+  function tagsOf(note) {
+    const out = new Set();
+    if (Array.isArray(note.tags)) note.tags.forEach(function (t) { out.add(String(t).toLowerCase()); });
+    // also pick up #tags written in the body
+    const body = String(note.content || '');
+    const m = body.match(/(^|\s)#([a-z0-9][\w/-]*)/gi);
+    if (m) m.forEach(function (raw) { out.add(raw.trim().replace(/^#/, '').toLowerCase()); });
+    return out;
+  }
+
+  function linkedIdsOf(note, byTitle) {
+    const out = new Set();
+    if (Array.isArray(note.links)) {
+      note.links.forEach(function (l) {
+        if (typeof l === 'string') {
+          const hit = byTitle.get(l.toLowerCase());
+          if (hit) out.add(hit);
+        } else if (l && l.id) out.add(l.id);
+      });
+    }
+    // wikilinks written in the body
+    const body = String(note.content || '');
+    let m;
+    const re = /\[\[([^\]|#]+)/g;
+    while ((m = re.exec(body)) !== null) {
+      const hit = byTitle.get(m[1].trim().toLowerCase());
+      if (hit) out.add(hit);
+    }
+    return out;
+  }
+
+  /* --------------------------------------------------------------- index */
+
+  function notesMap() {
+    return (N.store && N.store.state && N.store.state.notes) || null;
+  }
+
+  function buildIndex() {
+    const notes = notesMap();
+    if (!notes || building) return;
+    building = true;
+    try {
+      const df = new Map();
+      const docs = new Map();
+      const postings = new Map();   // term -> array of note ids (the inverted index)
+      notes.forEach(function (note, id) {
+        // the title is weighted by repeating it: a title match matters more
+        // than the same word buried in paragraph nine
+        const terms = tokenize((titleOf(note) + ' ').repeat(3) + (note.content || ''));
+        if (!terms.length) { docs.set(id, new Map()); return; }
+        const tf = new Map();
+        terms.forEach(function (t) { tf.set(t, (tf.get(t) || 0) + 1); });
+        tf.forEach(function (_, t) {
+          df.set(t, (df.get(t) || 0) + 1);
+          let list = postings.get(t);
+          if (!list) { list = []; postings.set(t, list); }
+          list.push(id);
+        });
+        docs.set(id, tf);
+      });
+      index = { df: df, docs: docs, postings: postings, n: docs.size };
+    } catch (err) {
+      console.warn('[nodalis] related: index build failed', err);
+      index = null;
+    } finally {
+      building = false;
+    }
+  }
+
+  function ensureIndex() {
+    if (index) return;
+    buildIndex();
+  }
+
+  function scheduleRebuild() {
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(function () {
+      index = null;
+      const idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 200); };
+      idle(function () { ensureIndex(); refresh(); });
+    }, REBUILD_DEBOUNCE);
+  }
+
+  /* --------------------------------------------------------------- score */
+
+  function weightsFor(id) {
+    const tf = index.docs.get(id);
+    if (!tf || !tf.size) return null;
+    const w = new Map();
+    let norm = 0;
+    tf.forEach(function (count, term) {
+      const d = index.df.get(term) || 1;
+      const idf = Math.log(1 + index.n / d);
+      const val = (1 + Math.log(count)) * idf;
+      w.set(term, val);
+      norm += val * val;
+    });
+    norm = Math.sqrt(norm) || 1;
+    return { w: w, norm: norm };
+  }
+
+  function related(noteId) {
+    ensureIndex();
+    const notes = notesMap();
+    if (!index || !notes) return [];
+    const self = notes.get(noteId);
+    if (!self) return [];
+
+    const base = weightsFor(noteId);
+    if (!base) return [];
+
+    const byTitle = new Map();
+    notes.forEach(function (n2, id) { byTitle.set(titleOf(n2).toLowerCase(), id); });
+    const linked = linkedIdsOf(self, byTitle);
+    const selfTags = tagsOf(self);
+
+    // Only consider notes that share at least one term, reached through the
+    // posting lists — never a full scan.
+    const candidates = new Map();
+    base.w.forEach(function (val, term) {
+      // Skip terms so common they carry no signal — but ONLY once the vault
+      // is big enough for "common" to mean anything. In a 3-note vault every
+      // shared word looks common, and filtering them all leaves nothing to
+      // match on, so small vaults skip this rule entirely.
+      if (index.n >= 25 && (index.df.get(term) || 0) > index.n * 0.5) return;
+      const list = index.postings.get(term);
+      if (!list) return;
+      for (let i = 0; i < list.length; i++) {
+        const id = list[i];
+        if (id === noteId || linked.has(id)) continue;
+        candidates.set(id, (candidates.get(id) || 0) + 1);
+      }
+    });
+
+    const scored = [];
+    candidates.forEach(function (_, id) {
+      const other = weightsFor(id);
+      if (!other) return;
+      let dot = 0;
+      base.w.forEach(function (val, term) {
+        const o = other.w.get(term);
+        if (o) dot += val * o;
+      });
+      let score = dot / (base.norm * other.norm);
+
+      const n2 = notes.get(id);
+      if (!n2) return;
+      // a shared tag is a deliberate signal — worth more than prose overlap
+      let shared = 0;
+      const t2 = tagsOf(n2);
+      selfTags.forEach(function (t) { if (t2.has(t)) shared++; });
+      if (shared) score += 0.10 * Math.min(shared, 3);
+      // same folder: a nudge, not a verdict
+      if (self.folder && n2.folder && self.folder === n2.folder) score += 0.03;
+
+      if (score >= MIN_SCORE) scored.push({ id: id, note: n2, score: score, tags: shared });
+    });
+
+    scored.sort(function (a, b) { return b.score - a.score; });
+    return scored.slice(0, MAX_RESULTS);
+  }
+
+  /* ------------------------------------------------------------------ ui */
+
+  function activeNoteId() {
+    const s = N.store && N.store.state;
+    if (!s) return null;
+    return s.activeNoteId || s.currentNoteId || (s.activeNote && s.activeNote.id) || null;
+  }
+
+  function render(list) {
+    const box = el('div.related-panel');
+    const head = el('div.related-head', null, 'Related — not yet linked');
+    box.appendChild(head);
+
+    if (!list.length) {
+      box.appendChild(el('div.related-empty', null,
+        'Nothing close enough yet. This fills in as the vault grows.'));
+      return box;
+    }
+
+    list.forEach(function (item) {
+      const pct = Math.round(Math.min(1, item.score) * 100);
+      const row = el('button.related-item', {
+        type: 'button',
+        title: 'Open "' + titleOf(item.note) + '"',
+        onclick: function () {
+          if (N.app && typeof N.app.openNote === 'function') N.app.openNote(item.id);
+        }
+      });
+      row.appendChild(el('span.related-title', null, titleOf(item.note)));
+      const meta = el('span.related-meta', null,
+        pct + '% match' + (item.tags ? ' · shared tag' : ''));
+      row.appendChild(meta);
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  function host() {
+    return document.querySelector('.right-panel') || null;
+  }
+
+  function refresh() {
+    const parent = host();
+    if (!parent) return;
+    const id = activeNoteId();
+    if (mounted && mounted.parentNode) mounted.parentNode.removeChild(mounted);
+    mounted = null;
+    if (!id) return;
+    let list = [];
+    try { list = related(id); }
+    catch (err) { console.warn('[nodalis] related: scoring failed', err); return; }
+    mounted = render(list);
+    parent.appendChild(mounted);
+  }
+
+  /* ---------------------------------------------------------------- init */
+
+  function init() {
+    if (!notesMap()) {
+      console.warn('[nodalis] related: store unavailable, feature disabled');
+      return;
+    }
+
+    const idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 300); };
+    idle(function () { ensureIndex(); refresh(); });
+
+    if (N.bus && typeof N.bus.on === 'function') {
+      N.bus.on('note:active', refresh);
+      N.bus.on('note:updated', scheduleRebuild);
+      N.bus.on('note:deleted', scheduleRebuild);
+      N.bus.on('vault:changed', scheduleRebuild);
+      N.bus.on('view:changed', function () { setTimeout(refresh, 60); });
+    }
+
+    if (N.commands && typeof N.commands.registerMany === 'function') {
+      N.commands.registerMany([
+        {
+          id: 'related.show', title: 'Show related notes', group: 'View', icon: 'link',
+          run: function () {
+            const id = activeNoteId();
+            if (!id) { N.toast && N.toast.info && N.toast.info('Open a note first.'); return; }
+            refresh();
+            const list = related(id);
+            if (N.toast && N.toast.info) {
+              N.toast.info(list.length
+                ? 'Found ' + list.length + ' related note' + (list.length > 1 ? 's' : '') + '.'
+                : 'No strong matches yet.');
+            }
+          }
+        },
+        {
+          id: 'related.reindex', title: 'Rebuild the related-notes index', group: 'Vault', icon: 'refresh',
+          run: function () {
+            index = null;
+            ensureIndex();
+            refresh();
+            N.toast && N.toast.success && N.toast.success('Related index rebuilt.');
+          }
+        }
+      ]);
+    }
+  }
+
+  N.related = { init: init, related: related, refresh: refresh, rebuild: function () { index = null; ensureIndex(); } };
+})(window.NODALIS = window.NODALIS || {});
+  
 
 /* ===== js/app.js ===== */
 /* =========================================================================
@@ -25523,6 +26072,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       ['matrix', N.matrix], ['sticky', N.sticky], ['scratch', N.scratch], ['daily', N.daily],
       ['ocr', N.ocr], ['exporter', N.exporter], ['settings', N.settings], ['help', N.help],
       ['history', N.history], ['writing', N.writing], ['github', N.github], ['capture', N.capture],
+      ['related', N.related],
     ];
     modules.forEach(function (entry) {
       const name = entry[0], mod = entry[1];
@@ -26131,7 +26681,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       { id: 'theme.notion', title: 'Theme: Notion', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('notion'); } },
       { id: 'theme.nothing', title: 'Theme: Nothing', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('nothing'); } },
       { id: 'theme.slate', title: 'Theme: Slate', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('slate'); } },
-      { id: 'theme.aurora', title: 'Theme: Aurora', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('aurora'); } },
+      { id: 'theme.aurora', title: 'Theme: Schematic', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('aurora'); } },
       { id: 'theme.terminal', title: 'Theme: Terminal', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('terminal'); } },
       { id: 'theme.biggerText', title: 'Increase text size', group: 'Appearance', icon: 'font-size', accel: 'Mod+=',
         run: function () { N.theme.set('fontSize', U.clamp(N.store.state.settings.fontSize + 1, 12, 26)); } },
