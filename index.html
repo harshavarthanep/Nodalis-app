@@ -18,6 +18,60 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+
+<!-- New Code   -->
+
+<!-- =========================================================================
+     NODALIS - EARLY INSTALL-PROMPT CAPTURE
+     =========================================================================
+     THIS IS THE FIX FOR "the Install button never appears".
+
+     THE BUG
+     Chrome fires `beforeinstallprompt` a second or two after the page loads.
+     Your app only starts listening for it inside features/pwa.js init(),
+     which runs after the whole vault has booted. On a phone that boot takes
+     longer than Chrome's timer, so the event fires into a page with no
+     listener - and Chrome only fires it ONCE per page load. The prompt is
+     then gone forever, `deferred` stays null, and the card falls back to the
+     "add it from your browser menu" wording. Meanwhile the browser's own
+     menu still offers Install, which is exactly what your screenshots show.
+
+     THE FIX
+     Listen in the <head>, before anything else runs, and park the event on
+     window. The pwa module then picks it up whenever it happens to start.
+
+     WHERE THIS GOES
+     Paste this block inside <head>, as early as possible - immediately after
+     the <meta name="viewport"> tag is a good spot. It must come BEFORE the
+     app's <script> and before the stylesheet, so nothing can delay it.
+     ========================================================================= -->
+<script>
+(function () {
+  'use strict';
+  // Park the event; features/pwa.js reads window.__ndInstallPrompt on init.
+  window.__ndInstallPrompt = null;
+  window.__ndInstalled = false;
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();                 // stop Chrome's own mini-infobar
+    window.__ndInstallPrompt = e;
+    // If the module is already running, hand it over immediately.
+    if (window.NODALIS && window.NODALIS.pwa && window.NODALIS.pwa.acceptPrompt) {
+      window.NODALIS.pwa.acceptPrompt(e);
+    }
+  });
+
+  window.addEventListener('appinstalled', function () {
+    window.__ndInstallPrompt = null;
+    window.__ndInstalled = true;
+    if (window.NODALIS && window.NODALIS.pwa && window.NODALIS.pwa.onInstalled) {
+      window.NODALIS.pwa.onInstalled();
+    }
+  });
+})();
+</script>
+  
+  
 <title>Nodalis — your knowledge, connected</title>
 <meta name="description" content="A local-first notes, canvas and knowledge-graph app. Your notes are plain markdown files on your own disk. Free forever, works offline, no account.">
 <meta name="theme-color" content="#f6f2e9">
@@ -5139,6 +5193,266 @@ body[data-speed='cinematic'] {
   .intel-row { flex-direction: column; }
   .intel-row .btn { align-self: stretch; }
 }
+
+/* New Code   */
+
+/* =========================================================================
+ * Nodalis - install prompt, refined
+ *
+ * Replaces the look of .pwa-prompt. Built entirely from the app's own design
+ * tokens, so it inherits every theme (including Schematic) automatically -
+ * cream and ink in light, true black in dark, sharp corners where the theme
+ * is sharp, soft where it is soft.
+ *
+ * WHERE THIS GOES
+ *   Paste immediately BEFORE the FIRST closing style tag in index.html.
+ *   Reminder: there are TWO closing style tags and the second is inside a
+ *   JavaScript string (the print/export template). Search for
+ *       body[data-animations='none']
+ *   and use the closing style tag just below it.
+ * ========================================================================= */
+
+.pwa-prompt {
+  position: fixed;
+  z-index: var(--z-toast, 900);
+  left: 50%;
+  bottom: calc(var(--mobilebar-h, 0px) + var(--safe-bottom, 0px) + 16px);
+  width: min(440px, calc(100vw - 24px));
+  transform: translate(-50%, 24px) scale(0.98);
+  opacity: 0;
+
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--sp-4, 12px);
+  align-items: start;
+
+  padding: var(--sp-5, 16px);
+  background: var(--bg-panel);
+  color: var(--text-0);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg, 14px);
+  box-shadow: var(--shadow-lg, 0 18px 48px -18px rgba(0, 0, 0, 0.45));
+
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+/* Desktop: sit it bottom-right like a real app toast rather than centred. */
+@media (min-width: 780px) {
+  .pwa-prompt {
+    left: auto;
+    right: 20px;
+    bottom: 20px;
+    transform: translate(0, 24px) scale(0.98);
+  }
+  .pwa-prompt.is-in  { transform: translate(0, 0) scale(1); }
+  .pwa-prompt.is-out { transform: translate(0, 12px) scale(0.98); }
+}
+
+.pwa-prompt.is-in  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.pwa-prompt.is-out { opacity: 0; transform: translate(-50%, 12px) scale(0.98); }
+
+/* ---- the icon tile ---- */
+.pwa-mark {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md, 10px);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* A single slow sweep across the tile the moment the card lands. It reads as
+   "this is new" without ever repeating, so it cannot become annoying. */
+.pwa-prompt.is-in .pwa-mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 40%, var(--accent) 50%, transparent 60%);
+  opacity: 0.18;
+  animation: pwa-sheen-once 900ms var(--ease-out) 220ms 1 both;
+}
+.pwa-mark { position: relative; overflow: hidden; }
+
+@keyframes pwa-sheen-once {
+  from { transform: translateX(-120%); }
+  to   { transform: translateX(120%); }
+}
+
+/* ---- text ---- */
+.pwa-main { min-width: 0; }
+
+.pwa-title {
+  font-family: var(--font-display);
+  font-size: var(--text-md, 15px);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-0);
+}
+
+.pwa-text {
+  margin: 6px 0 0;
+  font-size: var(--text-sm, 12.5px);
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.pwa-steps {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: var(--text-sm, 12.5px);
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.pwa-steps li::marker { color: var(--accent); font-weight: 600; }
+
+/* ---- actions ---- */
+.pwa-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: var(--sp-4, 12px);
+  flex-wrap: wrap;
+}
+
+.pwa-cta {
+  /* the primary action leads, and is never the same weight as "Not now" */
+  gap: 7px;
+}
+
+/* Phones: full-width primary, so it is a comfortable thumb target. */
+@media (max-width: 460px) {
+  .pwa-prompt { grid-template-columns: auto 1fr; }
+  .pwa-close  { grid-column: 2; justify-self: end; margin-top: -4px; }
+  .pwa-main   { grid-column: 1 / -1; }
+  .pwa-actions { gap: 6px; }
+  .pwa-cta { flex: 1 1 100%; justify-content: center; padding-block: 11px; }
+}
+
+.pwa-close {
+  flex-shrink: 0;
+  color: var(--text-3);
+  transition: color var(--dur-fast) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out);
+}
+.pwa-close:hover { color: var(--text-0); background: var(--bg-1); }
+
+/* ---- respect the user ---- */
+@media (prefers-reduced-motion: reduce) {
+  .pwa-prompt { transition: opacity 1ms linear; transform: none !important; }
+  .pwa-prompt.is-in  { opacity: 1; }
+  .pwa-prompt.is-out { opacity: 0; }
+  .pwa-prompt.is-in .pwa-mark::after { animation: none; }
+}
+
+body[data-animations='none'] .pwa-prompt { transition: none; }
+body[data-animations='none'] .pwa-prompt.is-in .pwa-mark::after { animation: none; }
+
+/* =========================================================================
+ * Nodalis - theme-aware loading screen
+ *
+ * The loader already animates nicely; what it did not do was follow the
+ * theme. These rules make every part of it read from the same tokens the
+ * rest of the app uses, so the first thing a user sees is already in their
+ * chosen theme instead of a generic splash - which is most of what makes an
+ * app feel hand-built rather than assembled.
+ *
+ * It also adds a per-theme character to the node graph the loader draws:
+ * Schematic gets sharp square nodes on a blueprint grid, Terminal gets a
+ * phosphor glow, Nothing goes flat and monochrome.
+ *
+ * WHERE THIS GOES
+ *   Paste immediately BEFORE the FIRST closing style tag in index.html.
+ *   (Two exist; the second is inside a JavaScript string. Search for
+ *    body[data-animations='none'] and use the one just below it.)
+ * ========================================================================= */
+
+/* ---- base: follow the theme, not a fixed palette ---- */
+.loader-stage {
+  background: var(--bg-canvas);
+  color: var(--text-0);
+  transition: background-color var(--dur-slow) var(--ease-out);
+}
+
+.loader-core { color: var(--accent); }
+.loader-node { fill: var(--accent); stroke: var(--accent); }
+.loader-link { stroke: var(--border-strong); opacity: 0.35; }
+.loader-ring { stroke: var(--accent-soft); }
+
+.loader-word    { color: var(--text-0); font-family: var(--font-display); }
+.loader-tagline { color: var(--text-2); font-family: var(--font-ui); }
+.loader-step    { color: var(--text-3); font-family: var(--font-ui); }
+
+.loader-bar      { background: var(--bg-2); border-radius: var(--r-pill); overflow: hidden; }
+.loader-bar-fill { background: var(--accent); }
+
+.loader-skip {
+  color: var(--text-3);
+  font-family: var(--font-ui);
+  border-radius: var(--r-sm);
+  transition: color var(--dur-fast) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out);
+}
+.loader-skip:hover { color: var(--text-0); background: var(--bg-1); }
+
+/* ---- SCHEMATIC: drawn, not lit. Square nodes on a faint blueprint grid. -- */
+[data-style='aurora'] .loader-stage {
+  background-image:
+    linear-gradient(var(--grid-line, rgba(18,16,11,.055)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line, rgba(18,16,11,.055)) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+[data-style='aurora'] .loader-node { rx: 0; ry: 0; }          /* sharp, not round */
+[data-style='aurora'] .loader-link { opacity: 0.5; stroke-dasharray: 3 3; }
+[data-style='aurora'] .loader-word { text-transform: uppercase; letter-spacing: -0.01em; }
+[data-style='aurora'] .loader-bar  { border-radius: 2px; border: 1px solid var(--border-strong); }
+[data-style='aurora'] .loader-step { text-transform: uppercase; letter-spacing: 0.08em; font-size: 10.5px; }
+
+/* ---- TERMINAL: phosphor. The one theme where a glow belongs. ---- */
+[data-style='terminal'] .loader-node {
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+[data-style='terminal'] .loader-word,
+[data-style='terminal'] .loader-step {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+[data-style='terminal'] .loader-step::before { content: '> '; color: var(--accent); }
+
+/* ---- NOTHING: flat, monochrome, dot-matrix. No glow, no gradient. ---- */
+[data-style='nothing'] .loader-node { fill: var(--text-0); stroke: var(--text-0); }
+[data-style='nothing'] .loader-core { color: var(--accent); }
+[data-style='nothing'] .loader-bar-fill { background: var(--text-0); }
+[data-style='nothing'] .loader-word { font-family: var(--font-dot); letter-spacing: 0.06em; }
+
+/* ---- AURORA-as-was / SLATE / NOTION keep the default soft treatment ---- */
+[data-style='slate'] .loader-node,
+[data-style='notion'] .loader-node { rx: 50%; ry: 50%; }
+
+/* ---- the graph settles rather than spinning forever ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .loader-svg { animation: loader-settle var(--dur-slower) var(--ease-out) both; }
+}
+@keyframes loader-settle {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-svg { animation: none; }
+  .loader-stage { transition: none; }
+}
+body[data-animations='none'] .loader-svg { animation: none; }
+  
   
 </style>
 </head>
@@ -25180,23 +25494,1545 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
 
 /* ===== js/features/pwa.js ===== */
+// /* =========================================================================
+//  * Nodalis — features/pwa.js
+//  * The install prompt.
+//  *
+//  * Three states, and which one you see depends on where you are standing:
+//  *
+//  *   1. INSTALLABLE  the browser has offered us a beforeinstallprompt event.
+//  *                   Show the card with a real Install button.
+//  *   2. MANUAL       no event (Safari, Firefox, iOS). Show the card with the
+//  *                   exact steps for that browser instead of a dead button.
+//  *   3. INSTALLED    the app exists on this device but you are in the browser.
+//  *                   Offer to open it there instead.
+//  *
+//  * Dismissing is deliberately per-page-load, as asked: close it and it stays
+//  * closed until the next refresh. "Don't show this again" is offered after the
+//  * third dismissal, because a prompt that can never be silenced is a dark
+//  * pattern and this app does not do those.
+//  * ========================================================================= */
+// (function (N) {
+//   'use strict';
+
+//   const U = N.util;
+//   const el = U.el;
+
+//   const DISMISS_KEY = 'pwaDismissCount';
+//   const SILENCE_KEY = 'pwaSilenced';
+
+//   let deferred = null;      // the captured beforeinstallprompt event
+//   let card = null;
+//   let shown = false;
+
+//   function isStandalone() {
+//     return window.matchMedia('(display-mode: standalone)').matches ||
+//       window.matchMedia('(display-mode: window-controls-overlay)').matches ||
+//       window.navigator.standalone === true;
+//   }
+
+//   /** Best-effort: has this browser told us the app is already installed? */
+//   async function installedElsewhere() {
+//     try {
+//       if (navigator.getInstalledRelatedApps) {
+//         const apps = await navigator.getInstalledRelatedApps();
+//         if (apps && apps.length) return true;
+//       }
+//     } catch (err) { /* not supported; fall through */ }
+//     return N.store.state.settings.pwaInstalled === true;
+//   }
+
+//   function manualSteps() {
+//     const ua = navigator.userAgent;
+//     if (U.supports.isIOS) {
+//       return {
+//         title: 'Add Nodalis to your Home Screen',
+//         steps: ['Tap the Share button in Safari', 'Choose "Add to Home Screen"', 'Tap Add'],
+//       };
+//     }
+//     if (/Firefox/i.test(ua)) {
+//       return {
+//         title: 'Install Nodalis',
+//         steps: ['Open the Firefox menu', 'Choose "Install" or "Add to Home screen"'],
+//       };
+//     }
+//     if (/Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua)) {
+//       return {
+//         title: 'Install Nodalis',
+//         steps: ['Open the File menu in Safari', 'Choose "Add to Dock"'],
+//       };
+//     }
+//     return {
+//       title: 'Install Nodalis',
+//       steps: ['Open your browser menu', 'Choose "Install Nodalis" or "Add to Home screen"'],
+//     };
+//   }
+
+//   /* ----------------------------------------------------------------- card */
+
+//   // function build(mode) {
+//   //   const node = el('div.pwa-prompt', { role: 'dialog', 'aria-label': 'Install Nodalis' });
+
+//   //   const mark = el('div.pwa-mark');
+//   //   mark.appendChild(N.icons.node(mode === 'installed' ? 'external' : 'download', { size: 22 }));
+//   //   node.appendChild(mark);
+
+//   //   const main = el('div.pwa-main');
+
+//   //   if (mode === 'installed') {
+//   //     main.appendChild(el('div.pwa-title', null, 'Nodalis is installed on this device'));
+//   //     main.appendChild(el('p.pwa-text', null,
+//   //       'The installed app opens in its own window, starts faster and keeps working with no connection.'));
+//   //   } else if (mode === 'installable') {
+//   //     main.appendChild(el('div.pwa-title', null, 'Install Nodalis'));
+//   //     main.appendChild(el('p.pwa-text', null,
+//   //       'Its own window, its own icon, instant start, and it keeps working offline. Nothing is uploaded — the app just lives on your device.'));
+//   //   } else {
+//   //     const info = manualSteps();
+//   //     main.appendChild(el('div.pwa-title', null, info.title));
+//   //     const ol = el('ol.pwa-steps');
+//   //     info.steps.forEach(function (step) { ol.appendChild(el('li', null, step)); });
+//   //     main.appendChild(ol);
+//   //   }
+
+//   //   // Install first, dismissal second. The primary action always leads.
+//   //   const actions = el('div.pwa-actions');
+
+//   //   if (mode === 'installable') {
+//   //     const install = el('button.btn.btn-primary.btn-sm', { type: 'button' });
+//   //     install.appendChild(N.icons.node('download', { size: 15 }));
+//   //     install.appendChild(el('span', null, 'Install'));
+//   //     install.addEventListener('click', doInstall);
+//   //     actions.appendChild(install);
+//   //   } else if (mode === 'installed') {
+//   //     const open = el('button.btn.btn-primary.btn-sm', { type: 'button' });
+//   //     open.appendChild(N.icons.node('external', { size: 15 }));
+//   //     open.appendChild(el('span', null, 'Open the app'));
+//   //     open.addEventListener('click', openInstalled);
+//   //     actions.appendChild(open);
+//   //   }
+
+//   //   const later = el('button.btn.btn-sm.btn-ghost', { type: 'button' }, 'Not now');
+//   //   later.addEventListener('click', function () { dismiss('later'); });
+//   //   actions.appendChild(later);
+
+//   //   main.appendChild(actions);
+//   //   node.appendChild(main);
+
+//   //   const close = el('button.icon-btn.icon-btn-sm.pwa-close', {
+//   //     type: 'button', 'aria-label': 'Close',
+//   //   });
+//   //   close.appendChild(N.icons.node('close', { size: 16 }));
+//   //   close.addEventListener('click', function () { dismiss('close'); });
+//   //   node.appendChild(close);
+
+//   //   return node;
+//   // }
+
+//   /* ============ REPLACEMENT 2 of 4 — build ================================ */
+
+// function build(mode) {
+//   const node = el('div.pwa-prompt', { role: 'dialog', 'aria-label': 'Install Nodalis' });
+
+//   const mark = el('div.pwa-mark');
+//   mark.appendChild(N.icons.node(mode === 'installed' ? 'external' : 'download', { size: 22 }));
+//   node.appendChild(mark);
+
+//   const main = el('div.pwa-main');
+
+//   if (mode === 'installed') {
+//     main.appendChild(el('div.pwa-title', null, 'Nodalis is installed on this device'));
+//     main.appendChild(el('p.pwa-text', null,
+//       'The installed app opens in its own window, starts faster and keeps working with no connection.'));
+//   } else if (mode === 'installable') {
+//     main.appendChild(el('div.pwa-title', null, 'Install Nodalis'));
+//     main.appendChild(el('p.pwa-text', null,
+//       'Its own window, its own icon, instant start, and it keeps working offline. Nothing is uploaded — the app just lives on your device.'));
+//   } else {
+//     const info = manualSteps();
+//     main.appendChild(el('div.pwa-title', null, info.title));
+//     main.appendChild(el('p.pwa-text', null, canMakeShortcutFile()
+//       ? 'This browser has no one-click install. You can still keep Nodalis one click away with a desktop shortcut.'
+//       : 'This browser adds apps from its own menu. It takes two taps:'));
+//     const ol = el('ol.pwa-steps');
+//     info.steps.forEach(function (step) { ol.appendChild(el('li', null, step)); });
+//     main.appendChild(ol);
+//   }
+
+//   // Primary action first, dismissal second — the primary always leads, and
+//   // EVERY mode now has one, including manual.
+//   const actions = el('div.pwa-actions');
+
+//   if (mode === 'installable') {
+//     const install = el('button.btn.btn-primary.btn-sm', { type: 'button' });
+//     install.appendChild(N.icons.node('download', { size: 15 }));
+//     install.appendChild(el('span', null, 'Install'));
+//     install.addEventListener('click', doInstall);
+//     actions.appendChild(install);
+
+//   } else if (mode === 'installed') {
+//     const open = el('button.btn.btn-primary.btn-sm', { type: 'button' });
+//     open.appendChild(N.icons.node('external', { size: 15 }));
+//     open.appendChild(el('span', null, 'Open the app'));
+//     open.addEventListener('click', openInstalled);
+//     actions.appendChild(open);
+
+//   } else {
+//     // MANUAL — this is the branch that previously had no button at all.
+//     if (canMakeShortcutFile()) {
+//       const sc = el('button.btn.btn-primary.btn-sm', { type: 'button' });
+//       sc.appendChild(N.icons.node('download', { size: 15 }));
+//       sc.appendChild(el('span', null, 'Create shortcut'));
+//       sc.addEventListener('click', makeShortcut);
+//       actions.appendChild(sc);
+//     } else {
+//       // Mobile: no file can create a Home Screen icon, so the honest action
+//       // is to hand over the link and stop asking.
+//       const copy = el('button.btn.btn-primary.btn-sm', { type: 'button' });
+//       copy.appendChild(N.icons.node('link', { size: 15 }));
+//       copy.appendChild(el('span', null, 'Copy link'));
+//       copy.addEventListener('click', async function () {
+//         let ok = false;
+//         try { ok = await U.copyToClipboard(location.href); } catch (err) { ok = false; }
+//         N.toast[ok ? 'success' : 'info'](ok
+//           ? 'Link copied. Use your browser menu → Add to Home Screen.'
+//           : location.href, { ms: 5000 });
+//       });
+//       actions.appendChild(copy);
+
+//       const done = el('button.btn.btn-sm.btn-ghost', { type: 'button' }, 'Added it');
+//       done.addEventListener('click', async function () {
+//         await N.store.setSetting('pwaShortcutAdded', true);
+//         hide();
+//         N.toast.success('Great — this will not ask again.', { ms: 2600 });
+//       });
+//       actions.appendChild(done);
+//     }
+//   }
+
+//   const later = el('button.btn.btn-sm.btn-ghost', { type: 'button' }, 'Not now');
+//   later.addEventListener('click', function () { dismiss('later'); });
+//   actions.appendChild(later);
+
+//   main.appendChild(actions);
+//   node.appendChild(main);
+
+//   const close = el('button.icon-btn.icon-btn-sm.pwa-close', {
+//     type: 'button', 'aria-label': 'Close',
+//   });
+//   close.appendChild(N.icons.node('close', { size: 16 }));
+//   close.addEventListener('click', function () { dismiss('close'); });
+//   node.appendChild(close);
+
+//   return node;
+// }
+
+
+//   function show(mode) {
+//     if (shown || card) return;
+//     shown = true;
+//     card = build(mode);
+//     document.body.appendChild(card);
+//     // Next frame, so the entrance transition actually runs.
+//     requestAnimationFrame(function () { card.classList.add('is-in'); });
+
+//     // Escape closes it, like every other dismissible surface in the app.
+//     document.addEventListener('keydown', onKey, true);
+//   }
+
+//   function onKey(e) {
+//     if (e.key !== 'Escape' || !card) return;
+//     if (N.modal.anyOpen() || N.palette.isOpen()) return;
+//     e.preventDefault();
+//     dismiss('close');
+//   }
+
+//   function hide() {
+//     if (!card) return;
+//     const node = card;
+//     card = null;
+//     document.removeEventListener('keydown', onKey, true);
+//     node.classList.remove('is-in');
+//     node.classList.add('is-out');
+//     const drop = function () { if (node.parentNode) node.parentNode.removeChild(node); };
+//     node.addEventListener('transitionend', drop, { once: true });
+//     setTimeout(drop, 500);
+//   }
+
+//   async function dismiss(how) {
+//     hide();
+//     const count = (N.store.state.settings[DISMISS_KEY] || 0) + 1;
+//     await N.store.setSetting(DISMISS_KEY, count);
+
+//     // Asked for: it comes back on the next refresh. But after the third time
+//     // we offer a way out, because nagging forever is not charming.
+//     if (how === 'close' && count >= 3 && !N.store.state.settings[SILENCE_KEY]) {
+//       N.toast.info('Nodalis will keep offering this on every refresh.', {
+//         ms: 7000,
+//         key: 'pwa-silence',
+//         action: {
+//           label: 'Stop asking',
+//           onClick: async function () {
+//             await N.store.setSetting(SILENCE_KEY, true);
+//             N.toast.success('Understood. Install is still in Settings → About.', { ms: 3000 });
+//           },
+//         },
+//       });
+//     }
+//   }
+
+//   /**
+//    * Press Install -> the browser's own install dialog opens. That is the only
+//    * thing that actually installs a PWA, and it can only be called from inside
+//    * a user gesture — which is why `prompt()` is invoked synchronously here,
+//    * before any await, and why the captured event is held rather than dropped.
+//    *
+//    * If the person cancels the browser dialog the event is spent and cannot be
+//    * replayed; the card falls back to showing the manual steps rather than
+//    * offering a button that would now do nothing.
+//    */
+//   function doInstall() {
+//     if (!deferred) { showManualFallback(); return; }
+//     const event = deferred;
+//     deferred = null;
+
+//     let dialogOpened = true;
+//     try {
+//       // Synchronous, inside the click. Awaiting first loses the gesture and
+//       // Chrome silently refuses to show the dialog.
+//       event.prompt();
+//     } catch (err) {
+//       dialogOpened = false;
+//     }
+
+//     if (!dialogOpened) { showManualFallback(); return; }
+
+//     hide();
+//     Promise.resolve(event.userChoice).then(function (choice) {
+//       if (choice && choice.outcome === 'accepted') {
+//         N.store.setSetting('pwaInstalled', true);
+//         N.toast.success('Installing Nodalis…', { ms: 3000 });
+//       } else {
+//         N.toast.info('No problem — you can install it any time from the menu.', {
+//           ms: 4000,
+//           action: { label: 'How', onClick: function () { shown = false; show('manual'); } },
+//         });
+//       }
+//     }).catch(function () { /* the browser closed it without telling us */ });
+//   }
+
+//   /* ============ REPLACEMENT 4 of 4 — NEW helpers ==========================
+//  * Paste these two NEW functions directly above doInstall().
+//  * ======================================================================== */
+
+// /**
+//  * A shortcut FILE only helps on a desktop OS. On phones and tablets the
+//  * Home Screen is owned by the browser and no download can touch it.
+//  */
+// function canMakeShortcutFile() {
+//   if (U.supports.isIOS) return false;
+//   if (/Android/i.test(navigator.userAgent)) return false;
+//   // Coarse pointer with no fine pointer ⇒ almost certainly a touch device.
+//   try {
+//     if (window.matchMedia('(pointer: coarse)').matches &&
+//         !window.matchMedia('(pointer: fine)').matches) return false;
+//   } catch (err) { /* older browser: assume desktop */ }
+//   return true;
+// }
+
+// /**
+//  * Builds the correct shortcut file for the operating system and downloads it.
+//  * This is a real shortcut — the same format the OS itself writes.
+//  */
+// async function makeShortcut() {
+//   const url = location.href.split('#')[0];
+//   const ua = navigator.userAgent;
+//   const isWin = /Windows/i.test(ua);
+//   const isMac = /Macintosh|Mac OS X/i.test(ua);
+
+//   let text, filename, mime, where;
+
+//   if (isWin) {
+//     filename = 'Nodalis.url';
+//     mime = 'application/internet-shortcut';
+//     text = '[InternetShortcut]\r\nURL=' + url + '\r\nIconIndex=0\r\n';
+//     where = 'Move Nodalis.url to your Desktop.';
+//   } else if (isMac) {
+//     filename = 'Nodalis.webloc';
+//     mime = 'application/xml';
+//     text =
+//       '<?xml version="1.0" encoding="UTF-8"?>\n' +
+//       '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" ' +
+//       '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n' +
+//       '<plist version="1.0"><dict><key>URL</key><string>' + url +
+//       '</string></dict></plist>\n';
+//     where = 'Drag Nodalis.webloc to your Desktop or Dock.';
+//   } else {
+//     filename = 'Nodalis.desktop';
+//     mime = 'application/x-desktop';
+//     text =
+//       '[Desktop Entry]\n' +
+//       'Type=Link\n' +
+//       'Name=Nodalis\n' +
+//       'Comment=Local-first notes, graph and canvas\n' +
+//       'URL=' + url + '\n' +
+//       'Icon=text-editor\n';
+//     where = 'Move Nodalis.desktop to your Desktop, then mark it executable ' +
+//             '(right-click → Properties → Permissions).';
+//   }
+
+//   try {
+//     U.downloadText(text, filename, mime);
+//   } catch (err) {
+//     N.toast.error('Could not create the shortcut file.', { ms: 4000 });
+//     return;
+//   }
+
+//   await N.store.setSetting('pwaShortcutAdded', true);
+//   hide();
+//   N.toast.success('Shortcut downloaded. ' + where, { ms: 7000 });
+// }
+
+
+//   /* ============ REPLACEMENT 3 of 4 — doInstall ============================ */
+
+// function doInstall() {
+//   if (!deferred) { showManualFallback(); return; }
+//   const event = deferred;
+//   deferred = null;
+
+//   let dialogOpened = true;
+//   try {
+//     // Synchronous, inside the click. Awaiting first loses the user gesture
+//     // and Chrome silently refuses to show the dialog.
+//     event.prompt();
+//   } catch (err) {
+//     dialogOpened = false;
+//   }
+
+//   if (!dialogOpened) { showManualFallback(); return; }
+
+//   hide();
+//   Promise.resolve(event.userChoice).then(function (choice) {
+//     if (choice && choice.outcome === 'accepted') {
+//       // Recorded here as well as in the appinstalled listener, because on
+//       // some browsers appinstalled never fires. Either path stops the prompt.
+//       N.store.setSetting('pwaInstalled', true);
+//       N.toast.success('Installing Nodalis…', { ms: 3000 });
+//     } else {
+//       N.toast.info('No problem — you can install it any time from the menu.', {
+//         ms: 4000,
+//         action: { label: 'How', onClick: function () { shown = false; show('manual'); } },
+//       });
+//     }
+//   }).catch(function () { /* the browser closed it without telling us */ });
+// }
+
+
+//   function showManualFallback() {
+//     hide();
+//     shown = false;
+//     show('manual');
+//   }
+
+//   /**
+//    * There is no web API that launches an installed PWA from a tab. What does
+//    * work is a link with the app's start URL: if the app is installed and the
+//    * browser supports app scope capture, it opens there; otherwise it opens a
+//    * clean window on the same URL, which is still what the user asked for.
+//    */
+//   function openInstalled() {
+//     const url = new URL('./', location.href).href;
+//     const win = window.open(url, '_blank', 'noopener');
+//     if (!win) {
+//       N.toast.info('Open Nodalis from your home screen, dock or app list.', { ms: 5000 });
+//       return;
+//     }
+//     hide();
+//   }
+
+//   /* ----------------------------------------------------------------- init */
+
+//   function init() {
+//     // Inside the installed app there is nothing to install.
+//     if (isStandalone()) {
+//       N.store.setSetting('pwaInstalled', true);
+//       return;
+//     }
+
+//     window.addEventListener('beforeinstallprompt', function (e) {
+//       e.preventDefault();
+//       deferred = e;
+//       const btn = document.getElementById('btn-install');
+//       if (btn) btn.classList.remove('hidden');
+//       N.bus.emit('commands:changed');
+//       maybeShow();
+//     });
+
+//     window.addEventListener('appinstalled', function () {
+//       deferred = null;
+//       N.store.setSetting('pwaInstalled', true);
+//       hide();
+//       const btn = document.getElementById('btn-install');
+//       if (btn) btn.classList.add('hidden');
+//       N.toast.success('Nodalis is installed. It works offline from here on.', { ms: 4000 });
+//     });
+
+//     const btn = document.getElementById('btn-install');
+//     if (btn) btn.addEventListener('click', function () { forceShow(); });
+
+//     // Give the interface a moment to settle before asking for anything.
+//     setTimeout(maybeShow, 2600);
+
+//     N.commands.registerMany([{
+//       id: 'app.install',
+//       title: 'Install Nodalis as an app',
+//       group: 'App',
+//       icon: 'download',
+//       run: forceShow,
+//     }]);
+//   }
+
+//   // async function maybeShow() {
+//   //   if (shown || isStandalone()) return;
+//   //   if (N.store.state.settings[SILENCE_KEY]) return;
+//   //   if (N.modal.anyOpen()) { setTimeout(maybeShow, 1500); return; }
+//   //   if (await installedElsewhere()) { show('installed'); return; }
+//   //   show(deferred ? 'installable' : 'manual');
+//   // }
+
+//   /* ============ REPLACEMENT 1 of 4 — maybeShow ============================ */
+
+// async function maybeShow() {
+//   if (shown || isStandalone()) return;
+//   if (N.store.state.settings[SILENCE_KEY]) return;
+
+//   // Installed, or a shortcut has been made: there is nothing left to ask for.
+//   // This is the fix — the old code fell through to show('installed') here and
+//   // the prompt reappeared on every single load after installing.
+//   if (N.store.state.settings.pwaInstalled === true) return;
+//   if (N.store.state.settings.pwaShortcutAdded === true) return;
+//   if (await installedElsewhere()) return;
+
+//   if (N.modal.anyOpen()) { setTimeout(maybeShow, 1500); return; }
+
+//   show(deferred ? 'installable' : 'manual');
+// }
+
+
+//   async function forceShow() {
+//     if (isStandalone()) {
+//       N.toast.success('You are already in the installed app.', { ms: 2600 });
+//       return;
+//     }
+//     shown = false;
+//     hide();
+//     if (await installedElsewhere()) show('installed');
+//     else show(deferred ? 'installable' : 'manual');
+//   }
+
+//   N.pwa = {
+//     init: init, show: forceShow, hide: hide,
+//     isStandalone: isStandalone,
+//     canInstall: function () { return !!deferred; },
+//   };
+// })(window.NODALIS = window.NODALIS || {});
+
+// /* =========================================================================
+//  * Nodalis — PWA install prompt: REPLACEMENT FUNCTIONS
+//  * -------------------------------------------------------------------------
+//  * This replaces FOUR functions inside the existing features/pwa.js module.
+//  * You are not adding a new module — you are swapping four function bodies.
+//  * See INSTALL.md for exactly which lines.
+//  *
+//  * WHAT CHANGES
+//  *
+//  * 1. maybeShow()  — THE BUG YOU HIT.
+//  *    The old version, once the app was installed, still fired the popup on
+//  *    every load — it just switched to the "Nodalis is installed" wording.
+//  *    That is why the prompt kept coming back after installing. It now
+//  *    returns silently if the app is installed OR a shortcut was created.
+//  *    The "installed" card still exists, but only when the user asks for it
+//  *    from the menu (forceShow), which is the only time it is useful.
+//  *
+//  * 2. build()      — the manual/unsupported branch had NO action button, only
+//  *    a list of steps. It now always gets a primary button sitting beside
+//  *    "Not now", exactly like the installable branch.
+//  *
+//  * 3. doInstall()  — unchanged in spirit (it already called prompt() inside
+//  *    the click, which is correct) but now records the result so the prompt
+//  *    stays gone.
+//  *
+//  * 4. NEW makeShortcut() — for browsers with no install prompt.
+//  *
+//  * AN HONEST NOTE ABOUT "CREATE A SHORTCUT"
+//  *
+//  * There is no web API that can create a browser bookmark or a desktop
+//  * shortcut. Browsers deliberately forbid it — a page that could drop icons
+//  * on your desktop would be an obvious abuse vector. Any code claiming to do
+//  * it directly is not doing what it says.
+//  *
+//  * What genuinely works, and is what this does on desktop, is generating the
+//  * shortcut FILE the operating system understands and handing it to the user
+//  * through a normal download:
+//  *      Windows  .url      [InternetShortcut]
+//  *      macOS    .webloc   an XML plist
+//  *      Linux    .desktop  a freedesktop entry
+//  * The user drops that file on their desktop and it behaves exactly like a
+//  * shortcut, because it is one.
+//  *
+//  * On iOS and Android no file can do this — Add to Home Screen is the only
+//  * route and it must be driven by the user through the browser UI. There the
+//  * button reveals the precise steps for that browser and offers to copy the
+//  * link, which is the most any web page is permitted to do.
+//  * ========================================================================= */
+
+
+// // New Code
+
+// /* =========================================================================
+//  * Nodalis — features/related.js
+//  * "Notes you have not linked yet."
+//  *
+//  * WHY THIS AND NOT SOMETHING ELSE
+//  *
+//  * Nodalis already shows you the links you MADE (backlinks, unlinked mentions,
+//  * the graph). Nothing in it shows you the links you SHOULD have made. That is
+//  * the gap this fills, and it is the difference between a graph that documents
+//  * your thinking and a graph that adds to it: the vault gets more useful the
+//  * more you write, instead of just bigger.
+//  *
+//  * HOW IT SCORES  (all local, no network, no dependencies)
+//  *   term overlap   TF-IDF cosine over the note bodies. Rare shared words
+//  *                  ("perovskite") count for far more than common ones
+//  *                  ("project"), which is what makes the results feel smart.
+//  *   tag overlap    a shared #tag is a deliberate signal, weighted above prose.
+//  *   folder         same folder is a weak nudge, not a decision.
+//  *   already linked EXCLUDED. If you already linked it, the Links panel has
+//  *                  it covered and repeating it here is noise.
+//  *
+//  * PERFORMANCE
+//  *   The index is built once, off the main thread's critical path (idle
+//  *   callback), cached, and rebuilt at most once every few seconds after a
+//  *   vault change. Scoring a note is then a walk over the posting lists of
+//  *   only the terms that note contains — not a scan of the vault. This stays
+//  *   responsive at the ~2,000 notes the graph is already built to handle.
+//  *
+//  * SAFETY
+//  *   Every integration point is feature-detected. If an API it expects is
+//  *   missing, the module logs once and no-ops — it can never take the app
+//  *   down with it. app.js already wraps module init in try/catch as well.
+//  * ========================================================================= */
+// (function (N) {
+//   'use strict';
+
+//   const U = N && N.util;
+//   if (!U || typeof U.el !== 'function') {
+//     console.warn('[nodalis] related: util.el unavailable, feature disabled');
+//     return;
+//   }
+//   const el = U.el;
+
+//   const MAX_RESULTS   = 5;
+//   const MIN_SCORE     = 0.045;  // below this the "match" is coincidence
+//   const REBUILD_DEBOUNCE = 2500;
+
+//   let index = null;       // { df: Map(term -> docCount), docs: Map(id -> Map(term -> tf)), n }
+//   let building = false;
+//   let rebuildTimer = null;
+//   let mounted = null;     // the DOM node we own inside the right panel
+
+//   /* ---------------------------------------------------------------- text */
+
+//   // Deliberately small stopword list: enough to stop "the" dominating,
+//   // short enough that domain words are never accidentally dropped.
+//   const STOP = new Set(('a about above after again against all am an and any are as at be because been before being ' +
+//     'below between both but by can cannot could did do does doing down during each few for from further had has have ' +
+//     'having he her here hers him his how i if in into is it its itself just me more most my no nor not of off on once ' +
+//     'only or other our out over own same she should so some such than that the their them then there these they this ' +
+//     'those through to too under until up very was we were what when where which while who whom why will with you your ' +
+//     'yours it\'s i\'m don\'t was were be been').split(/\s+/));
+
+//   function titleOf(note) {
+//     if (!note) return 'Untitled';
+//     return note.title ||
+//       String(note.path || '').split('/').pop().replace(/\.md$/i, '') ||
+//       'Untitled';
+//   }
+
+//   function tokenize(text) {
+//     if (!text) return [];
+//     return String(text)
+//       .toLowerCase()
+//       // strip fenced code, inline code, urls and wiki/link syntax first —
+//       // none of it is prose and all of it creates false matches
+//       .replace(/```[\s\S]*?```/g, ' ')
+//       .replace(/`[^`]*`/g, ' ')
+//       .replace(/https?:\/\/\S+/g, ' ')
+//       .replace(/\[\[([^\]]*)\]\]/g, ' $1 ')
+//       .replace(/[^a-z0-9À-ɏ'\s-]/g, ' ')
+//       .split(/\s+/)
+//       .filter(function (w) {
+//         return w.length > 2 && w.length < 32 && !STOP.has(w) && !/^\d+$/.test(w);
+//       });
+//   }
+
+//   function tagsOf(note) {
+//     const out = new Set();
+//     if (Array.isArray(note.tags)) note.tags.forEach(function (t) { out.add(String(t).toLowerCase()); });
+//     // also pick up #tags written in the body
+//     const body = String(note.content || '');
+//     const m = body.match(/(^|\s)#([a-z0-9][\w/-]*)/gi);
+//     if (m) m.forEach(function (raw) { out.add(raw.trim().replace(/^#/, '').toLowerCase()); });
+//     return out;
+//   }
+
+//   function linkedIdsOf(note, byTitle) {
+//     const out = new Set();
+//     if (Array.isArray(note.links)) {
+//       note.links.forEach(function (l) {
+//         if (typeof l === 'string') {
+//           const hit = byTitle.get(l.toLowerCase());
+//           if (hit) out.add(hit);
+//         } else if (l && l.id) out.add(l.id);
+//       });
+//     }
+//     // wikilinks written in the body
+//     const body = String(note.content || '');
+//     let m;
+//     const re = /\[\[([^\]|#]+)/g;
+//     while ((m = re.exec(body)) !== null) {
+//       const hit = byTitle.get(m[1].trim().toLowerCase());
+//       if (hit) out.add(hit);
+//     }
+//     return out;
+//   }
+
+//   /* --------------------------------------------------------------- index */
+
+//   function notesMap() {
+//     return (N.store && N.store.state && N.store.state.notes) || null;
+//   }
+
+//   function buildIndex() {
+//     const notes = notesMap();
+//     if (!notes || building) return;
+//     building = true;
+//     try {
+//       const df = new Map();
+//       const docs = new Map();
+//       const postings = new Map();   // term -> array of note ids (the inverted index)
+//       notes.forEach(function (note, id) {
+//         // the title is weighted by repeating it: a title match matters more
+//         // than the same word buried in paragraph nine
+//         const terms = tokenize((titleOf(note) + ' ').repeat(3) + (note.content || ''));
+//         if (!terms.length) { docs.set(id, new Map()); return; }
+//         const tf = new Map();
+//         terms.forEach(function (t) { tf.set(t, (tf.get(t) || 0) + 1); });
+//         tf.forEach(function (_, t) {
+//           df.set(t, (df.get(t) || 0) + 1);
+//           let list = postings.get(t);
+//           if (!list) { list = []; postings.set(t, list); }
+//           list.push(id);
+//         });
+//         docs.set(id, tf);
+//       });
+//       index = { df: df, docs: docs, postings: postings, n: docs.size };
+//     } catch (err) {
+//       console.warn('[nodalis] related: index build failed', err);
+//       index = null;
+//     } finally {
+//       building = false;
+//     }
+//   }
+
+//   function ensureIndex() {
+//     if (index) return;
+//     buildIndex();
+//   }
+
+//   function scheduleRebuild() {
+//     clearTimeout(rebuildTimer);
+//     rebuildTimer = setTimeout(function () {
+//       index = null;
+//       const idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 200); };
+//       idle(function () { ensureIndex(); refresh(); });
+//     }, REBUILD_DEBOUNCE);
+//   }
+
+//   /* --------------------------------------------------------------- score */
+
+//   function weightsFor(id) {
+//     const tf = index.docs.get(id);
+//     if (!tf || !tf.size) return null;
+//     const w = new Map();
+//     let norm = 0;
+//     tf.forEach(function (count, term) {
+//       const d = index.df.get(term) || 1;
+//       const idf = Math.log(1 + index.n / d);
+//       const val = (1 + Math.log(count)) * idf;
+//       w.set(term, val);
+//       norm += val * val;
+//     });
+//     norm = Math.sqrt(norm) || 1;
+//     return { w: w, norm: norm };
+//   }
+
+//   function related(noteId) {
+//     ensureIndex();
+//     const notes = notesMap();
+//     if (!index || !notes) return [];
+//     const self = notes.get(noteId);
+//     if (!self) return [];
+
+//     const base = weightsFor(noteId);
+//     if (!base) return [];
+
+//     const byTitle = new Map();
+//     notes.forEach(function (n2, id) { byTitle.set(titleOf(n2).toLowerCase(), id); });
+//     const linked = linkedIdsOf(self, byTitle);
+//     const selfTags = tagsOf(self);
+
+//     // Only consider notes that share at least one term, reached through the
+//     // posting lists — never a full scan.
+//     const candidates = new Map();
+//     base.w.forEach(function (val, term) {
+//       // Skip terms so common they carry no signal — but ONLY once the vault
+//       // is big enough for "common" to mean anything. In a 3-note vault every
+//       // shared word looks common, and filtering them all leaves nothing to
+//       // match on, so small vaults skip this rule entirely.
+//       if (index.n >= 25 && (index.df.get(term) || 0) > index.n * 0.5) return;
+//       const list = index.postings.get(term);
+//       if (!list) return;
+//       for (let i = 0; i < list.length; i++) {
+//         const id = list[i];
+//         if (id === noteId || linked.has(id)) continue;
+//         candidates.set(id, (candidates.get(id) || 0) + 1);
+//       }
+//     });
+
+//     const scored = [];
+//     candidates.forEach(function (_, id) {
+//       const other = weightsFor(id);
+//       if (!other) return;
+//       let dot = 0;
+//       base.w.forEach(function (val, term) {
+//         const o = other.w.get(term);
+//         if (o) dot += val * o;
+//       });
+//       let score = dot / (base.norm * other.norm);
+
+//       const n2 = notes.get(id);
+//       if (!n2) return;
+//       // a shared tag is a deliberate signal — worth more than prose overlap
+//       let shared = 0;
+//       const t2 = tagsOf(n2);
+//       selfTags.forEach(function (t) { if (t2.has(t)) shared++; });
+//       if (shared) score += 0.10 * Math.min(shared, 3);
+//       // same folder: a nudge, not a verdict
+//       if (self.folder && n2.folder && self.folder === n2.folder) score += 0.03;
+
+//       if (score >= MIN_SCORE) scored.push({ id: id, note: n2, score: score, tags: shared });
+//     });
+
+//     scored.sort(function (a, b) { return b.score - a.score; });
+//     return scored.slice(0, MAX_RESULTS);
+//   }
+
+//   /* ------------------------------------------------------------------ ui */
+
+//   function activeNoteId() {
+//     const s = N.store && N.store.state;
+//     if (!s) return null;
+//     return s.activeNoteId || s.currentNoteId || (s.activeNote && s.activeNote.id) || null;
+//   }
+
+//   function render(list) {
+//     const box = el('div.related-panel');
+//     const head = el('div.related-head', null, 'Related — not yet linked');
+//     box.appendChild(head);
+
+//     if (!list.length) {
+//       box.appendChild(el('div.related-empty', null,
+//         'Nothing close enough yet. This fills in as the vault grows.'));
+//       return box;
+//     }
+
+//     list.forEach(function (item) {
+//       const pct = Math.round(Math.min(1, item.score) * 100);
+//       const row = el('button.related-item', {
+//         type: 'button',
+//         title: 'Open "' + titleOf(item.note) + '"',
+//         onclick: function () {
+//           if (N.app && typeof N.app.openNote === 'function') N.app.openNote(item.id);
+//         }
+//       });
+//       row.appendChild(el('span.related-title', null, titleOf(item.note)));
+//       const meta = el('span.related-meta', null,
+//         pct + '% match' + (item.tags ? ' · shared tag' : ''));
+//       row.appendChild(meta);
+//       box.appendChild(row);
+//     });
+//     return box;
+//   }
+
+//   function host() {
+//     return document.querySelector('.right-panel') || null;
+//   }
+
+//   function refresh() {
+//     const parent = host();
+//     if (!parent) return;
+//     const id = activeNoteId();
+//     if (mounted && mounted.parentNode) mounted.parentNode.removeChild(mounted);
+//     mounted = null;
+//     if (!id) return;
+//     let list = [];
+//     try { list = related(id); }
+//     catch (err) { console.warn('[nodalis] related: scoring failed', err); return; }
+//     mounted = render(list);
+//     parent.appendChild(mounted);
+//   }
+
+//   /* ---------------------------------------------------------------- init */
+
+//   function init() {
+//     if (!notesMap()) {
+//       console.warn('[nodalis] related: store unavailable, feature disabled');
+//       return;
+//     }
+
+//     const idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 300); };
+//     idle(function () { ensureIndex(); refresh(); });
+
+//     if (N.bus && typeof N.bus.on === 'function') {
+//       N.bus.on('note:active', refresh);
+//       N.bus.on('note:updated', scheduleRebuild);
+//       N.bus.on('note:deleted', scheduleRebuild);
+//       N.bus.on('vault:changed', scheduleRebuild);
+//       N.bus.on('view:changed', function () { setTimeout(refresh, 60); });
+//     }
+
+//     if (N.commands && typeof N.commands.registerMany === 'function') {
+//       N.commands.registerMany([
+//         {
+//           id: 'related.show', title: 'Show related notes', group: 'View', icon: 'link',
+//           run: function () {
+//             const id = activeNoteId();
+//             if (!id) { N.toast && N.toast.info && N.toast.info('Open a note first.'); return; }
+//             refresh();
+//             const list = related(id);
+//             if (N.toast && N.toast.info) {
+//               N.toast.info(list.length
+//                 ? 'Found ' + list.length + ' related note' + (list.length > 1 ? 's' : '') + '.'
+//                 : 'No strong matches yet.');
+//             }
+//           }
+//         },
+//         {
+//           id: 'related.reindex', title: 'Rebuild the related-notes index', group: 'Vault', icon: 'refresh',
+//           run: function () {
+//             index = null;
+//             ensureIndex();
+//             refresh();
+//             N.toast && N.toast.success && N.toast.success('Related index rebuilt.');
+//           }
+//         }
+//       ]);
+//     }
+//   }
+
+//   N.related = { init: init, related: related, refresh: refresh, rebuild: function () { index = null; ensureIndex(); } };
+// })(window.NODALIS = window.NODALIS || {});
+  
+// // New Code
+
+// /* =========================================================================
+//  * Nodalis - features/intel.js
+//  * Vault intelligence: eight features that make the vault get MORE USEFUL
+//  * as it grows, instead of just bigger.
+//  *
+//  *   1. Auto-link            find note titles sitting in plain text and turn
+//  *                           them into real [[links]] - with a preview first
+//  *   2. Suggest tags         propose #tags from what the note is actually about
+//  *   3. Resurface            bring back a good note you have forgotten
+//  *   4. Find duplicates      near-identical notes, before they diverge
+//  *   5. Fix broken links     [[links]] pointing nowhere + closest match
+//  *   6. Vault report         orphans, hubs, growth, what needs attention
+//  *   7. Random note          the serendipity button
+//  *   8. Auto-link whole vault  the same as 1, applied everywhere
+//  *
+//  * WHY THESE
+//  * Obsidian needs plugins for most of this; Notion cannot do several at all
+//  * because it has no real link graph. All of it runs locally on files you own,
+//  * with no account, no server and no network.
+//  *
+//  * SHARED ENGINE
+//  * One TF-IDF index over the vault, built once on an idle callback, cached,
+//  * and rebuilt (debounced) after edits. The features all read from it, so the
+//  * cost is paid once rather than eight times.
+//  *
+//  * SAFETY
+//  * Every write goes through N.store.updateNoteContent, which is the same path
+//  * the editor uses - so version history captures it and Undo works normally.
+//  * Nothing here writes without showing you exactly what will change first.
+//  * ========================================================================= */
+// (function (N) {
+//   'use strict';
+
+//   const U = N && N.util;
+//   if (!U || typeof U.el !== 'function') {
+//     console.warn('[nodalis] intel: util unavailable, feature disabled');
+//     return;
+//   }
+//   const el = U.el;
+
+//   const REBUILD_DEBOUNCE = 2500;
+//   const DUP_THRESHOLD    = 0.62;   // cosine above this means "near-duplicate"
+//   const STALE_DAYS       = 30;     // untouched this long means resurfaceable
+
+//   let index = null;   // { df, docs, postings, n }
+//   let rebuildTimer = null;
+
+//   const STOP = new Set(('a about above after again against all am an and any are as at be because been before being ' +
+//     'below between both but by can cannot could did do does doing down during each few for from further had has have ' +
+//     'having he her here hers him his how i if in into is it its itself just me more most my no nor not of off on once ' +
+//     'only or other our out over own same she should so some such than that the their them then there these they this ' +
+//     'those through to too under until up very was we were what when where which while who whom why will with you your ' +
+//     'yours also could would should must may might one two get got make made use used using like new').split(/\s+/));
+
+//   /* ------------------------------------------------------------ helpers */
+
+//   function notes() { return (N.store && N.store.state && N.store.state.notes) || null; }
+//   function titleOf(note) {
+//     if (N.store && typeof N.store.noteTitle === 'function') return N.store.noteTitle(note);
+//     return (note && note.title) || 'Untitled';
+//   }
+//   function activeId() {
+//     const s = N.store && N.store.state;
+//     return s ? (s.activeNoteId || null) : null;
+//   }
+
+//   function tokenize(text) {
+//     if (!text) return [];
+//     return String(text).toLowerCase()
+//       .replace(/```[\s\S]*?```/g, ' ')
+//       .replace(/`[^`]*`/g, ' ')
+//       .replace(/https?:\/\/\S+/g, ' ')
+//       .replace(/\[\[([^\]]*)\]\]/g, ' $1 ')
+//       .replace(/[^a-z0-9à-ÿ'\s-]/g, ' ')
+//       .split(/\s+/)
+//       .filter(function (w) {
+//         return w.length > 2 && w.length < 32 && !STOP.has(w) && !/^\d+$/.test(w);
+//       });
+//   }
+
+//   /* -------------------------------------------------------------- index */
+
+//   function buildIndex() {
+//     const map = notes();
+//     if (!map) return;
+//     const df = new Map(), docs = new Map(), postings = new Map();
+//     map.forEach(function (note, id) {
+//       const terms = tokenize((titleOf(note) + ' ').repeat(3) + (note.content || ''));
+//       const tf = new Map();
+//       terms.forEach(function (t) { tf.set(t, (tf.get(t) || 0) + 1); });
+//       tf.forEach(function (_, t) {
+//         df.set(t, (df.get(t) || 0) + 1);
+//         let l = postings.get(t); if (!l) { l = []; postings.set(t, l); }
+//         l.push(id);
+//       });
+//       docs.set(id, tf);
+//     });
+//     index = { df: df, docs: docs, postings: postings, n: docs.size };
+//   }
+//   function ensureIndex() { if (!index) buildIndex(); }
+//   function scheduleRebuild() {
+//     clearTimeout(rebuildTimer);
+//     rebuildTimer = setTimeout(function () {
+//       index = null;
+//       const idle = window.requestIdleCallback || function (f) { return setTimeout(f, 200); };
+//       idle(ensureIndex);
+//     }, REBUILD_DEBOUNCE);
+//   }
+
+//   function weights(id) {
+//     const tf = index.docs.get(id);
+//     if (!tf || !tf.size) return null;
+//     const w = new Map(); let norm = 0;
+//     tf.forEach(function (c, t) {
+//       const idf = Math.log(1 + index.n / (index.df.get(t) || 1));
+//       const v = (1 + Math.log(c)) * idf;
+//       w.set(t, v); norm += v * v;
+//     });
+//     return { w: w, norm: Math.sqrt(norm) || 1 };
+//   }
+
+//   function cosine(aId, bId) {
+//     const A = weights(aId), B = weights(bId);
+//     if (!A || !B) return 0;
+//     let dot = 0;
+//     const small = A.w.size < B.w.size ? A : B;
+//     const big   = small === A ? B : A;
+//     small.w.forEach(function (v, t) { const o = big.w.get(t); if (o) dot += v * o; });
+//     return dot / (A.norm * B.norm);
+//   }
+
+//   /* ------------------------------------------------------ shared modal */
+
+//   function listModal(opts) {
+//     if (!N.modal || typeof N.modal.open !== 'function') {
+//       if (N.toast && N.toast.info) N.toast.info(opts.title + ': ' + opts.rows.length + ' result(s)');
+//       return;
+//     }
+//     N.modal.open({
+//       title: opts.title,
+//       size: opts.size || 'md',
+//       render: function (api) {
+//         const wrap = el('div.intel-modal');
+//         if (opts.subtitle) wrap.appendChild(el('p.intel-sub', null, opts.subtitle));
+//         if (!opts.rows.length) {
+//           wrap.appendChild(el('div.intel-empty', null, opts.empty || 'Nothing found.'));
+//           return wrap;
+//         }
+//         const list = el('div.intel-list');
+//         opts.rows.forEach(function (r) {
+//           const row = el('div.intel-row');
+//           const main = el('button.intel-main', {
+//             type: 'button',
+//             onclick: function () { if (r.onClick) { r.onClick(); if (api && api.close) api.close(); } }
+//           });
+//           main.appendChild(el('span.intel-label', null, r.label));
+//           if (r.sub) main.appendChild(el('span.intel-sub2', null, r.sub));
+//           row.appendChild(main);
+//           if (r.action) {
+//             row.appendChild(el('button.btn.btn-sm.btn-primary', {
+//               type: 'button',
+//               onclick: async function () { await r.action.run(); if (api && api.close) api.close(); }
+//             }, r.action.label));
+//           }
+//           list.appendChild(row);
+//         });
+//         wrap.appendChild(list);
+//         return wrap;
+//       }
+//     });
+//   }
+
+//   /* ================================================== 1. AUTO-LINK ===== */
+
+//   function linkableTitles() {
+//     const map = notes(); const out = [];
+//     map.forEach(function (n2, id) {
+//       const t = titleOf(n2);
+//       if (!t || t.length < 4 || t.toLowerCase() === 'untitled') return;
+//       if (STOP.has(t.toLowerCase())) return;
+//       out.push({ id: id, title: t });
+//     });
+//     // longest first, so "Machine learning basics" wins over "Machine learning"
+//     out.sort(function (a, b) { return b.title.length - a.title.length; });
+//     return out;
+//   }
+
+//   // Returns { count, titles, apply() } - never writes on its own.
+//   function planAutoLink(noteId) {
+//     const map = notes(); if (!map) return null;
+//     const note = map.get(noteId); if (!note) return null;
+//     const original = String(note.content || '');
+//     if (!original.trim()) return null;
+
+//     // Protect regions that must never be touched: frontmatter, code fences,
+//     // inline code, existing [[wikilinks]], [md](links), urls and headings.
+//     const guards = [];
+//     let masked = original.replace(
+//       /(^---[\s\S]*?^---)|(```[\s\S]*?```)|(`[^`]*`)|(\[\[[^\]]*\]\])|(\[[^\]]*\]\([^)]*\))|(https?:\/\/\S+)|(^#{1,6} .*$)/gm,
+//       function (m) { guards.push(m); return '@@ND' + (guards.length - 1) + 'ND@@'; }
+//     );
+
+//     const hits = [];
+//     linkableTitles().forEach(function (cand) {
+//       if (cand.id === noteId) return;
+//       const safe = cand.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+//       // whole-word, case-insensitive, FIRST occurrence only - linking every
+//       // occurrence turns a paragraph into a wall of blue
+//       const re = new RegExp('(^|[^\\w\\[])(' + safe + ')(?![\\w\\]])', 'i');
+//       if (!re.test(masked)) return;
+//       masked = masked.replace(re, function (full, pre, word) { return pre + '[[' + word + ']]'; });
+//       hits.push(cand.title);
+//     });
+
+//     if (!hits.length) return null;
+//     // Restore the protected regions. The sentinel is plain ASCII that cannot
+//     // occur in normal prose, so digits in the text are never mistaken for a
+//     // placeholder and no surrounding whitespace is added or eaten.
+//     const final = masked.replace(/@@ND(\d+)ND@@/g, function (_, i) { return guards[+i]; });
+//     return {
+//       count: hits.length,
+//       titles: hits,
+//       apply: async function () { await N.store.updateNoteContent(noteId, final); }
+//     };
+//   }
+
+//   async function autoLinkActive() {
+//     ensureIndex();
+//     const id = activeId();
+//     if (!id) { N.toast.info('Open a note first.'); return; }
+//     if (N.editor && N.editor.flushSave) { try { await N.editor.flushSave(); } catch (e) {} }
+
+//     const plan = planAutoLink(id);
+//     if (!plan) { N.toast.info('No unlinked note titles found in this note.'); return; }
+
+//     const ok = await N.modal.confirm({
+//       title: 'Link ' + plan.count + ' mention' + (plan.count > 1 ? 's' : '') + '?',
+//       message: 'These note titles appear in the text and are not linked yet:\n\n' +
+//                plan.titles.map(function (t) { return '- ' + t; }).join('\n') +
+//                '\n\nCode, existing links and headings are left untouched. Undo works normally.',
+//       confirmLabel: 'Link them'
+//     });
+//     if (!ok) return;
+//     await plan.apply();
+//     N.toast.success('Linked ' + plan.count + ' mention' + (plan.count > 1 ? 's' : '') + '.', {
+//       ms: 5000,
+//       action: { label: 'Undo', onClick: function () { N.store.undo(); } }
+//     });
+//   }
+
+//   async function autoLinkVault() {
+//     ensureIndex();
+//     const map = notes(); if (!map) return;
+//     const plans = [];
+//     map.forEach(function (_, id) { const p = planAutoLink(id); if (p) plans.push({ id: id, plan: p }); });
+//     if (!plans.length) { N.toast.info('Nothing to link across the vault.'); return; }
+//     const total = plans.reduce(function (s, p) { return s + p.plan.count; }, 0);
+//     const ok = await N.modal.confirm({
+//       title: 'Link ' + total + ' mentions across ' + plans.length + ' notes?',
+//       message: 'Every unlinked mention of an existing note title becomes a [[link]]. ' +
+//                'Code blocks, existing links and headings are skipped. This is one undo step per note.',
+//       confirmLabel: 'Link everything'
+//     });
+//     if (!ok) return;
+//     for (const p of plans) { await p.plan.apply(); }
+//     N.toast.success('Linked ' + total + ' mentions in ' + plans.length + ' notes.', { ms: 6000 });
+//   }
+
+//   /* ================================================ 2. SUGGEST TAGS ==== */
+
+//   function suggestTags(noteId) {
+//     ensureIndex();
+//     const map = notes(); const note = map && map.get(noteId);
+//     if (!note || !index) return [];
+//     const w = weights(noteId); if (!w) return [];
+//     const existing = new Set((note.tags || []).map(function (t) { return String(t).toLowerCase(); }));
+//     const body = String(note.content || '').toLowerCase();
+//     const inBody = new Set((body.match(/(^|\s)#([a-z0-9][\w/-]*)/g) || [])
+//       .map(function (s) { return s.trim().replace(/^#/, ''); }));
+
+//     const scored = [];
+//     w.w.forEach(function (v, term) {
+//       if (existing.has(term) || inBody.has(term)) return;
+//       const df = index.df.get(term) || 1;
+//       // A good tag is distinctive but not unique - it should group notes.
+//       if (df < 2 || df > Math.max(3, index.n * 0.3)) return;
+//       scored.push({ term: term, score: v * Math.log(1 + df) });
+//     });
+//     scored.sort(function (a, b) { return b.score - a.score; });
+//     return scored.slice(0, 6).map(function (s) { return s.term; });
+//   }
+
+//   async function suggestTagsActive() {
+//     const id = activeId();
+//     if (!id) { N.toast.info('Open a note first.'); return; }
+//     const tags = suggestTags(id);
+//     if (!tags.length) { N.toast.info('No confident tag suggestions for this note yet.'); return; }
+//     listModal({
+//       title: 'Suggested tags',
+//       subtitle: 'Chosen because they are distinctive in this note and shared with a few others, so they actually group things.',
+//       rows: tags.map(function (t) {
+//         return {
+//           label: '#' + t,
+//           sub: 'appears in ' + (index.df.get(t) || 0) + ' notes',
+//           action: {
+//             label: 'Add',
+//             run: async function () {
+//               const note = notes().get(id); if (!note) return;
+//               const content = String(note.content || '');
+//               await N.store.updateNoteContent(id, content.replace(/\s*$/, '') + '\n\n#' + t + '\n');
+//               N.toast.success('Added #' + t, {
+//                 ms: 4000,
+//                 action: { label: 'Undo', onClick: function () { N.store.undo(); } }
+//               });
+//             }
+//           }
+//         };
+//       })
+//     });
+//   }
+
+//   /* =================================================== 3. RESURFACE ==== */
+
+//   function staleNotes() {
+//     const map = notes(); if (!map) return [];
+//     const cutoff = Date.now() - STALE_DAYS * 86400000;
+//     const out = [];
+//     map.forEach(function (n2, id) {
+//       const t = n2.updated || n2.modified || n2.created || 0;
+//       const ts = typeof t === 'number' ? t : (Date.parse(t) || 0);
+//       const len = String(n2.content || '').length;
+//       if (len < 120) return;             // stubs are not worth resurfacing
+//       if (ts && ts > cutoff) return;
+//       out.push({ id: id, note: n2, ts: ts, len: len });
+//     });
+//     // longest-untouched first, but weight substance so a real note beats a scrap
+//     out.sort(function (a, b) { return (a.ts - b.ts) || (b.len - a.len); });
+//     return out;
+//   }
+
+//   function resurface() {
+//     const stale = staleNotes();
+//     if (!stale.length) { N.toast.info('Nothing has gone stale - the whole vault is recent.'); return; }
+//     const pick = stale[Math.floor(Math.random() * Math.min(stale.length, 12))];
+//     const days = pick.ts ? Math.round((Date.now() - pick.ts) / 86400000) : null;
+//     listModal({
+//       title: 'From your vault',
+//       subtitle: days ? 'Untouched for about ' + days + ' days. Still any good?'
+//                      : 'You have not opened this in a while.',
+//       rows: [{
+//         label: titleOf(pick.note),
+//         sub: String(pick.note.content || '').replace(/\s+/g, ' ').slice(0, 140),
+//         onClick: function () { N.app.openNote(pick.id); }
+//       }]
+//     });
+//   }
+
+//   /* ============================================== 4. FIND DUPLICATES === */
+
+//   function findDuplicates() {
+//     ensureIndex();
+//     if (!index) return [];
+//     const seen = new Set(), pairs = [];
+//     index.docs.forEach(function (_, a) {
+//       const wa = weights(a); if (!wa) return;
+//       const cand = new Map();
+//       wa.w.forEach(function (_v, term) {
+//         const list = index.postings.get(term); if (!list) return;
+//         for (let i = 0; i < list.length; i++) if (list[i] !== a) cand.set(list[i], 1);
+//       });
+//       cand.forEach(function (_v, b) {
+//         const key = a < b ? a + '|' + b : b + '|' + a;
+//         if (seen.has(key)) return;
+//         seen.add(key);
+//         const score = cosine(a, b);
+//         if (score >= DUP_THRESHOLD) pairs.push({ a: a, b: b, score: score });
+//       });
+//     });
+//     pairs.sort(function (x, y) { return y.score - x.score; });
+//     return pairs.slice(0, 25);
+//   }
+
+//   function showDuplicates() {
+//     const map = notes();
+//     const pairs = findDuplicates();
+//     listModal({
+//       title: 'Possible duplicates',
+//       subtitle: 'Notes that overlap heavily. Worth merging before they drift apart.',
+//       empty: 'No near-duplicates found. The vault is clean.',
+//       rows: pairs.map(function (p) {
+//         return {
+//           label: titleOf(map.get(p.a)) + '  /  ' + titleOf(map.get(p.b)),
+//           sub: Math.round(p.score * 100) + '% similar',
+//           onClick: function () { N.app.openNote(p.a); }
+//         };
+//       })
+//     });
+//   }
+
+//   /* ============================================ 5. FIX BROKEN LINKS ==== */
+
+//   function brokenLinks() {
+//     const map = notes(); if (!map) return [];
+//     const byTitle = new Map();
+//     map.forEach(function (n2, id) { byTitle.set(titleOf(n2).toLowerCase(), id); });
+//     const out = [];
+//     map.forEach(function (n2, id) {
+//       const body = String(n2.content || '');
+//       const re = /\[\[([^\]|#]+)(\|[^\]]*)?\]\]/g;
+//       let m;
+//       while ((m = re.exec(body)) !== null) {
+//         const target = m[1].trim();
+//         if (!target || byTitle.has(target.toLowerCase())) continue;
+//         let best = null, bestScore = 0;
+//         byTitle.forEach(function (tid, t) {
+//           let s = 0;
+//           if (t.indexOf(target.toLowerCase()) !== -1 || target.toLowerCase().indexOf(t) !== -1) {
+//             s = Math.min(t.length, target.length) / Math.max(t.length, target.length);
+//           }
+//           if (s > bestScore) { bestScore = s; best = { id: tid, title: t }; }
+//         });
+//         out.push({ noteId: id, target: target, suggestion: bestScore > 0.55 ? best : null });
+//       }
+//     });
+//     return out;
+//   }
+
+//   function showBrokenLinks() {
+//     const map = notes();
+//     const broken = brokenLinks();
+//     listModal({
+//       title: 'Links pointing nowhere',
+//       subtitle: 'A [[link]] whose note does not exist. Create it, or fix the spelling.',
+//       empty: 'Every link resolves. Nothing broken.',
+//       rows: broken.map(function (b) {
+//         const host = map.get(b.noteId);
+//         const row = {
+//           label: '[[' + b.target + ']]',
+//           sub: 'in "' + titleOf(host) + '"' + (b.suggestion ? ' - did you mean "' + b.suggestion.title + '"?' : ''),
+//           onClick: function () { N.app.openNote(b.noteId); }
+//         };
+//         if (N.store.createNote) {
+//           row.action = {
+//             label: 'Create',
+//             run: async function () {
+//               await N.store.createNote({ title: b.target, folder: host ? host.folder : '', content: '' });
+//               N.toast.success('Created "' + b.target + '".', { ms: 3500 });
+//               scheduleRebuild();
+//             }
+//           };
+//         }
+//         return row;
+//       })
+//     });
+//   }
+
+//   /* ================================================= 6. VAULT REPORT === */
+
+//   function vaultReport() {
+//     ensureIndex();
+//     const map = notes(); if (!map) { N.toast.info('No vault loaded.'); return; }
+//     const all = Array.from(map.values());
+//     const byTitle = new Map();
+//     map.forEach(function (n2, id) { byTitle.set(titleOf(n2).toLowerCase(), id); });
+
+//     const inbound = new Map();
+//     let linkCount = 0;
+//     map.forEach(function (n2) {
+//       const re = /\[\[([^\]|#]+)(\|[^\]]*)?\]\]/g; let m;
+//       while ((m = re.exec(String(n2.content || ''))) !== null) {
+//         linkCount++;
+//         const tid = byTitle.get(m[1].trim().toLowerCase());
+//         if (tid) inbound.set(tid, (inbound.get(tid) || 0) + 1);
+//       }
+//     });
+
+//     const orphans = all.filter(function (n2) {
+//       return !inbound.get(n2.id) && !/\[\[/.test(String(n2.content || ''));
+//     });
+//     const hubs = Array.from(inbound.entries())
+//       .sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
+//     const words = all.reduce(function (s, n2) {
+//       return s + String(n2.content || '').split(/\s+/).filter(Boolean).length;
+//     }, 0);
+
+//     const rows = [
+//       { label: String(all.length), sub: 'notes' },
+//       { label: words.toLocaleString(), sub: 'words written' },
+//       { label: String(linkCount), sub: 'links between notes' },
+//       { label: String(orphans.length), sub: 'orphans - connected to nothing' },
+//       { label: String(findDuplicates().length), sub: 'possible duplicate pairs' },
+//       { label: String(brokenLinks().length), sub: 'links pointing nowhere' }
+//     ];
+//     hubs.forEach(function (h) {
+//       const n2 = map.get(h[0]);
+//       rows.push({
+//         label: titleOf(n2),
+//         sub: h[1] + ' notes link here - a hub',
+//         onClick: function () { N.app.openNote(h[0]); }
+//       });
+//     });
+
+//     listModal({ title: 'Vault report', subtitle: 'A quick read on the shape of your thinking.', rows: rows });
+//   }
+
+//   /* ================================================== 7. RANDOM NOTE === */
+
+//   function randomNote() {
+//     const map = notes();
+//     if (!map || !map.size) { N.toast.info('No notes yet.'); return; }
+//     const ids = Array.from(map.keys());
+//     N.app.openNote(ids[Math.floor(Math.random() * ids.length)]);
+//   }
+
+//   /* ---------------------------------------------------------------- init */
+
+//   function init() {
+//     if (!notes()) { console.warn('[nodalis] intel: store unavailable'); return; }
+//     const idle = window.requestIdleCallback || function (f) { return setTimeout(f, 400); };
+//     idle(ensureIndex);
+
+//     if (N.bus && N.bus.on) {
+//       N.bus.on('note:updated', scheduleRebuild);
+//       N.bus.on('note:deleted', scheduleRebuild);
+//       N.bus.on('vault:changed', scheduleRebuild);
+//     }
+
+//     if (N.commands && N.commands.registerMany) {
+//       N.commands.registerMany([
+//         { id: 'intel.autolink',    title: 'Auto-link mentions in this note', group: 'Edit',  icon: 'link',    run: autoLinkActive },
+//         { id: 'intel.autolinkAll', title: 'Auto-link the whole vault',       group: 'Vault', icon: 'link',    run: autoLinkVault },
+//         { id: 'intel.tags',        title: 'Suggest tags for this note',      group: 'Edit',  icon: 'tag',     run: suggestTagsActive },
+//         { id: 'intel.resurface',   title: 'Resurface a forgotten note',      group: 'View',  icon: 'clock',   run: resurface },
+//         { id: 'intel.duplicates',  title: 'Find duplicate notes',            group: 'Vault', icon: 'copy',    run: showDuplicates },
+//         { id: 'intel.broken',      title: 'Find links pointing nowhere',     group: 'Vault', icon: 'warning', run: showBrokenLinks },
+//         { id: 'intel.report',      title: 'Vault report',                    group: 'Vault', icon: 'info',    run: vaultReport },
+//         { id: 'intel.random',      title: 'Open a random note',              group: 'View',  icon: 'shuffle', run: randomNote }
+//       ]);
+//     }
+//   }
+
+//   N.intel = {
+//     init: init,
+//     autoLink: autoLinkActive,
+//     autoLinkVault: autoLinkVault,
+//     planAutoLink: planAutoLink,
+//     suggestTags: suggestTags,
+//     resurface: resurface,
+//     duplicates: findDuplicates,
+//     brokenLinks: brokenLinks,
+//     report: vaultReport,
+//     random: randomNote,
+//     rebuild: function () { index = null; ensureIndex(); }
+//   };
+// })(window.NODALIS = window.NODALIS || {});
+
+// New Code
+
 /* =========================================================================
- * Nodalis — features/pwa.js
- * The install prompt.
+ * Nodalis - features/pwa.js  (COMPLETE REPLACEMENT)
  *
- * Three states, and which one you see depends on where you are standing:
+ * Replaces the ENTIRE existing pwa.js module. See INSTALL.md step 2.
  *
- *   1. INSTALLABLE  the browser has offered us a beforeinstallprompt event.
- *                   Show the card with a real Install button.
- *   2. MANUAL       no event (Safari, Firefox, iOS). Show the card with the
- *                   exact steps for that browser instead of a dead button.
- *   3. INSTALLED    the app exists on this device but you are in the browser.
- *                   Offer to open it there instead.
+ * THREE STATES, and the card only ever shows one:
  *
- * Dismissing is deliberately per-page-load, as asked: close it and it stays
- * closed until the next refresh. "Don't show this again" is offered after the
- * third dismissal, because a prompt that can never be silenced is a dark
- * pattern and this app does not do those.
+ *   INSTALLABLE  the browser gave us a real install event.
+ *                [ Install app ]  [ Not now ]
+ *                Install fires the browser's own install dialog - the exact
+ *                native sheet in your second screenshot.
+ *
+ *   INSTALLED    the app is already on this device.
+ *                [ Open app ]  [ Not now ]
+ *                Shown once per visit (per browser session), never on every
+ *                reload, so it helps rather than nags.
+ *
+ *   MANUAL       no install event and no way to trigger one.
+ *                [ Show me how ]  [ Not now ]
+ *                Honest instructions for that exact browser. No fake action
+ *                buttons - see the note at the bottom of this file.
+ *
+ * WHAT CHANGED FROM THE VERSION YOU HAVE
+ *   - Reads the early-captured event from window.__ndInstallPrompt, so the
+ *     Install button actually appears (this was the whole bug).
+ *   - "Copy link" and "Added it" are gone. They were busywork.
+ *   - The installed state now offers to open the app, as you asked.
+ *   - Dismissal is per-session, so "Not now" means not now, not never.
  * ========================================================================= */
 (function (N) {
   'use strict';
@@ -25204,470 +27040,309 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   const U = N.util;
   const el = U.el;
 
-  const DISMISS_KEY = 'pwaDismissCount';
-  const SILENCE_KEY = 'pwaSilenced';
+  const SILENCE_KEY  = 'pwaSilenced';      // permanent, user asked to stop
+  const DISMISS_KEY  = 'pwaDismissCount';
+  const SESSION_KEY  = 'nd-pwa-dismissed'; // per-session "not now"
 
-  let deferred = null;      // the captured beforeinstallprompt event
-  let card = null;
+  let deferred = null;
   let shown = false;
+  let node = null;
+
+  /* --------------------------------------------------------------- state */
 
   function isStandalone() {
     return window.matchMedia('(display-mode: standalone)').matches ||
       window.matchMedia('(display-mode: window-controls-overlay)').matches ||
+      window.matchMedia('(display-mode: minimal-ui)').matches ||
       window.navigator.standalone === true;
   }
 
-  /** Best-effort: has this browser told us the app is already installed? */
-  async function installedElsewhere() {
+  function startUrl() {
+    // Same origin + path the manifest uses. Keeping it explicit means the
+    // "Open app" link matches the installed app's scope.
+    return location.origin + location.pathname;
+  }
+
+  async function isInstalled() {
+    if (window.__ndInstalled) return true;
+    if (N.store.state.settings.pwaInstalled === true) return true;
     try {
       if (navigator.getInstalledRelatedApps) {
         const apps = await navigator.getInstalledRelatedApps();
         if (apps && apps.length) return true;
       }
-    } catch (err) { /* not supported; fall through */ }
-    return N.store.state.settings.pwaInstalled === true;
+    } catch (err) { /* unsupported: fall through */ }
+    return false;
   }
+
+  function dismissedThisSession() {
+    try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch (e) { return false; }
+  }
+  function markDismissedThisSession() {
+    try { sessionStorage.setItem(SESSION_KEY, '1'); } catch (e) { /* private mode */ }
+  }
+
+  /* ------------------------------------------------------- manual steps */
 
   function manualSteps() {
     const ua = navigator.userAgent;
     if (U.supports.isIOS) {
       return {
         title: 'Add Nodalis to your Home Screen',
-        steps: ['Tap the Share button in Safari', 'Choose "Add to Home Screen"', 'Tap Add'],
+        lead: 'Safari installs apps from the Share menu. It takes three taps.',
+        steps: ['Tap the Share button at the bottom of Safari',
+                'Scroll and choose "Add to Home Screen"',
+                'Tap Add']
       };
     }
     if (/Firefox/i.test(ua)) {
       return {
         title: 'Install Nodalis',
-        steps: ['Open the Firefox menu', 'Choose "Install" or "Add to Home screen"'],
+        lead: 'Firefox installs apps from its own menu.',
+        steps: ['Open the Firefox menu', 'Choose "Install" or "Add to Home screen"']
       };
     }
     if (/Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua)) {
       return {
-        title: 'Install Nodalis',
-        steps: ['Open the File menu in Safari', 'Choose "Add to Dock"'],
+        title: 'Add Nodalis to your Dock',
+        lead: 'Safari on Mac installs apps from the File menu.',
+        steps: ['Open the File menu in Safari', 'Choose "Add to Dock"']
       };
     }
     return {
       title: 'Install Nodalis',
-      steps: ['Open your browser menu', 'Choose "Install Nodalis" or "Add to Home screen"'],
+      lead: 'Your browser installs apps from its own menu.',
+      steps: ['Open your browser menu', 'Choose "Install Nodalis" or "Add to Home screen"']
     };
   }
 
-  /* ----------------------------------------------------------------- card */
+  /* ---------------------------------------------------------------- card */
 
-  // function build(mode) {
-  //   const node = el('div.pwa-prompt', { role: 'dialog', 'aria-label': 'Install Nodalis' });
+  function build(mode) {
+    const card = el('div.pwa-prompt', {
+      role: 'dialog', 'aria-modal': 'false', 'aria-label': 'Install Nodalis'
+    });
+    card.dataset.mode = mode;
 
-  //   const mark = el('div.pwa-mark');
-  //   mark.appendChild(N.icons.node(mode === 'installed' ? 'external' : 'download', { size: 22 }));
-  //   node.appendChild(mark);
+    const mark = el('div.pwa-mark');
+    mark.appendChild(N.icons.node(mode === 'installed' ? 'external' : 'download', { size: 20 }));
+    card.appendChild(mark);
 
-  //   const main = el('div.pwa-main');
+    const main = el('div.pwa-main');
+    const actions = el('div.pwa-actions');
 
-  //   if (mode === 'installed') {
-  //     main.appendChild(el('div.pwa-title', null, 'Nodalis is installed on this device'));
-  //     main.appendChild(el('p.pwa-text', null,
-  //       'The installed app opens in its own window, starts faster and keeps working with no connection.'));
-  //   } else if (mode === 'installable') {
-  //     main.appendChild(el('div.pwa-title', null, 'Install Nodalis'));
-  //     main.appendChild(el('p.pwa-text', null,
-  //       'Its own window, its own icon, instant start, and it keeps working offline. Nothing is uploaded — the app just lives on your device.'));
-  //   } else {
-  //     const info = manualSteps();
-  //     main.appendChild(el('div.pwa-title', null, info.title));
-  //     const ol = el('ol.pwa-steps');
-  //     info.steps.forEach(function (step) { ol.appendChild(el('li', null, step)); });
-  //     main.appendChild(ol);
-  //   }
+    if (mode === 'installable') {
+      main.appendChild(el('div.pwa-title', null, 'Install Nodalis'));
+      main.appendChild(el('p.pwa-text', null,
+        'Its own window and icon, instant start, and it keeps working with no connection. Nothing is uploaded.'));
 
-  //   // Install first, dismissal second. The primary action always leads.
-  //   const actions = el('div.pwa-actions');
+      const install = el('button.btn.btn-primary.btn-sm.pwa-cta', { type: 'button' });
+      install.appendChild(N.icons.node('download', { size: 15 }));
+      install.appendChild(el('span', null, 'Install app'));
+      install.addEventListener('click', doInstall);
+      actions.appendChild(install);
 
-  //   if (mode === 'installable') {
-  //     const install = el('button.btn.btn-primary.btn-sm', { type: 'button' });
-  //     install.appendChild(N.icons.node('download', { size: 15 }));
-  //     install.appendChild(el('span', null, 'Install'));
-  //     install.addEventListener('click', doInstall);
-  //     actions.appendChild(install);
-  //   } else if (mode === 'installed') {
-  //     const open = el('button.btn.btn-primary.btn-sm', { type: 'button' });
-  //     open.appendChild(N.icons.node('external', { size: 15 }));
-  //     open.appendChild(el('span', null, 'Open the app'));
-  //     open.addEventListener('click', openInstalled);
-  //     actions.appendChild(open);
-  //   }
+    } else if (mode === 'installed') {
+      main.appendChild(el('div.pwa-title', null, 'Nodalis is installed'));
+      main.appendChild(el('p.pwa-text', null,
+        'You already have it on this device. The installed app opens in its own window and starts faster.'));
 
-  //   const later = el('button.btn.btn-sm.btn-ghost', { type: 'button' }, 'Not now');
-  //   later.addEventListener('click', function () { dismiss('later'); });
-  //   actions.appendChild(later);
+      const open = el('button.btn.btn-primary.btn-sm.pwa-cta', { type: 'button' });
+      open.appendChild(N.icons.node('external', { size: 15 }));
+      open.appendChild(el('span', null, 'Open app'));
+      open.addEventListener('click', openInstalled);
+      actions.appendChild(open);
 
-  //   main.appendChild(actions);
-  //   node.appendChild(main);
-
-  //   const close = el('button.icon-btn.icon-btn-sm.pwa-close', {
-  //     type: 'button', 'aria-label': 'Close',
-  //   });
-  //   close.appendChild(N.icons.node('close', { size: 16 }));
-  //   close.addEventListener('click', function () { dismiss('close'); });
-  //   node.appendChild(close);
-
-  //   return node;
-  // }
-
-  /* ============ REPLACEMENT 2 of 4 — build ================================ */
-
-function build(mode) {
-  const node = el('div.pwa-prompt', { role: 'dialog', 'aria-label': 'Install Nodalis' });
-
-  const mark = el('div.pwa-mark');
-  mark.appendChild(N.icons.node(mode === 'installed' ? 'external' : 'download', { size: 22 }));
-  node.appendChild(mark);
-
-  const main = el('div.pwa-main');
-
-  if (mode === 'installed') {
-    main.appendChild(el('div.pwa-title', null, 'Nodalis is installed on this device'));
-    main.appendChild(el('p.pwa-text', null,
-      'The installed app opens in its own window, starts faster and keeps working with no connection.'));
-  } else if (mode === 'installable') {
-    main.appendChild(el('div.pwa-title', null, 'Install Nodalis'));
-    main.appendChild(el('p.pwa-text', null,
-      'Its own window, its own icon, instant start, and it keeps working offline. Nothing is uploaded — the app just lives on your device.'));
-  } else {
-    const info = manualSteps();
-    main.appendChild(el('div.pwa-title', null, info.title));
-    main.appendChild(el('p.pwa-text', null, canMakeShortcutFile()
-      ? 'This browser has no one-click install. You can still keep Nodalis one click away with a desktop shortcut.'
-      : 'This browser adds apps from its own menu. It takes two taps:'));
-    const ol = el('ol.pwa-steps');
-    info.steps.forEach(function (step) { ol.appendChild(el('li', null, step)); });
-    main.appendChild(ol);
-  }
-
-  // Primary action first, dismissal second — the primary always leads, and
-  // EVERY mode now has one, including manual.
-  const actions = el('div.pwa-actions');
-
-  if (mode === 'installable') {
-    const install = el('button.btn.btn-primary.btn-sm', { type: 'button' });
-    install.appendChild(N.icons.node('download', { size: 15 }));
-    install.appendChild(el('span', null, 'Install'));
-    install.addEventListener('click', doInstall);
-    actions.appendChild(install);
-
-  } else if (mode === 'installed') {
-    const open = el('button.btn.btn-primary.btn-sm', { type: 'button' });
-    open.appendChild(N.icons.node('external', { size: 15 }));
-    open.appendChild(el('span', null, 'Open the app'));
-    open.addEventListener('click', openInstalled);
-    actions.appendChild(open);
-
-  } else {
-    // MANUAL — this is the branch that previously had no button at all.
-    if (canMakeShortcutFile()) {
-      const sc = el('button.btn.btn-primary.btn-sm', { type: 'button' });
-      sc.appendChild(N.icons.node('download', { size: 15 }));
-      sc.appendChild(el('span', null, 'Create shortcut'));
-      sc.addEventListener('click', makeShortcut);
-      actions.appendChild(sc);
     } else {
-      // Mobile: no file can create a Home Screen icon, so the honest action
-      // is to hand over the link and stop asking.
-      const copy = el('button.btn.btn-primary.btn-sm', { type: 'button' });
-      copy.appendChild(N.icons.node('link', { size: 15 }));
-      copy.appendChild(el('span', null, 'Copy link'));
-      copy.addEventListener('click', async function () {
-        let ok = false;
-        try { ok = await U.copyToClipboard(location.href); } catch (err) { ok = false; }
-        N.toast[ok ? 'success' : 'info'](ok
-          ? 'Link copied. Use your browser menu → Add to Home Screen.'
-          : location.href, { ms: 5000 });
-      });
-      actions.appendChild(copy);
-
-      const done = el('button.btn.btn-sm.btn-ghost', { type: 'button' }, 'Added it');
-      done.addEventListener('click', async function () {
-        await N.store.setSetting('pwaShortcutAdded', true);
-        hide();
-        N.toast.success('Great — this will not ask again.', { ms: 2600 });
-      });
-      actions.appendChild(done);
+      const info = manualSteps();
+      main.appendChild(el('div.pwa-title', null, info.title));
+      main.appendChild(el('p.pwa-text', null, info.lead));
+      const ol = el('ol.pwa-steps');
+      info.steps.forEach(function (s) { ol.appendChild(el('li', null, s)); });
+      main.appendChild(ol);
     }
+
+    const later = el('button.btn.btn-sm.btn-ghost', { type: 'button' },
+      mode === 'installed' ? 'Not now' : 'Not now');
+    later.addEventListener('click', function () { dismiss('later'); });
+    actions.appendChild(later);
+
+    main.appendChild(actions);
+    card.appendChild(main);
+
+    const close = el('button.icon-btn.icon-btn-sm.pwa-close', {
+      type: 'button', 'aria-label': 'Close'
+    });
+    close.appendChild(N.icons.node('close', { size: 16 }));
+    close.addEventListener('click', function () { dismiss('close'); });
+    card.appendChild(close);
+
+    return card;
   }
-
-  const later = el('button.btn.btn-sm.btn-ghost', { type: 'button' }, 'Not now');
-  later.addEventListener('click', function () { dismiss('later'); });
-  actions.appendChild(later);
-
-  main.appendChild(actions);
-  node.appendChild(main);
-
-  const close = el('button.icon-btn.icon-btn-sm.pwa-close', {
-    type: 'button', 'aria-label': 'Close',
-  });
-  close.appendChild(N.icons.node('close', { size: 16 }));
-  close.addEventListener('click', function () { dismiss('close'); });
-  node.appendChild(close);
-
-  return node;
-}
-
 
   function show(mode) {
-    if (shown || card) return;
+    if (shown) return;
     shown = true;
-    card = build(mode);
-    document.body.appendChild(card);
-    // Next frame, so the entrance transition actually runs.
-    requestAnimationFrame(function () { card.classList.add('is-in'); });
-
-    // Escape closes it, like every other dismissible surface in the app.
-    document.addEventListener('keydown', onKey, true);
-  }
-
-  function onKey(e) {
-    if (e.key !== 'Escape' || !card) return;
-    if (N.modal.anyOpen() || N.palette.isOpen()) return;
-    e.preventDefault();
-    dismiss('close');
+    hide();
+    node = build(mode);
+    document.body.appendChild(node);
+    // next frame so the entry transition actually runs
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { if (node) node.classList.add('is-in'); });
+    });
+    if (N.haptics && N.haptics.buzz) { try { N.haptics.buzz('light'); } catch (e) {} }
   }
 
   function hide() {
-    if (!card) return;
-    const node = card;
-    card = null;
-    document.removeEventListener('keydown', onKey, true);
-    node.classList.remove('is-in');
-    node.classList.add('is-out');
-    const drop = function () { if (node.parentNode) node.parentNode.removeChild(node); };
-    node.addEventListener('transitionend', drop, { once: true });
-    setTimeout(drop, 500);
+    const existing = document.querySelector('.pwa-prompt');
+    if (!existing) { node = null; return; }
+    existing.classList.remove('is-in');
+    existing.classList.add('is-out');
+    const done = function () { if (existing.parentNode) existing.parentNode.removeChild(existing); };
+    existing.addEventListener('transitionend', done, { once: true });
+    setTimeout(done, 400);            // failsafe if the transition never fires
+    node = null;
   }
 
   async function dismiss(how) {
     hide();
+    shown = false;
+    markDismissedThisSession();
     const count = (N.store.state.settings[DISMISS_KEY] || 0) + 1;
     await N.store.setSetting(DISMISS_KEY, count);
 
-    // Asked for: it comes back on the next refresh. But after the third time
-    // we offer a way out, because nagging forever is not charming.
+    // Only after repeated closes do we offer to stop entirely. A prompt that
+    // can never be silenced is a dark pattern; one that silences itself too
+    // early is useless.
     if (how === 'close' && count >= 3 && !N.store.state.settings[SILENCE_KEY]) {
-      N.toast.info('Nodalis will keep offering this on every refresh.', {
+      N.toast.info('Stop asking about installing?', {
         ms: 7000,
-        key: 'pwa-silence',
         action: {
           label: 'Stop asking',
           onClick: async function () {
             await N.store.setSetting(SILENCE_KEY, true);
-            N.toast.success('Understood. Install is still in Settings → About.', { ms: 3000 });
-          },
-        },
+            N.toast.success('Understood. Install is still in the menu if you change your mind.', { ms: 3500 });
+          }
+        }
       });
     }
   }
 
-  /**
-   * Press Install -> the browser's own install dialog opens. That is the only
-   * thing that actually installs a PWA, and it can only be called from inside
-   * a user gesture — which is why `prompt()` is invoked synchronously here,
-   * before any await, and why the captured event is held rather than dropped.
-   *
-   * If the person cancels the browser dialog the event is spent and cannot be
-   * replayed; the card falls back to showing the manual steps rather than
-   * offering a button that would now do nothing.
-   */
+  /* ------------------------------------------------------------- actions */
+
   function doInstall() {
-    if (!deferred) { showManualFallback(); return; }
-    const event = deferred;
+    const event = deferred || window.__ndInstallPrompt;
+    if (!event) { shown = false; hide(); show('manual'); return; }
     deferred = null;
+    window.__ndInstallPrompt = null;
 
-    let dialogOpened = true;
+    let opened = true;
     try {
-      // Synchronous, inside the click. Awaiting first loses the gesture and
-      // Chrome silently refuses to show the dialog.
+      // MUST be synchronous inside the click. Awaiting anything first loses
+      // the user gesture and the browser silently refuses to show the dialog.
       event.prompt();
-    } catch (err) {
-      dialogOpened = false;
-    }
+    } catch (err) { opened = false; }
 
-    if (!dialogOpened) { showManualFallback(); return; }
+    if (!opened) { shown = false; hide(); show('manual'); return; }
 
-    hide();
-    Promise.resolve(event.userChoice).then(function (choice) {
-      if (choice && choice.outcome === 'accepted') {
-        N.store.setSetting('pwaInstalled', true);
-        N.toast.success('Installing Nodalis…', { ms: 3000 });
-      } else {
-        N.toast.info('No problem — you can install it any time from the menu.', {
-          ms: 4000,
-          action: { label: 'How', onClick: function () { shown = false; show('manual'); } },
-        });
-      }
-    }).catch(function () { /* the browser closed it without telling us */ });
-  }
-
-  /* ============ REPLACEMENT 4 of 4 — NEW helpers ==========================
- * Paste these two NEW functions directly above doInstall().
- * ======================================================================== */
-
-/**
- * A shortcut FILE only helps on a desktop OS. On phones and tablets the
- * Home Screen is owned by the browser and no download can touch it.
- */
-function canMakeShortcutFile() {
-  if (U.supports.isIOS) return false;
-  if (/Android/i.test(navigator.userAgent)) return false;
-  // Coarse pointer with no fine pointer ⇒ almost certainly a touch device.
-  try {
-    if (window.matchMedia('(pointer: coarse)').matches &&
-        !window.matchMedia('(pointer: fine)').matches) return false;
-  } catch (err) { /* older browser: assume desktop */ }
-  return true;
-}
-
-/**
- * Builds the correct shortcut file for the operating system and downloads it.
- * This is a real shortcut — the same format the OS itself writes.
- */
-async function makeShortcut() {
-  const url = location.href.split('#')[0];
-  const ua = navigator.userAgent;
-  const isWin = /Windows/i.test(ua);
-  const isMac = /Macintosh|Mac OS X/i.test(ua);
-
-  let text, filename, mime, where;
-
-  if (isWin) {
-    filename = 'Nodalis.url';
-    mime = 'application/internet-shortcut';
-    text = '[InternetShortcut]\r\nURL=' + url + '\r\nIconIndex=0\r\n';
-    where = 'Move Nodalis.url to your Desktop.';
-  } else if (isMac) {
-    filename = 'Nodalis.webloc';
-    mime = 'application/xml';
-    text =
-      '<?xml version="1.0" encoding="UTF-8"?>\n' +
-      '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" ' +
-      '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n' +
-      '<plist version="1.0"><dict><key>URL</key><string>' + url +
-      '</string></dict></plist>\n';
-    where = 'Drag Nodalis.webloc to your Desktop or Dock.';
-  } else {
-    filename = 'Nodalis.desktop';
-    mime = 'application/x-desktop';
-    text =
-      '[Desktop Entry]\n' +
-      'Type=Link\n' +
-      'Name=Nodalis\n' +
-      'Comment=Local-first notes, graph and canvas\n' +
-      'URL=' + url + '\n' +
-      'Icon=text-editor\n';
-    where = 'Move Nodalis.desktop to your Desktop, then mark it executable ' +
-            '(right-click → Properties → Permissions).';
-  }
-
-  try {
-    U.downloadText(text, filename, mime);
-  } catch (err) {
-    N.toast.error('Could not create the shortcut file.', { ms: 4000 });
-    return;
-  }
-
-  await N.store.setSetting('pwaShortcutAdded', true);
-  hide();
-  N.toast.success('Shortcut downloaded. ' + where, { ms: 7000 });
-}
-
-
-  /* ============ REPLACEMENT 3 of 4 — doInstall ============================ */
-
-function doInstall() {
-  if (!deferred) { showManualFallback(); return; }
-  const event = deferred;
-  deferred = null;
-
-  let dialogOpened = true;
-  try {
-    // Synchronous, inside the click. Awaiting first loses the user gesture
-    // and Chrome silently refuses to show the dialog.
-    event.prompt();
-  } catch (err) {
-    dialogOpened = false;
-  }
-
-  if (!dialogOpened) { showManualFallback(); return; }
-
-  hide();
-  Promise.resolve(event.userChoice).then(function (choice) {
-    if (choice && choice.outcome === 'accepted') {
-      // Recorded here as well as in the appinstalled listener, because on
-      // some browsers appinstalled never fires. Either path stops the prompt.
-      N.store.setSetting('pwaInstalled', true);
-      N.toast.success('Installing Nodalis…', { ms: 3000 });
-    } else {
-      N.toast.info('No problem — you can install it any time from the menu.', {
-        ms: 4000,
-        action: { label: 'How', onClick: function () { shown = false; show('manual'); } },
-      });
-    }
-  }).catch(function () { /* the browser closed it without telling us */ });
-}
-
-
-  function showManualFallback() {
     hide();
     shown = false;
-    show('manual');
+    Promise.resolve(event.userChoice).then(function (choice) {
+      if (choice && choice.outcome === 'accepted') {
+        onInstalled();
+      } else {
+        N.toast.info('No problem. Install is in the menu whenever you want it.', { ms: 4000 });
+      }
+    }).catch(function () { /* browser closed it without telling us */ });
   }
 
-  /**
-   * There is no web API that launches an installed PWA from a tab. What does
-   * work is a link with the app's start URL: if the app is installed and the
-   * browser supports app scope capture, it opens there; otherwise it opens a
-   * clean window on the same URL, which is still what the user asked for.
-   */
   function openInstalled() {
-    const url = new URL('./', location.href).href;
-    const win = window.open(url, '_blank', 'noopener');
-    if (!win) {
-      N.toast.info('Open Nodalis from your home screen, dock or app list.', { ms: 5000 });
+    const url = startUrl();
+    // There is no web API that launches an installed PWA from a tab. Opening
+    // the start URL in a new context is the only route: on Android and on
+    // desktop Chrome the OS will usually hand it to the installed app,
+    // because the URL is inside the app's scope. If it does not, the user
+    // still lands on the app in a clean window, which is what they asked for.
+    let win = null;
+    try { win = window.open(url, '_blank', 'noopener'); } catch (err) { win = null; }
+    if (!win) { location.href = url; return; }
+    hide();
+    shown = false;
+    markDismissedThisSession();
+  }
+
+  /* ---------------------------------------------------------- public in */
+
+  function acceptPrompt(e) {
+    deferred = e;
+    const btn = document.getElementById('btn-install');
+    if (btn) btn.classList.remove('hidden');
+    try { N.bus.emit('commands:changed'); } catch (err) {}
+    // If a manual card is on screen, upgrade it to the real thing.
+    if (node && node.dataset.mode === 'manual') { shown = false; hide(); show('installable'); }
+  }
+
+  async function onInstalled() {
+    deferred = null;
+    window.__ndInstallPrompt = null;
+    window.__ndInstalled = true;
+    try { await N.store.setSetting('pwaInstalled', true); } catch (e) {}
+    hide();
+    shown = false;
+    const btn = document.getElementById('btn-install');
+    if (btn) btn.classList.add('hidden');
+    N.toast.success('Nodalis is installed. It works offline from here on.', { ms: 4000 });
+  }
+
+  /* --------------------------------------------------------------- gate */
+
+  async function maybeShow() {
+    if (shown) return;
+    if (isStandalone()) return;                                  // already in the app
+    if (N.store.state.settings[SILENCE_KEY]) return;             // user said stop
+    if (dismissedThisSession()) return;                          // "not now" this visit
+    if (N.modal.anyOpen()) { setTimeout(maybeShow, 1500); return; }
+
+    if (await isInstalled()) { show('installed'); return; }
+    show((deferred || window.__ndInstallPrompt) ? 'installable' : 'manual');
+  }
+
+  async function forceShow() {
+    if (isStandalone()) {
+      N.toast.success('You are already using the installed app.', { ms: 2600 });
       return;
     }
+    shown = false;
     hide();
+    if (await isInstalled()) { show('installed'); return; }
+    show((deferred || window.__ndInstallPrompt) ? 'installable' : 'manual');
   }
 
-  /* ----------------------------------------------------------------- init */
+  /* --------------------------------------------------------------- init */
 
   function init() {
-    // Inside the installed app there is nothing to install.
     if (isStandalone()) {
       N.store.setSetting('pwaInstalled', true);
       return;
     }
 
+    // Pick up anything the <head> snippet already caught. This is the fix.
+    if (window.__ndInstallPrompt) deferred = window.__ndInstallPrompt;
+    if (window.__ndInstalled) N.store.setSetting('pwaInstalled', true);
+
+    // Still listen directly, in case the snippet was not installed.
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();
-      deferred = e;
-      const btn = document.getElementById('btn-install');
-      if (btn) btn.classList.remove('hidden');
-      N.bus.emit('commands:changed');
-      maybeShow();
+      acceptPrompt(e);
     });
-
-    window.addEventListener('appinstalled', function () {
-      deferred = null;
-      N.store.setSetting('pwaInstalled', true);
-      hide();
-      const btn = document.getElementById('btn-install');
-      if (btn) btn.classList.add('hidden');
-      N.toast.success('Nodalis is installed. It works offline from here on.', { ms: 4000 });
-    });
+    window.addEventListener('appinstalled', function () { onInstalled(); });
 
     const btn = document.getElementById('btn-install');
-    if (btn) btn.addEventListener('click', function () { forceShow(); });
+    if (btn) {
+      if (deferred) btn.classList.remove('hidden');
+      btn.addEventListener('click', function () { forceShow(); });
+    }
 
-    // Give the interface a moment to settle before asking for anything.
     setTimeout(maybeShow, 2600);
 
     N.commands.registerMany([{
@@ -25675,1019 +27350,159 @@ function doInstall() {
       title: 'Install Nodalis as an app',
       group: 'App',
       icon: 'download',
-      run: forceShow,
+      run: forceShow
     }]);
   }
 
-  // async function maybeShow() {
-  //   if (shown || isStandalone()) return;
-  //   if (N.store.state.settings[SILENCE_KEY]) return;
-  //   if (N.modal.anyOpen()) { setTimeout(maybeShow, 1500); return; }
-  //   if (await installedElsewhere()) { show('installed'); return; }
-  //   show(deferred ? 'installable' : 'manual');
-  // }
-
-  /* ============ REPLACEMENT 1 of 4 — maybeShow ============================ */
-
-async function maybeShow() {
-  if (shown || isStandalone()) return;
-  if (N.store.state.settings[SILENCE_KEY]) return;
-
-  // Installed, or a shortcut has been made: there is nothing left to ask for.
-  // This is the fix — the old code fell through to show('installed') here and
-  // the prompt reappeared on every single load after installing.
-  if (N.store.state.settings.pwaInstalled === true) return;
-  if (N.store.state.settings.pwaShortcutAdded === true) return;
-  if (await installedElsewhere()) return;
-
-  if (N.modal.anyOpen()) { setTimeout(maybeShow, 1500); return; }
-
-  show(deferred ? 'installable' : 'manual');
-}
-
-
-  async function forceShow() {
-    if (isStandalone()) {
-      N.toast.success('You are already in the installed app.', { ms: 2600 });
-      return;
-    }
-    shown = false;
-    hide();
-    if (await installedElsewhere()) show('installed');
-    else show(deferred ? 'installable' : 'manual');
-  }
-
   N.pwa = {
-    init: init, show: forceShow, hide: hide,
-    isStandalone: isStandalone,
-    canInstall: function () { return !!deferred; },
-  };
-})(window.NODALIS = window.NODALIS || {});
-
-/* =========================================================================
- * Nodalis — PWA install prompt: REPLACEMENT FUNCTIONS
- * -------------------------------------------------------------------------
- * This replaces FOUR functions inside the existing features/pwa.js module.
- * You are not adding a new module — you are swapping four function bodies.
- * See INSTALL.md for exactly which lines.
- *
- * WHAT CHANGES
- *
- * 1. maybeShow()  — THE BUG YOU HIT.
- *    The old version, once the app was installed, still fired the popup on
- *    every load — it just switched to the "Nodalis is installed" wording.
- *    That is why the prompt kept coming back after installing. It now
- *    returns silently if the app is installed OR a shortcut was created.
- *    The "installed" card still exists, but only when the user asks for it
- *    from the menu (forceShow), which is the only time it is useful.
- *
- * 2. build()      — the manual/unsupported branch had NO action button, only
- *    a list of steps. It now always gets a primary button sitting beside
- *    "Not now", exactly like the installable branch.
- *
- * 3. doInstall()  — unchanged in spirit (it already called prompt() inside
- *    the click, which is correct) but now records the result so the prompt
- *    stays gone.
- *
- * 4. NEW makeShortcut() — for browsers with no install prompt.
- *
- * AN HONEST NOTE ABOUT "CREATE A SHORTCUT"
- *
- * There is no web API that can create a browser bookmark or a desktop
- * shortcut. Browsers deliberately forbid it — a page that could drop icons
- * on your desktop would be an obvious abuse vector. Any code claiming to do
- * it directly is not doing what it says.
- *
- * What genuinely works, and is what this does on desktop, is generating the
- * shortcut FILE the operating system understands and handing it to the user
- * through a normal download:
- *      Windows  .url      [InternetShortcut]
- *      macOS    .webloc   an XML plist
- *      Linux    .desktop  a freedesktop entry
- * The user drops that file on their desktop and it behaves exactly like a
- * shortcut, because it is one.
- *
- * On iOS and Android no file can do this — Add to Home Screen is the only
- * route and it must be driven by the user through the browser UI. There the
- * button reveals the precise steps for that browser and offers to copy the
- * link, which is the most any web page is permitted to do.
- * ========================================================================= */
-
-
-// New Code
-
-/* =========================================================================
- * Nodalis — features/related.js
- * "Notes you have not linked yet."
- *
- * WHY THIS AND NOT SOMETHING ELSE
- *
- * Nodalis already shows you the links you MADE (backlinks, unlinked mentions,
- * the graph). Nothing in it shows you the links you SHOULD have made. That is
- * the gap this fills, and it is the difference between a graph that documents
- * your thinking and a graph that adds to it: the vault gets more useful the
- * more you write, instead of just bigger.
- *
- * HOW IT SCORES  (all local, no network, no dependencies)
- *   term overlap   TF-IDF cosine over the note bodies. Rare shared words
- *                  ("perovskite") count for far more than common ones
- *                  ("project"), which is what makes the results feel smart.
- *   tag overlap    a shared #tag is a deliberate signal, weighted above prose.
- *   folder         same folder is a weak nudge, not a decision.
- *   already linked EXCLUDED. If you already linked it, the Links panel has
- *                  it covered and repeating it here is noise.
- *
- * PERFORMANCE
- *   The index is built once, off the main thread's critical path (idle
- *   callback), cached, and rebuilt at most once every few seconds after a
- *   vault change. Scoring a note is then a walk over the posting lists of
- *   only the terms that note contains — not a scan of the vault. This stays
- *   responsive at the ~2,000 notes the graph is already built to handle.
- *
- * SAFETY
- *   Every integration point is feature-detected. If an API it expects is
- *   missing, the module logs once and no-ops — it can never take the app
- *   down with it. app.js already wraps module init in try/catch as well.
- * ========================================================================= */
-(function (N) {
-  'use strict';
-
-  const U = N && N.util;
-  if (!U || typeof U.el !== 'function') {
-    console.warn('[nodalis] related: util.el unavailable, feature disabled');
-    return;
-  }
-  const el = U.el;
-
-  const MAX_RESULTS   = 5;
-  const MIN_SCORE     = 0.045;  // below this the "match" is coincidence
-  const REBUILD_DEBOUNCE = 2500;
-
-  let index = null;       // { df: Map(term -> docCount), docs: Map(id -> Map(term -> tf)), n }
-  let building = false;
-  let rebuildTimer = null;
-  let mounted = null;     // the DOM node we own inside the right panel
-
-  /* ---------------------------------------------------------------- text */
-
-  // Deliberately small stopword list: enough to stop "the" dominating,
-  // short enough that domain words are never accidentally dropped.
-  const STOP = new Set(('a about above after again against all am an and any are as at be because been before being ' +
-    'below between both but by can cannot could did do does doing down during each few for from further had has have ' +
-    'having he her here hers him his how i if in into is it its itself just me more most my no nor not of off on once ' +
-    'only or other our out over own same she should so some such than that the their them then there these they this ' +
-    'those through to too under until up very was we were what when where which while who whom why will with you your ' +
-    'yours it\'s i\'m don\'t was were be been').split(/\s+/));
-
-  function titleOf(note) {
-    if (!note) return 'Untitled';
-    return note.title ||
-      String(note.path || '').split('/').pop().replace(/\.md$/i, '') ||
-      'Untitled';
-  }
-
-  function tokenize(text) {
-    if (!text) return [];
-    return String(text)
-      .toLowerCase()
-      // strip fenced code, inline code, urls and wiki/link syntax first —
-      // none of it is prose and all of it creates false matches
-      .replace(/```[\s\S]*?```/g, ' ')
-      .replace(/`[^`]*`/g, ' ')
-      .replace(/https?:\/\/\S+/g, ' ')
-      .replace(/\[\[([^\]]*)\]\]/g, ' $1 ')
-      .replace(/[^a-z0-9À-ɏ'\s-]/g, ' ')
-      .split(/\s+/)
-      .filter(function (w) {
-        return w.length > 2 && w.length < 32 && !STOP.has(w) && !/^\d+$/.test(w);
-      });
-  }
-
-  function tagsOf(note) {
-    const out = new Set();
-    if (Array.isArray(note.tags)) note.tags.forEach(function (t) { out.add(String(t).toLowerCase()); });
-    // also pick up #tags written in the body
-    const body = String(note.content || '');
-    const m = body.match(/(^|\s)#([a-z0-9][\w/-]*)/gi);
-    if (m) m.forEach(function (raw) { out.add(raw.trim().replace(/^#/, '').toLowerCase()); });
-    return out;
-  }
-
-  function linkedIdsOf(note, byTitle) {
-    const out = new Set();
-    if (Array.isArray(note.links)) {
-      note.links.forEach(function (l) {
-        if (typeof l === 'string') {
-          const hit = byTitle.get(l.toLowerCase());
-          if (hit) out.add(hit);
-        } else if (l && l.id) out.add(l.id);
-      });
-    }
-    // wikilinks written in the body
-    const body = String(note.content || '');
-    let m;
-    const re = /\[\[([^\]|#]+)/g;
-    while ((m = re.exec(body)) !== null) {
-      const hit = byTitle.get(m[1].trim().toLowerCase());
-      if (hit) out.add(hit);
-    }
-    return out;
-  }
-
-  /* --------------------------------------------------------------- index */
-
-  function notesMap() {
-    return (N.store && N.store.state && N.store.state.notes) || null;
-  }
-
-  function buildIndex() {
-    const notes = notesMap();
-    if (!notes || building) return;
-    building = true;
-    try {
-      const df = new Map();
-      const docs = new Map();
-      const postings = new Map();   // term -> array of note ids (the inverted index)
-      notes.forEach(function (note, id) {
-        // the title is weighted by repeating it: a title match matters more
-        // than the same word buried in paragraph nine
-        const terms = tokenize((titleOf(note) + ' ').repeat(3) + (note.content || ''));
-        if (!terms.length) { docs.set(id, new Map()); return; }
-        const tf = new Map();
-        terms.forEach(function (t) { tf.set(t, (tf.get(t) || 0) + 1); });
-        tf.forEach(function (_, t) {
-          df.set(t, (df.get(t) || 0) + 1);
-          let list = postings.get(t);
-          if (!list) { list = []; postings.set(t, list); }
-          list.push(id);
-        });
-        docs.set(id, tf);
-      });
-      index = { df: df, docs: docs, postings: postings, n: docs.size };
-    } catch (err) {
-      console.warn('[nodalis] related: index build failed', err);
-      index = null;
-    } finally {
-      building = false;
-    }
-  }
-
-  function ensureIndex() {
-    if (index) return;
-    buildIndex();
-  }
-
-  function scheduleRebuild() {
-    clearTimeout(rebuildTimer);
-    rebuildTimer = setTimeout(function () {
-      index = null;
-      const idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 200); };
-      idle(function () { ensureIndex(); refresh(); });
-    }, REBUILD_DEBOUNCE);
-  }
-
-  /* --------------------------------------------------------------- score */
-
-  function weightsFor(id) {
-    const tf = index.docs.get(id);
-    if (!tf || !tf.size) return null;
-    const w = new Map();
-    let norm = 0;
-    tf.forEach(function (count, term) {
-      const d = index.df.get(term) || 1;
-      const idf = Math.log(1 + index.n / d);
-      const val = (1 + Math.log(count)) * idf;
-      w.set(term, val);
-      norm += val * val;
-    });
-    norm = Math.sqrt(norm) || 1;
-    return { w: w, norm: norm };
-  }
-
-  function related(noteId) {
-    ensureIndex();
-    const notes = notesMap();
-    if (!index || !notes) return [];
-    const self = notes.get(noteId);
-    if (!self) return [];
-
-    const base = weightsFor(noteId);
-    if (!base) return [];
-
-    const byTitle = new Map();
-    notes.forEach(function (n2, id) { byTitle.set(titleOf(n2).toLowerCase(), id); });
-    const linked = linkedIdsOf(self, byTitle);
-    const selfTags = tagsOf(self);
-
-    // Only consider notes that share at least one term, reached through the
-    // posting lists — never a full scan.
-    const candidates = new Map();
-    base.w.forEach(function (val, term) {
-      // Skip terms so common they carry no signal — but ONLY once the vault
-      // is big enough for "common" to mean anything. In a 3-note vault every
-      // shared word looks common, and filtering them all leaves nothing to
-      // match on, so small vaults skip this rule entirely.
-      if (index.n >= 25 && (index.df.get(term) || 0) > index.n * 0.5) return;
-      const list = index.postings.get(term);
-      if (!list) return;
-      for (let i = 0; i < list.length; i++) {
-        const id = list[i];
-        if (id === noteId || linked.has(id)) continue;
-        candidates.set(id, (candidates.get(id) || 0) + 1);
-      }
-    });
-
-    const scored = [];
-    candidates.forEach(function (_, id) {
-      const other = weightsFor(id);
-      if (!other) return;
-      let dot = 0;
-      base.w.forEach(function (val, term) {
-        const o = other.w.get(term);
-        if (o) dot += val * o;
-      });
-      let score = dot / (base.norm * other.norm);
-
-      const n2 = notes.get(id);
-      if (!n2) return;
-      // a shared tag is a deliberate signal — worth more than prose overlap
-      let shared = 0;
-      const t2 = tagsOf(n2);
-      selfTags.forEach(function (t) { if (t2.has(t)) shared++; });
-      if (shared) score += 0.10 * Math.min(shared, 3);
-      // same folder: a nudge, not a verdict
-      if (self.folder && n2.folder && self.folder === n2.folder) score += 0.03;
-
-      if (score >= MIN_SCORE) scored.push({ id: id, note: n2, score: score, tags: shared });
-    });
-
-    scored.sort(function (a, b) { return b.score - a.score; });
-    return scored.slice(0, MAX_RESULTS);
-  }
-
-  /* ------------------------------------------------------------------ ui */
-
-  function activeNoteId() {
-    const s = N.store && N.store.state;
-    if (!s) return null;
-    return s.activeNoteId || s.currentNoteId || (s.activeNote && s.activeNote.id) || null;
-  }
-
-  function render(list) {
-    const box = el('div.related-panel');
-    const head = el('div.related-head', null, 'Related — not yet linked');
-    box.appendChild(head);
-
-    if (!list.length) {
-      box.appendChild(el('div.related-empty', null,
-        'Nothing close enough yet. This fills in as the vault grows.'));
-      return box;
-    }
-
-    list.forEach(function (item) {
-      const pct = Math.round(Math.min(1, item.score) * 100);
-      const row = el('button.related-item', {
-        type: 'button',
-        title: 'Open "' + titleOf(item.note) + '"',
-        onclick: function () {
-          if (N.app && typeof N.app.openNote === 'function') N.app.openNote(item.id);
-        }
-      });
-      row.appendChild(el('span.related-title', null, titleOf(item.note)));
-      const meta = el('span.related-meta', null,
-        pct + '% match' + (item.tags ? ' · shared tag' : ''));
-      row.appendChild(meta);
-      box.appendChild(row);
-    });
-    return box;
-  }
-
-  function host() {
-    return document.querySelector('.right-panel') || null;
-  }
-
-  function refresh() {
-    const parent = host();
-    if (!parent) return;
-    const id = activeNoteId();
-    if (mounted && mounted.parentNode) mounted.parentNode.removeChild(mounted);
-    mounted = null;
-    if (!id) return;
-    let list = [];
-    try { list = related(id); }
-    catch (err) { console.warn('[nodalis] related: scoring failed', err); return; }
-    mounted = render(list);
-    parent.appendChild(mounted);
-  }
-
-  /* ---------------------------------------------------------------- init */
-
-  function init() {
-    if (!notesMap()) {
-      console.warn('[nodalis] related: store unavailable, feature disabled');
-      return;
-    }
-
-    const idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 300); };
-    idle(function () { ensureIndex(); refresh(); });
-
-    if (N.bus && typeof N.bus.on === 'function') {
-      N.bus.on('note:active', refresh);
-      N.bus.on('note:updated', scheduleRebuild);
-      N.bus.on('note:deleted', scheduleRebuild);
-      N.bus.on('vault:changed', scheduleRebuild);
-      N.bus.on('view:changed', function () { setTimeout(refresh, 60); });
-    }
-
-    if (N.commands && typeof N.commands.registerMany === 'function') {
-      N.commands.registerMany([
-        {
-          id: 'related.show', title: 'Show related notes', group: 'View', icon: 'link',
-          run: function () {
-            const id = activeNoteId();
-            if (!id) { N.toast && N.toast.info && N.toast.info('Open a note first.'); return; }
-            refresh();
-            const list = related(id);
-            if (N.toast && N.toast.info) {
-              N.toast.info(list.length
-                ? 'Found ' + list.length + ' related note' + (list.length > 1 ? 's' : '') + '.'
-                : 'No strong matches yet.');
-            }
-          }
-        },
-        {
-          id: 'related.reindex', title: 'Rebuild the related-notes index', group: 'Vault', icon: 'refresh',
-          run: function () {
-            index = null;
-            ensureIndex();
-            refresh();
-            N.toast && N.toast.success && N.toast.success('Related index rebuilt.');
-          }
-        }
-      ]);
-    }
-  }
-
-  N.related = { init: init, related: related, refresh: refresh, rebuild: function () { index = null; ensureIndex(); } };
-})(window.NODALIS = window.NODALIS || {});
-  
-// New Code
-
-/* =========================================================================
- * Nodalis - features/intel.js
- * Vault intelligence: eight features that make the vault get MORE USEFUL
- * as it grows, instead of just bigger.
- *
- *   1. Auto-link            find note titles sitting in plain text and turn
- *                           them into real [[links]] - with a preview first
- *   2. Suggest tags         propose #tags from what the note is actually about
- *   3. Resurface            bring back a good note you have forgotten
- *   4. Find duplicates      near-identical notes, before they diverge
- *   5. Fix broken links     [[links]] pointing nowhere + closest match
- *   6. Vault report         orphans, hubs, growth, what needs attention
- *   7. Random note          the serendipity button
- *   8. Auto-link whole vault  the same as 1, applied everywhere
- *
- * WHY THESE
- * Obsidian needs plugins for most of this; Notion cannot do several at all
- * because it has no real link graph. All of it runs locally on files you own,
- * with no account, no server and no network.
- *
- * SHARED ENGINE
- * One TF-IDF index over the vault, built once on an idle callback, cached,
- * and rebuilt (debounced) after edits. The features all read from it, so the
- * cost is paid once rather than eight times.
- *
- * SAFETY
- * Every write goes through N.store.updateNoteContent, which is the same path
- * the editor uses - so version history captures it and Undo works normally.
- * Nothing here writes without showing you exactly what will change first.
- * ========================================================================= */
-(function (N) {
-  'use strict';
-
-  const U = N && N.util;
-  if (!U || typeof U.el !== 'function') {
-    console.warn('[nodalis] intel: util unavailable, feature disabled');
-    return;
-  }
-  const el = U.el;
-
-  const REBUILD_DEBOUNCE = 2500;
-  const DUP_THRESHOLD    = 0.62;   // cosine above this means "near-duplicate"
-  const STALE_DAYS       = 30;     // untouched this long means resurfaceable
-
-  let index = null;   // { df, docs, postings, n }
-  let rebuildTimer = null;
-
-  const STOP = new Set(('a about above after again against all am an and any are as at be because been before being ' +
-    'below between both but by can cannot could did do does doing down during each few for from further had has have ' +
-    'having he her here hers him his how i if in into is it its itself just me more most my no nor not of off on once ' +
-    'only or other our out over own same she should so some such than that the their them then there these they this ' +
-    'those through to too under until up very was we were what when where which while who whom why will with you your ' +
-    'yours also could would should must may might one two get got make made use used using like new').split(/\s+/));
-
-  /* ------------------------------------------------------------ helpers */
-
-  function notes() { return (N.store && N.store.state && N.store.state.notes) || null; }
-  function titleOf(note) {
-    if (N.store && typeof N.store.noteTitle === 'function') return N.store.noteTitle(note);
-    return (note && note.title) || 'Untitled';
-  }
-  function activeId() {
-    const s = N.store && N.store.state;
-    return s ? (s.activeNoteId || null) : null;
-  }
-
-  function tokenize(text) {
-    if (!text) return [];
-    return String(text).toLowerCase()
-      .replace(/```[\s\S]*?```/g, ' ')
-      .replace(/`[^`]*`/g, ' ')
-      .replace(/https?:\/\/\S+/g, ' ')
-      .replace(/\[\[([^\]]*)\]\]/g, ' $1 ')
-      .replace(/[^a-z0-9à-ÿ'\s-]/g, ' ')
-      .split(/\s+/)
-      .filter(function (w) {
-        return w.length > 2 && w.length < 32 && !STOP.has(w) && !/^\d+$/.test(w);
-      });
-  }
-
-  /* -------------------------------------------------------------- index */
-
-  function buildIndex() {
-    const map = notes();
-    if (!map) return;
-    const df = new Map(), docs = new Map(), postings = new Map();
-    map.forEach(function (note, id) {
-      const terms = tokenize((titleOf(note) + ' ').repeat(3) + (note.content || ''));
-      const tf = new Map();
-      terms.forEach(function (t) { tf.set(t, (tf.get(t) || 0) + 1); });
-      tf.forEach(function (_, t) {
-        df.set(t, (df.get(t) || 0) + 1);
-        let l = postings.get(t); if (!l) { l = []; postings.set(t, l); }
-        l.push(id);
-      });
-      docs.set(id, tf);
-    });
-    index = { df: df, docs: docs, postings: postings, n: docs.size };
-  }
-  function ensureIndex() { if (!index) buildIndex(); }
-  function scheduleRebuild() {
-    clearTimeout(rebuildTimer);
-    rebuildTimer = setTimeout(function () {
-      index = null;
-      const idle = window.requestIdleCallback || function (f) { return setTimeout(f, 200); };
-      idle(ensureIndex);
-    }, REBUILD_DEBOUNCE);
-  }
-
-  function weights(id) {
-    const tf = index.docs.get(id);
-    if (!tf || !tf.size) return null;
-    const w = new Map(); let norm = 0;
-    tf.forEach(function (c, t) {
-      const idf = Math.log(1 + index.n / (index.df.get(t) || 1));
-      const v = (1 + Math.log(c)) * idf;
-      w.set(t, v); norm += v * v;
-    });
-    return { w: w, norm: Math.sqrt(norm) || 1 };
-  }
-
-  function cosine(aId, bId) {
-    const A = weights(aId), B = weights(bId);
-    if (!A || !B) return 0;
-    let dot = 0;
-    const small = A.w.size < B.w.size ? A : B;
-    const big   = small === A ? B : A;
-    small.w.forEach(function (v, t) { const o = big.w.get(t); if (o) dot += v * o; });
-    return dot / (A.norm * B.norm);
-  }
-
-  /* ------------------------------------------------------ shared modal */
-
-  function listModal(opts) {
-    if (!N.modal || typeof N.modal.open !== 'function') {
-      if (N.toast && N.toast.info) N.toast.info(opts.title + ': ' + opts.rows.length + ' result(s)');
-      return;
-    }
-    N.modal.open({
-      title: opts.title,
-      size: opts.size || 'md',
-      render: function (api) {
-        const wrap = el('div.intel-modal');
-        if (opts.subtitle) wrap.appendChild(el('p.intel-sub', null, opts.subtitle));
-        if (!opts.rows.length) {
-          wrap.appendChild(el('div.intel-empty', null, opts.empty || 'Nothing found.'));
-          return wrap;
-        }
-        const list = el('div.intel-list');
-        opts.rows.forEach(function (r) {
-          const row = el('div.intel-row');
-          const main = el('button.intel-main', {
-            type: 'button',
-            onclick: function () { if (r.onClick) { r.onClick(); if (api && api.close) api.close(); } }
-          });
-          main.appendChild(el('span.intel-label', null, r.label));
-          if (r.sub) main.appendChild(el('span.intel-sub2', null, r.sub));
-          row.appendChild(main);
-          if (r.action) {
-            row.appendChild(el('button.btn.btn-sm.btn-primary', {
-              type: 'button',
-              onclick: async function () { await r.action.run(); if (api && api.close) api.close(); }
-            }, r.action.label));
-          }
-          list.appendChild(row);
-        });
-        wrap.appendChild(list);
-        return wrap;
-      }
-    });
-  }
-
-  /* ================================================== 1. AUTO-LINK ===== */
-
-  function linkableTitles() {
-    const map = notes(); const out = [];
-    map.forEach(function (n2, id) {
-      const t = titleOf(n2);
-      if (!t || t.length < 4 || t.toLowerCase() === 'untitled') return;
-      if (STOP.has(t.toLowerCase())) return;
-      out.push({ id: id, title: t });
-    });
-    // longest first, so "Machine learning basics" wins over "Machine learning"
-    out.sort(function (a, b) { return b.title.length - a.title.length; });
-    return out;
-  }
-
-  // Returns { count, titles, apply() } - never writes on its own.
-  function planAutoLink(noteId) {
-    const map = notes(); if (!map) return null;
-    const note = map.get(noteId); if (!note) return null;
-    const original = String(note.content || '');
-    if (!original.trim()) return null;
-
-    // Protect regions that must never be touched: frontmatter, code fences,
-    // inline code, existing [[wikilinks]], [md](links), urls and headings.
-    const guards = [];
-    let masked = original.replace(
-      /(^---[\s\S]*?^---)|(```[\s\S]*?```)|(`[^`]*`)|(\[\[[^\]]*\]\])|(\[[^\]]*\]\([^)]*\))|(https?:\/\/\S+)|(^#{1,6} .*$)/gm,
-      function (m) { guards.push(m); return '@@ND' + (guards.length - 1) + 'ND@@'; }
-    );
-
-    const hits = [];
-    linkableTitles().forEach(function (cand) {
-      if (cand.id === noteId) return;
-      const safe = cand.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // whole-word, case-insensitive, FIRST occurrence only - linking every
-      // occurrence turns a paragraph into a wall of blue
-      const re = new RegExp('(^|[^\\w\\[])(' + safe + ')(?![\\w\\]])', 'i');
-      if (!re.test(masked)) return;
-      masked = masked.replace(re, function (full, pre, word) { return pre + '[[' + word + ']]'; });
-      hits.push(cand.title);
-    });
-
-    if (!hits.length) return null;
-    // Restore the protected regions. The sentinel is plain ASCII that cannot
-    // occur in normal prose, so digits in the text are never mistaken for a
-    // placeholder and no surrounding whitespace is added or eaten.
-    const final = masked.replace(/@@ND(\d+)ND@@/g, function (_, i) { return guards[+i]; });
-    return {
-      count: hits.length,
-      titles: hits,
-      apply: async function () { await N.store.updateNoteContent(noteId, final); }
-    };
-  }
-
-  async function autoLinkActive() {
-    ensureIndex();
-    const id = activeId();
-    if (!id) { N.toast.info('Open a note first.'); return; }
-    if (N.editor && N.editor.flushSave) { try { await N.editor.flushSave(); } catch (e) {} }
-
-    const plan = planAutoLink(id);
-    if (!plan) { N.toast.info('No unlinked note titles found in this note.'); return; }
-
-    const ok = await N.modal.confirm({
-      title: 'Link ' + plan.count + ' mention' + (plan.count > 1 ? 's' : '') + '?',
-      message: 'These note titles appear in the text and are not linked yet:\n\n' +
-               plan.titles.map(function (t) { return '- ' + t; }).join('\n') +
-               '\n\nCode, existing links and headings are left untouched. Undo works normally.',
-      confirmLabel: 'Link them'
-    });
-    if (!ok) return;
-    await plan.apply();
-    N.toast.success('Linked ' + plan.count + ' mention' + (plan.count > 1 ? 's' : '') + '.', {
-      ms: 5000,
-      action: { label: 'Undo', onClick: function () { N.store.undo(); } }
-    });
-  }
-
-  async function autoLinkVault() {
-    ensureIndex();
-    const map = notes(); if (!map) return;
-    const plans = [];
-    map.forEach(function (_, id) { const p = planAutoLink(id); if (p) plans.push({ id: id, plan: p }); });
-    if (!plans.length) { N.toast.info('Nothing to link across the vault.'); return; }
-    const total = plans.reduce(function (s, p) { return s + p.plan.count; }, 0);
-    const ok = await N.modal.confirm({
-      title: 'Link ' + total + ' mentions across ' + plans.length + ' notes?',
-      message: 'Every unlinked mention of an existing note title becomes a [[link]]. ' +
-               'Code blocks, existing links and headings are skipped. This is one undo step per note.',
-      confirmLabel: 'Link everything'
-    });
-    if (!ok) return;
-    for (const p of plans) { await p.plan.apply(); }
-    N.toast.success('Linked ' + total + ' mentions in ' + plans.length + ' notes.', { ms: 6000 });
-  }
-
-  /* ================================================ 2. SUGGEST TAGS ==== */
-
-  function suggestTags(noteId) {
-    ensureIndex();
-    const map = notes(); const note = map && map.get(noteId);
-    if (!note || !index) return [];
-    const w = weights(noteId); if (!w) return [];
-    const existing = new Set((note.tags || []).map(function (t) { return String(t).toLowerCase(); }));
-    const body = String(note.content || '').toLowerCase();
-    const inBody = new Set((body.match(/(^|\s)#([a-z0-9][\w/-]*)/g) || [])
-      .map(function (s) { return s.trim().replace(/^#/, ''); }));
-
-    const scored = [];
-    w.w.forEach(function (v, term) {
-      if (existing.has(term) || inBody.has(term)) return;
-      const df = index.df.get(term) || 1;
-      // A good tag is distinctive but not unique - it should group notes.
-      if (df < 2 || df > Math.max(3, index.n * 0.3)) return;
-      scored.push({ term: term, score: v * Math.log(1 + df) });
-    });
-    scored.sort(function (a, b) { return b.score - a.score; });
-    return scored.slice(0, 6).map(function (s) { return s.term; });
-  }
-
-  async function suggestTagsActive() {
-    const id = activeId();
-    if (!id) { N.toast.info('Open a note first.'); return; }
-    const tags = suggestTags(id);
-    if (!tags.length) { N.toast.info('No confident tag suggestions for this note yet.'); return; }
-    listModal({
-      title: 'Suggested tags',
-      subtitle: 'Chosen because they are distinctive in this note and shared with a few others, so they actually group things.',
-      rows: tags.map(function (t) {
-        return {
-          label: '#' + t,
-          sub: 'appears in ' + (index.df.get(t) || 0) + ' notes',
-          action: {
-            label: 'Add',
-            run: async function () {
-              const note = notes().get(id); if (!note) return;
-              const content = String(note.content || '');
-              await N.store.updateNoteContent(id, content.replace(/\s*$/, '') + '\n\n#' + t + '\n');
-              N.toast.success('Added #' + t, {
-                ms: 4000,
-                action: { label: 'Undo', onClick: function () { N.store.undo(); } }
-              });
-            }
-          }
-        };
-      })
-    });
-  }
-
-  /* =================================================== 3. RESURFACE ==== */
-
-  function staleNotes() {
-    const map = notes(); if (!map) return [];
-    const cutoff = Date.now() - STALE_DAYS * 86400000;
-    const out = [];
-    map.forEach(function (n2, id) {
-      const t = n2.updated || n2.modified || n2.created || 0;
-      const ts = typeof t === 'number' ? t : (Date.parse(t) || 0);
-      const len = String(n2.content || '').length;
-      if (len < 120) return;             // stubs are not worth resurfacing
-      if (ts && ts > cutoff) return;
-      out.push({ id: id, note: n2, ts: ts, len: len });
-    });
-    // longest-untouched first, but weight substance so a real note beats a scrap
-    out.sort(function (a, b) { return (a.ts - b.ts) || (b.len - a.len); });
-    return out;
-  }
-
-  function resurface() {
-    const stale = staleNotes();
-    if (!stale.length) { N.toast.info('Nothing has gone stale - the whole vault is recent.'); return; }
-    const pick = stale[Math.floor(Math.random() * Math.min(stale.length, 12))];
-    const days = pick.ts ? Math.round((Date.now() - pick.ts) / 86400000) : null;
-    listModal({
-      title: 'From your vault',
-      subtitle: days ? 'Untouched for about ' + days + ' days. Still any good?'
-                     : 'You have not opened this in a while.',
-      rows: [{
-        label: titleOf(pick.note),
-        sub: String(pick.note.content || '').replace(/\s+/g, ' ').slice(0, 140),
-        onClick: function () { N.app.openNote(pick.id); }
-      }]
-    });
-  }
-
-  /* ============================================== 4. FIND DUPLICATES === */
-
-  function findDuplicates() {
-    ensureIndex();
-    if (!index) return [];
-    const seen = new Set(), pairs = [];
-    index.docs.forEach(function (_, a) {
-      const wa = weights(a); if (!wa) return;
-      const cand = new Map();
-      wa.w.forEach(function (_v, term) {
-        const list = index.postings.get(term); if (!list) return;
-        for (let i = 0; i < list.length; i++) if (list[i] !== a) cand.set(list[i], 1);
-      });
-      cand.forEach(function (_v, b) {
-        const key = a < b ? a + '|' + b : b + '|' + a;
-        if (seen.has(key)) return;
-        seen.add(key);
-        const score = cosine(a, b);
-        if (score >= DUP_THRESHOLD) pairs.push({ a: a, b: b, score: score });
-      });
-    });
-    pairs.sort(function (x, y) { return y.score - x.score; });
-    return pairs.slice(0, 25);
-  }
-
-  function showDuplicates() {
-    const map = notes();
-    const pairs = findDuplicates();
-    listModal({
-      title: 'Possible duplicates',
-      subtitle: 'Notes that overlap heavily. Worth merging before they drift apart.',
-      empty: 'No near-duplicates found. The vault is clean.',
-      rows: pairs.map(function (p) {
-        return {
-          label: titleOf(map.get(p.a)) + '  /  ' + titleOf(map.get(p.b)),
-          sub: Math.round(p.score * 100) + '% similar',
-          onClick: function () { N.app.openNote(p.a); }
-        };
-      })
-    });
-  }
-
-  /* ============================================ 5. FIX BROKEN LINKS ==== */
-
-  function brokenLinks() {
-    const map = notes(); if (!map) return [];
-    const byTitle = new Map();
-    map.forEach(function (n2, id) { byTitle.set(titleOf(n2).toLowerCase(), id); });
-    const out = [];
-    map.forEach(function (n2, id) {
-      const body = String(n2.content || '');
-      const re = /\[\[([^\]|#]+)(\|[^\]]*)?\]\]/g;
-      let m;
-      while ((m = re.exec(body)) !== null) {
-        const target = m[1].trim();
-        if (!target || byTitle.has(target.toLowerCase())) continue;
-        let best = null, bestScore = 0;
-        byTitle.forEach(function (tid, t) {
-          let s = 0;
-          if (t.indexOf(target.toLowerCase()) !== -1 || target.toLowerCase().indexOf(t) !== -1) {
-            s = Math.min(t.length, target.length) / Math.max(t.length, target.length);
-          }
-          if (s > bestScore) { bestScore = s; best = { id: tid, title: t }; }
-        });
-        out.push({ noteId: id, target: target, suggestion: bestScore > 0.55 ? best : null });
-      }
-    });
-    return out;
-  }
-
-  function showBrokenLinks() {
-    const map = notes();
-    const broken = brokenLinks();
-    listModal({
-      title: 'Links pointing nowhere',
-      subtitle: 'A [[link]] whose note does not exist. Create it, or fix the spelling.',
-      empty: 'Every link resolves. Nothing broken.',
-      rows: broken.map(function (b) {
-        const host = map.get(b.noteId);
-        const row = {
-          label: '[[' + b.target + ']]',
-          sub: 'in "' + titleOf(host) + '"' + (b.suggestion ? ' - did you mean "' + b.suggestion.title + '"?' : ''),
-          onClick: function () { N.app.openNote(b.noteId); }
-        };
-        if (N.store.createNote) {
-          row.action = {
-            label: 'Create',
-            run: async function () {
-              await N.store.createNote({ title: b.target, folder: host ? host.folder : '', content: '' });
-              N.toast.success('Created "' + b.target + '".', { ms: 3500 });
-              scheduleRebuild();
-            }
-          };
-        }
-        return row;
-      })
-    });
-  }
-
-  /* ================================================= 6. VAULT REPORT === */
-
-  function vaultReport() {
-    ensureIndex();
-    const map = notes(); if (!map) { N.toast.info('No vault loaded.'); return; }
-    const all = Array.from(map.values());
-    const byTitle = new Map();
-    map.forEach(function (n2, id) { byTitle.set(titleOf(n2).toLowerCase(), id); });
-
-    const inbound = new Map();
-    let linkCount = 0;
-    map.forEach(function (n2) {
-      const re = /\[\[([^\]|#]+)(\|[^\]]*)?\]\]/g; let m;
-      while ((m = re.exec(String(n2.content || ''))) !== null) {
-        linkCount++;
-        const tid = byTitle.get(m[1].trim().toLowerCase());
-        if (tid) inbound.set(tid, (inbound.get(tid) || 0) + 1);
-      }
-    });
-
-    const orphans = all.filter(function (n2) {
-      return !inbound.get(n2.id) && !/\[\[/.test(String(n2.content || ''));
-    });
-    const hubs = Array.from(inbound.entries())
-      .sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
-    const words = all.reduce(function (s, n2) {
-      return s + String(n2.content || '').split(/\s+/).filter(Boolean).length;
-    }, 0);
-
-    const rows = [
-      { label: String(all.length), sub: 'notes' },
-      { label: words.toLocaleString(), sub: 'words written' },
-      { label: String(linkCount), sub: 'links between notes' },
-      { label: String(orphans.length), sub: 'orphans - connected to nothing' },
-      { label: String(findDuplicates().length), sub: 'possible duplicate pairs' },
-      { label: String(brokenLinks().length), sub: 'links pointing nowhere' }
-    ];
-    hubs.forEach(function (h) {
-      const n2 = map.get(h[0]);
-      rows.push({
-        label: titleOf(n2),
-        sub: h[1] + ' notes link here - a hub',
-        onClick: function () { N.app.openNote(h[0]); }
-      });
-    });
-
-    listModal({ title: 'Vault report', subtitle: 'A quick read on the shape of your thinking.', rows: rows });
-  }
-
-  /* ================================================== 7. RANDOM NOTE === */
-
-  function randomNote() {
-    const map = notes();
-    if (!map || !map.size) { N.toast.info('No notes yet.'); return; }
-    const ids = Array.from(map.keys());
-    N.app.openNote(ids[Math.floor(Math.random() * ids.length)]);
-  }
-
-  /* ---------------------------------------------------------------- init */
-
-  function init() {
-    if (!notes()) { console.warn('[nodalis] intel: store unavailable'); return; }
-    const idle = window.requestIdleCallback || function (f) { return setTimeout(f, 400); };
-    idle(ensureIndex);
-
-    if (N.bus && N.bus.on) {
-      N.bus.on('note:updated', scheduleRebuild);
-      N.bus.on('note:deleted', scheduleRebuild);
-      N.bus.on('vault:changed', scheduleRebuild);
-    }
-
-    if (N.commands && N.commands.registerMany) {
-      N.commands.registerMany([
-        { id: 'intel.autolink',    title: 'Auto-link mentions in this note', group: 'Edit',  icon: 'link',    run: autoLinkActive },
-        { id: 'intel.autolinkAll', title: 'Auto-link the whole vault',       group: 'Vault', icon: 'link',    run: autoLinkVault },
-        { id: 'intel.tags',        title: 'Suggest tags for this note',      group: 'Edit',  icon: 'tag',     run: suggestTagsActive },
-        { id: 'intel.resurface',   title: 'Resurface a forgotten note',      group: 'View',  icon: 'clock',   run: resurface },
-        { id: 'intel.duplicates',  title: 'Find duplicate notes',            group: 'Vault', icon: 'copy',    run: showDuplicates },
-        { id: 'intel.broken',      title: 'Find links pointing nowhere',     group: 'Vault', icon: 'warning', run: showBrokenLinks },
-        { id: 'intel.report',      title: 'Vault report',                    group: 'Vault', icon: 'info',    run: vaultReport },
-        { id: 'intel.random',      title: 'Open a random note',              group: 'View',  icon: 'shuffle', run: randomNote }
-      ]);
-    }
-  }
-
-  N.intel = {
     init: init,
-    autoLink: autoLinkActive,
-    autoLinkVault: autoLinkVault,
-    planAutoLink: planAutoLink,
-    suggestTags: suggestTags,
-    resurface: resurface,
-    duplicates: findDuplicates,
-    brokenLinks: brokenLinks,
-    report: vaultReport,
-    random: randomNote,
-    rebuild: function () { index = null; ensureIndex(); }
+    show: forceShow,
+    hide: hide,
+    isStandalone: isStandalone,
+    acceptPrompt: acceptPrompt,
+    onInstalled: onInstalled,
+    canInstall: function () { return !!(deferred || window.__ndInstallPrompt); }
   };
 })(window.NODALIS = window.NODALIS || {});
+
+/* -------------------------------------------------------------------------
+ * A STRAIGHT ANSWER ABOUT SHORTCUTS AND UPDATES
+ *
+ * You asked for a button that creates a *browser* shortcut instead of a
+ * downloaded file, so the app keeps receiving updates.
+ *
+ * Two things worth knowing:
+ *
+ * 1. No web page can create a browser bookmark. The old APIs that could
+ *    (window.external.AddFavorite, window.sidebar.addPanel) were removed
+ *    from every browser years ago precisely because pages abused them.
+ *    There is no replacement. Any button claiming to do it would do nothing.
+ *
+ * 2. The downloaded .url / .desktop / .webloc shortcut DOES receive updates.
+ *    It is not an offline copy of the app - it contains one line, a URL.
+ *    Opening it launches the browser at your live site, so the user always
+ *    gets whatever you last deployed. The concern that it would freeze at an
+ *    old version does not apply.
+ *
+ * Because it cannot be automated either way, this version drops the file
+ * download and simply tells the user the two taps their browser needs. That
+ * is honest, it is shorter, and on the browsers that matter (Chrome, Edge,
+ * Android) the real Install button now appears instead - which is the
+ * outcome you actually wanted.
+ * ------------------------------------------------------------------------- */
+
+// New Code
+  
+/* =========================================================================
+ * Nodalis - make the vault-intelligence features findable
+ *
+ * WHY YOU COULD NOT FIND THEM
+ * The eight features from the last patch registered correctly as commands -
+ * they were there the whole time - but commands only surface in the command
+ * palette (Ctrl/Cmd+K). On a phone there is no keyboard shortcut and nothing
+ * in the More sheet pointed at them, so in practice they were invisible.
+ * A feature nobody can find is a feature that does not exist.
+ *
+ * WHAT THIS DOES
+ * Adds a "Vault tools" entry to the mobile More sheet and a matching command,
+ * opening one menu that lists all eight with descriptions. It wraps the
+ * existing menu instead of editing app.js, so nothing in the app changes and
+ * this can be removed by deleting the block.
+ *
+ * WHERE THIS GOES
+ * Paste directly ABOVE the line  /* ===== js/app.js ===== *\/  - i.e. right
+ * next to where you pasted the intel module - then add ['tools', N.tools]
+ * to initModules(). Full steps in INSTALL.md.
+ * ========================================================================= */
+(function (N) {
+  'use strict';
+
+  const TOOLS = [
+    { cmd: 'intel.autolink',    label: 'Auto-link this note',      icon: 'link',
+      hint: 'Turn note titles in the text into real links' },
+    { cmd: 'intel.autolinkAll', label: 'Auto-link the whole vault', icon: 'link',
+      hint: 'The same, everywhere, with one confirmation' },
+    { cmd: 'intel.tags',        label: 'Suggest tags',              icon: 'tag',
+      hint: 'Tags drawn from what this note is about' },
+    { cmd: 'intel.resurface',   label: 'Resurface a note',          icon: 'clock',
+      hint: 'Something good you have not opened in a while' },
+    { cmd: 'intel.duplicates',  label: 'Find duplicates',           icon: 'copy',
+      hint: 'Near-identical notes, before they drift apart' },
+    { cmd: 'intel.broken',      label: 'Find broken links',         icon: 'warning',
+      hint: 'Links pointing at notes that do not exist' },
+    { cmd: 'intel.report',      label: 'Vault report',              icon: 'info',
+      hint: 'Orphans, hubs, words, and what needs attention' },
+    { cmd: 'intel.random',      label: 'Open a random note',        icon: 'shuffle',
+      hint: 'Serendipity' }
+  ];
+
+  function available() {
+    if (!N.commands || typeof N.commands.get !== 'function') return [];
+    return TOOLS.filter(function (t) {
+      try { return !!N.commands.get(t.cmd); } catch (e) { return false; }
+    });
+  }
+
+  function openToolsMenu() {
+    const list = available();
+    if (!list.length) {
+      N.toast.info('Vault tools are not installed in this build.', { ms: 3500 });
+      return;
+    }
+    N.menu.show(list.map(function (t) {
+      return {
+        label: t.label,
+        hint: t.hint,
+        icon: t.icon,
+        onClick: function () { N.commands.run(t.cmd); }
+      };
+    }), { title: 'Vault tools', allowSheet: true });
+  }
+
+  function init() {
+    // 1. A command, so it is in the palette and searchable by name.
+    if (N.commands && N.commands.registerMany) {
+      N.commands.registerMany([{
+        id: 'tools.open',
+        title: 'Vault tools',
+        group: 'Vault',
+        icon: 'sparkle',
+        run: openToolsMenu
+      }]);
+    }
+
+    // 2. Wrap N.menu.show so that whenever the app opens its "More" sheet we
+    //    append a Vault tools row. This avoids editing app.js directly: the
+    //    original function still does all the work, we only add one item.
+    if (N.menu && typeof N.menu.show === 'function' && !N.menu.__ndToolsWrapped) {
+      const originalShow = N.menu.show.bind(N.menu);
+      N.menu.show = function (items, opts) {
+        try {
+          if (opts && opts.title === 'More' && Array.isArray(items) && available().length) {
+            const already = items.some(function (i) { return i && i.label === 'Vault tools'; });
+            if (!already) {
+              // insert just above the Settings separator so it sits with the
+              // other "do something to the vault" actions
+              const idx = items.findIndex(function (i) { return i && i.label === 'Settings'; });
+              const row = {
+                label: 'Vault tools',
+                icon: 'sparkle',
+                onClick: function () { setTimeout(openToolsMenu, 60); }
+              };
+              if (idx > 0) items.splice(idx - 1, 0, row);
+              else items.push({ separator: true }, row);
+            }
+          }
+        } catch (err) { /* never let decoration break the menu */ }
+        return originalShow(items, opts);
+      };
+      N.menu.__ndToolsWrapped = true;
+    }
+  }
+
+  N.tools = { init: init, open: openToolsMenu };
+})(window.NODALIS = window.NODALIS || {});
+
   
   
 /* ===== js/app.js ===== */
@@ -27009,7 +27824,7 @@ async function maybeShow() {
       ['matrix', N.matrix], ['sticky', N.sticky], ['scratch', N.scratch], ['daily', N.daily],
       ['ocr', N.ocr], ['exporter', N.exporter], ['settings', N.settings], ['help', N.help],
       ['history', N.history], ['writing', N.writing], ['github', N.github], ['capture', N.capture],
-      ['related', N.related], ['intel', N.intel],
+      ['related', N.related], ['intel', N.intel], ['tools', N.tools],
     ];
     modules.forEach(function (entry) {
       const name = entry[0], mod = entry[1];
