@@ -25477,142 +25477,142 @@ function build(mode) {
    * replayed; the card falls back to showing the manual steps rather than
    * offering a button that would now do nothing.
    */
-  // function doInstall() {
-  //   if (!deferred) { showManualFallback(); return; }
-  //   const event = deferred;
-  //   deferred = null;
+  function doInstall() {
+    if (!deferred) { showManualFallback(); return; }
+    const event = deferred;
+    deferred = null;
 
-  //   let dialogOpened = true;
-  //   try {
-  //     // Synchronous, inside the click. Awaiting first loses the gesture and
-  //     // Chrome silently refuses to show the dialog.
-  //     event.prompt();
-  //   } catch (err) {
-  //     dialogOpened = false;
-  //   }
+    let dialogOpened = true;
+    try {
+      // Synchronous, inside the click. Awaiting first loses the gesture and
+      // Chrome silently refuses to show the dialog.
+      event.prompt();
+    } catch (err) {
+      dialogOpened = false;
+    }
 
-  //   if (!dialogOpened) { showManualFallback(); return; }
+    if (!dialogOpened) { showManualFallback(); return; }
 
-  //   hide();
-  //   Promise.resolve(event.userChoice).then(function (choice) {
-  //     if (choice && choice.outcome === 'accepted') {
-  //       N.store.setSetting('pwaInstalled', true);
-  //       N.toast.success('Installing Nodalis…', { ms: 3000 });
-  //     } else {
-  //       N.toast.info('No problem — you can install it any time from the menu.', {
-  //         ms: 4000,
-  //         action: { label: 'How', onClick: function () { shown = false; show('manual'); } },
-  //       });
-  //     }
-  //   }).catch(function () { /* the browser closed it without telling us */ });
-  // }
+    hide();
+    Promise.resolve(event.userChoice).then(function (choice) {
+      if (choice && choice.outcome === 'accepted') {
+        N.store.setSetting('pwaInstalled', true);
+        N.toast.success('Installing Nodalis…', { ms: 3000 });
+      } else {
+        N.toast.info('No problem — you can install it any time from the menu.', {
+          ms: 4000,
+          action: { label: 'How', onClick: function () { shown = false; show('manual'); } },
+        });
+      }
+    }).catch(function () { /* the browser closed it without telling us */ });
+  }
 
   /* ============ REPLACEMENT 4 of 4 — NEW helpers ==========================
  * Paste these two NEW functions directly above doInstall().
  * ======================================================================== */
 
-/**
- * A shortcut FILE only helps on a desktop OS. On phones and tablets the
- * Home Screen is owned by the browser and no download can touch it.
- */
-function canMakeShortcutFile() {
-  if (U.supports.isIOS) return false;
-  if (/Android/i.test(navigator.userAgent)) return false;
-  // Coarse pointer with no fine pointer ⇒ almost certainly a touch device.
-  try {
-    if (window.matchMedia('(pointer: coarse)').matches &&
-        !window.matchMedia('(pointer: fine)').matches) return false;
-  } catch (err) { /* older browser: assume desktop */ }
-  return true;
-}
+// /**
+//  * A shortcut FILE only helps on a desktop OS. On phones and tablets the
+//  * Home Screen is owned by the browser and no download can touch it.
+//  */
+// function canMakeShortcutFile() {
+//   if (U.supports.isIOS) return false;
+//   if (/Android/i.test(navigator.userAgent)) return false;
+//   // Coarse pointer with no fine pointer ⇒ almost certainly a touch device.
+//   try {
+//     if (window.matchMedia('(pointer: coarse)').matches &&
+//         !window.matchMedia('(pointer: fine)').matches) return false;
+//   } catch (err) { /* older browser: assume desktop */ }
+//   return true;
+// }
 
-/**
- * Builds the correct shortcut file for the operating system and downloads it.
- * This is a real shortcut — the same format the OS itself writes.
- */
-async function makeShortcut() {
-  const url = location.href.split('#')[0];
-  const ua = navigator.userAgent;
-  const isWin = /Windows/i.test(ua);
-  const isMac = /Macintosh|Mac OS X/i.test(ua);
+// /**
+//  * Builds the correct shortcut file for the operating system and downloads it.
+//  * This is a real shortcut — the same format the OS itself writes.
+//  */
+// async function makeShortcut() {
+//   const url = location.href.split('#')[0];
+//   const ua = navigator.userAgent;
+//   const isWin = /Windows/i.test(ua);
+//   const isMac = /Macintosh|Mac OS X/i.test(ua);
 
-  let text, filename, mime, where;
+//   let text, filename, mime, where;
 
-  if (isWin) {
-    filename = 'Nodalis.url';
-    mime = 'application/internet-shortcut';
-    text = '[InternetShortcut]\r\nURL=' + url + '\r\nIconIndex=0\r\n';
-    where = 'Move Nodalis.url to your Desktop.';
-  } else if (isMac) {
-    filename = 'Nodalis.webloc';
-    mime = 'application/xml';
-    text =
-      '<?xml version="1.0" encoding="UTF-8"?>\n' +
-      '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" ' +
-      '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n' +
-      '<plist version="1.0"><dict><key>URL</key><string>' + url +
-      '</string></dict></plist>\n';
-    where = 'Drag Nodalis.webloc to your Desktop or Dock.';
-  } else {
-    filename = 'Nodalis.desktop';
-    mime = 'application/x-desktop';
-    text =
-      '[Desktop Entry]\n' +
-      'Type=Link\n' +
-      'Name=Nodalis\n' +
-      'Comment=Local-first notes, graph and canvas\n' +
-      'URL=' + url + '\n' +
-      'Icon=text-editor\n';
-    where = 'Move Nodalis.desktop to your Desktop, then mark it executable ' +
-            '(right-click → Properties → Permissions).';
-  }
+//   if (isWin) {
+//     filename = 'Nodalis.url';
+//     mime = 'application/internet-shortcut';
+//     text = '[InternetShortcut]\r\nURL=' + url + '\r\nIconIndex=0\r\n';
+//     where = 'Move Nodalis.url to your Desktop.';
+//   } else if (isMac) {
+//     filename = 'Nodalis.webloc';
+//     mime = 'application/xml';
+//     text =
+//       '<?xml version="1.0" encoding="UTF-8"?>\n' +
+//       '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" ' +
+//       '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n' +
+//       '<plist version="1.0"><dict><key>URL</key><string>' + url +
+//       '</string></dict></plist>\n';
+//     where = 'Drag Nodalis.webloc to your Desktop or Dock.';
+//   } else {
+//     filename = 'Nodalis.desktop';
+//     mime = 'application/x-desktop';
+//     text =
+//       '[Desktop Entry]\n' +
+//       'Type=Link\n' +
+//       'Name=Nodalis\n' +
+//       'Comment=Local-first notes, graph and canvas\n' +
+//       'URL=' + url + '\n' +
+//       'Icon=text-editor\n';
+//     where = 'Move Nodalis.desktop to your Desktop, then mark it executable ' +
+//             '(right-click → Properties → Permissions).';
+//   }
 
-  try {
-    U.downloadText(text, filename, mime);
-  } catch (err) {
-    N.toast.error('Could not create the shortcut file.', { ms: 4000 });
-    return;
-  }
+//   try {
+//     U.downloadText(text, filename, mime);
+//   } catch (err) {
+//     N.toast.error('Could not create the shortcut file.', { ms: 4000 });
+//     return;
+//   }
 
-  await N.store.setSetting('pwaShortcutAdded', true);
-  hide();
-  N.toast.success('Shortcut downloaded. ' + where, { ms: 7000 });
-}
+//   await N.store.setSetting('pwaShortcutAdded', true);
+//   hide();
+//   N.toast.success('Shortcut downloaded. ' + where, { ms: 7000 });
+// }
 
 
   /* ============ REPLACEMENT 3 of 4 — doInstall ============================ */
 
-function doInstall() {
-  if (!deferred) { showManualFallback(); return; }
-  const event = deferred;
-  deferred = null;
+// function doInstall() {
+//   if (!deferred) { showManualFallback(); return; }
+//   const event = deferred;
+//   deferred = null;
 
-  let dialogOpened = true;
-  try {
-    // Synchronous, inside the click. Awaiting first loses the user gesture
-    // and Chrome silently refuses to show the dialog.
-    event.prompt();
-  } catch (err) {
-    dialogOpened = false;
-  }
+//   let dialogOpened = true;
+//   try {
+//     // Synchronous, inside the click. Awaiting first loses the user gesture
+//     // and Chrome silently refuses to show the dialog.
+//     event.prompt();
+//   } catch (err) {
+//     dialogOpened = false;
+//   }
 
-  if (!dialogOpened) { showManualFallback(); return; }
+//   if (!dialogOpened) { showManualFallback(); return; }
 
-  hide();
-  Promise.resolve(event.userChoice).then(function (choice) {
-    if (choice && choice.outcome === 'accepted') {
-      // Recorded here as well as in the appinstalled listener, because on
-      // some browsers appinstalled never fires. Either path stops the prompt.
-      N.store.setSetting('pwaInstalled', true);
-      N.toast.success('Installing Nodalis…', { ms: 3000 });
-    } else {
-      N.toast.info('No problem — you can install it any time from the menu.', {
-        ms: 4000,
-        action: { label: 'How', onClick: function () { shown = false; show('manual'); } },
-      });
-    }
-  }).catch(function () { /* the browser closed it without telling us */ });
-}
+//   hide();
+//   Promise.resolve(event.userChoice).then(function (choice) {
+//     if (choice && choice.outcome === 'accepted') {
+//       // Recorded here as well as in the appinstalled listener, because on
+//       // some browsers appinstalled never fires. Either path stops the prompt.
+//       N.store.setSetting('pwaInstalled', true);
+//       N.toast.success('Installing Nodalis…', { ms: 3000 });
+//     } else {
+//       N.toast.info('No problem — you can install it any time from the menu.', {
+//         ms: 4000,
+//         action: { label: 'How', onClick: function () { shown = false; show('manual'); } },
+//       });
+//     }
+//   }).catch(function () { /* the browser closed it without telling us */ });
+// }
 
 
   function showManualFallback() {
@@ -25679,31 +25679,31 @@ function doInstall() {
     }]);
   }
 
-//   async function maybeShow() {
-//     if (shown || isStandalone()) return;
-//     if (N.store.state.settings[SILENCE_KEY]) return;
-//     if (N.modal.anyOpen()) { setTimeout(maybeShow, 1500); return; }
-//     if (await installedElsewhere()) { show('installed'); return; }
-//     show(deferred ? 'installable' : 'manual');
-//   }
+  async function maybeShow() {
+    if (shown || isStandalone()) return;
+    if (N.store.state.settings[SILENCE_KEY]) return;
+    if (N.modal.anyOpen()) { setTimeout(maybeShow, 1500); return; }
+    if (await installedElsewhere()) { show('installed'); return; }
+    show(deferred ? 'installable' : 'manual');
+  }
 
-//   async function forceShow() {
-//     if (isStandalone()) {
-//       N.toast.success('You are already in the installed app.', { ms: 2600 });
-//       return;
-//     }
-//     shown = false;
-//     hide();
-//     if (await installedElsewhere()) show('installed');
-//     else show(deferred ? 'installable' : 'manual');
-//   }
+  async function forceShow() {
+    if (isStandalone()) {
+      N.toast.success('You are already in the installed app.', { ms: 2600 });
+      return;
+    }
+    shown = false;
+    hide();
+    if (await installedElsewhere()) show('installed');
+    else show(deferred ? 'installable' : 'manual');
+  }
 
-//   N.pwa = {
-//     init: init, show: forceShow, hide: hide,
-//     isStandalone: isStandalone,
-//     canInstall: function () { return !!deferred; },
-//   };
-// })(window.NODALIS = window.NODALIS || {});
+  N.pwa = {
+    init: init, show: forceShow, hide: hide,
+    isStandalone: isStandalone,
+    canInstall: function () { return !!deferred; },
+  };
+})(window.NODALIS = window.NODALIS || {});
 
 /* =========================================================================
  * Nodalis — PWA install prompt: REPLACEMENT FUNCTIONS
@@ -25757,21 +25757,21 @@ function doInstall() {
 
 /* ============ REPLACEMENT 1 of 4 — maybeShow ============================ */
 
-async function maybeShow() {
-  if (shown || isStandalone()) return;
-  if (N.store.state.settings[SILENCE_KEY]) return;
+// async function maybeShow() {
+//   if (shown || isStandalone()) return;
+//   if (N.store.state.settings[SILENCE_KEY]) return;
 
-  // Installed, or a shortcut has been made: there is nothing left to ask for.
-  // This is the fix — the old code fell through to show('installed') here and
-  // the prompt reappeared on every single load after installing.
-  if (N.store.state.settings.pwaInstalled === true) return;
-  if (N.store.state.settings.pwaShortcutAdded === true) return;
-  if (await installedElsewhere()) return;
+//   // Installed, or a shortcut has been made: there is nothing left to ask for.
+//   // This is the fix — the old code fell through to show('installed') here and
+//   // the prompt reappeared on every single load after installing.
+//   if (N.store.state.settings.pwaInstalled === true) return;
+//   if (N.store.state.settings.pwaShortcutAdded === true) return;
+//   if (await installedElsewhere()) return;
 
-  if (N.modal.anyOpen()) { setTimeout(maybeShow, 1500); return; }
+//   if (N.modal.anyOpen()) { setTimeout(maybeShow, 1500); return; }
 
-  show(deferred ? 'installable' : 'manual');
-}
+//   show(deferred ? 'installable' : 'manual');
+// }
 
   
   
