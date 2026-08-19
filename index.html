@@ -4910,109 +4910,6 @@ body[data-content-width='full']        { --content-max: 100%; }
 body[data-animations='reduced'] { --motion-scale: 0.5; }
 body[data-animations='none']    { --motion-scale: 0; }
 
-/* New Code   */
-
-
-/* =========================================================================
- * Nodalis - styles for features/intel.js
- *
- * Uses only the app's own design tokens, so it inherits every theme
- * automatically, including the Schematic theme.
- *
- * WHERE THIS GOES
- *   Paste immediately BEFORE the FIRST closing style tag in index.html.
- *   Reminder: the file contains TWO of them and the second is inside a
- *   JavaScript string (the print/export template). Search for
- *       body[data-animations='none']
- *   and use the closing style tag just below it.
- * ========================================================================= */
-
-.intel-modal {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4, 12px);
-  max-height: 60vh;
-}
-
-.intel-sub {
-  margin: 0;
-  font-size: var(--text-sm, 12.5px);
-  color: var(--text-2);
-  line-height: 1.6;
-}
-
-.intel-empty {
-  padding: var(--sp-6, 20px) 0;
-  text-align: center;
-  font-size: var(--text-sm, 12.5px);
-  color: var(--text-3);
-}
-
-.intel-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.intel-row {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.intel-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  text-align: left;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm, 6px);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease-out),
-              border-color var(--dur-fast) var(--ease-out),
-              transform var(--dur-instant) var(--ease-snap);
-}
-
-.intel-main:hover {
-  background: var(--bg-1);
-  border-color: var(--border-strong);
-}
-
-.intel-main:active { transform: translateY(1px); }
-
-.intel-label {
-  font-size: var(--text-base, 14px);
-  font-weight: 600;
-  color: var(--text-0);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.intel-sub2 {
-  font-size: var(--text-xs, 11px);
-  color: var(--text-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.intel-row .btn { align-self: center; flex-shrink: 0; }
-
-/* On a phone the action button drops beneath the row rather than squeezing
-   the label into two characters. */
-@media (max-width: 520px) {
-  .intel-row { flex-direction: column; }
-  .intel-row .btn { align-self: stretch; }
-}
-  
   
 /* New Code   */
 
@@ -5140,6 +5037,108 @@ body[data-speed='cinematic'] {
 }
 .related-meta { font-size: 10.5px; color: var(--text-3); }
   
+/* New Code   */
+
+
+/* =========================================================================
+ * Nodalis - styles for features/intel.js
+ *
+ * Uses only the app's own design tokens, so it inherits every theme
+ * automatically, including the Schematic theme.
+ *
+ * WHERE THIS GOES
+ *   Paste immediately BEFORE the FIRST closing style tag in index.html.
+ *   Reminder: the file contains TWO of them and the second is inside a
+ *   JavaScript string (the print/export template). Search for
+ *       body[data-animations='none']
+ *   and use the closing style tag just below it.
+ * ========================================================================= */
+
+.intel-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4, 12px);
+  max-height: 60vh;
+}
+
+.intel-sub {
+  margin: 0;
+  font-size: var(--text-sm, 12.5px);
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.intel-empty {
+  padding: var(--sp-6, 20px) 0;
+  text-align: center;
+  font-size: var(--text-sm, 12.5px);
+  color: var(--text-3);
+}
+
+.intel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.intel-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.intel-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              transform var(--dur-instant) var(--ease-snap);
+}
+
+.intel-main:hover {
+  background: var(--bg-1);
+  border-color: var(--border-strong);
+}
+
+.intel-main:active { transform: translateY(1px); }
+
+.intel-label {
+  font-size: var(--text-base, 14px);
+  font-weight: 600;
+  color: var(--text-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intel-sub2 {
+  font-size: var(--text-xs, 11px);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intel-row .btn { align-self: center; flex-shrink: 0; }
+
+/* On a phone the action button drops beneath the row rather than squeezing
+   the label into two characters. */
+@media (max-width: 520px) {
+  .intel-row { flex-direction: column; }
+  .intel-row .btn { align-self: stretch; }
+}
   
 </style>
 </head>
@@ -27011,7 +27010,7 @@ async function maybeShow() {
       ['matrix', N.matrix], ['sticky', N.sticky], ['scratch', N.scratch], ['daily', N.daily],
       ['ocr', N.ocr], ['exporter', N.exporter], ['settings', N.settings], ['help', N.help],
       ['history', N.history], ['writing', N.writing], ['github', N.github], ['capture', N.capture],
-      ['related', N.related],
+      ['related', N.related], ['intel', N.intel],
     ];
     modules.forEach(function (entry) {
       const name = entry[0], mod = entry[1];
