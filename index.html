@@ -5912,6 +5912,48 @@ body[data-animations='none'] .loader-stage::before { animation: none; }
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg-0) 70%, transparent);
 }
 
+/* ---- the live duplicate-title warning ---------------------------------- */
+/*
+ * Absolutely positioned so it can never push the title row around as it
+ * appears - the editor head is a flex row and a new block in it would make the
+ * whole toolbar jump while you type.
+ */
+.editor-head { position: relative; }
+
+.title-warn {
+  position: absolute;
+  left: var(--sp-6, 16px);
+  top: 100%;
+  z-index: 4;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  max-width: min(560px, calc(100% - var(--sp-8, 24px)));
+  margin-top: -2px;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--warn, #b8860b);
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  box-shadow: var(--shadow-2, 0 6px 20px rgba(0, 0, 0, 0.14));
+  animation: title-warn-in 180ms var(--ease-out) both;
+}
+.title-warn.is-on { display: flex; }
+.title-warn svg { flex: none; color: var(--warn, #b8860b); }
+@keyframes title-warn-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+.note-title-input.is-duplicate {
+  box-shadow: inset 0 -2px 0 var(--warn, #b8860b);
+}
+[data-animations='none'] .title-warn { animation: none; }
+@media (max-width: 760px) {
+  .title-warn { left: var(--sp-4, 12px); right: var(--sp-4, 12px); max-width: none; }
+}
+
 /* ---- floating selection bar ------------------------------------------- */
 .sel-bar {
   position: fixed;
@@ -6065,6 +6107,7 @@ body[data-animations='none'] .loader-stage::before { animation: none; }
       <section id="view-editor" class="view is-active" data-view="editor">
         <div class="editor-head">
           <input id="note-title" class="note-title-input" placeholder="Untitled" aria-label="Note title" spellcheck="false" autocomplete="off">
+          <div id="note-title-warn" class="title-warn" role="status" aria-live="polite"></div>
           <div class="editor-actions">
             <button id="btn-pin" class="icon-btn" title="Pin note"><span data-icon="pin" data-icon-size="17"></span></button>
             <button id="btn-note-menu" class="icon-btn" title="Note actions"><span data-icon="more" data-icon-size="17"></span></button>
@@ -8636,6 +8679,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     visibleViews: { editor: true, graph: true, canvas: true, database: true, tasks: true, calendar: true, matrix: true, sticky: true, scratch: true, review: true },
     // what happens to [[links]] pointing at a note you delete: plain | ask | off
     linkCleanupOnDelete: 'plain',
+    // where a note title has to be unique: vault (keeps [[links]] honest) | folder
+    uniqueTitles: 'vault',
+    // deleted notes go to the trash and are kept for this many days
+    useTrash: true,
+    trashRetentionDays: 30,
+    templateFolder: 'Templates',
     visibleSidebarTabs: { files: true, tags: true, canvases: true, recent: true },
 
     /* data */
@@ -8660,6 +8709,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     activeNoteId: null,
     activeView: 'editor',
+    // Deleted notes live here, deliberately NOT in state.notes, so nothing -
+    // search, graph, calendar, link scans - can ever pick them up.
+    trash: new Map(),
     activeCanvasId: null,
     recentNoteIds: [],
     loaded: false,
@@ -8706,6 +8758,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     ]);
 
     fill(state.notes, notes, 'id');
+    /*
+     * Trashed notes share the notes object store (no migration, no new
+     * database version) but must never appear as live notes. This is the one
+     * place that separation is established, and it runs before anything else
+     * reads state.notes.
+     */
+    state.trash = new Map();
+    Array.from(state.notes.values()).forEach(function (n) {
+      if (n && n.trashedAt) { state.notes.delete(n.id); state.trash.set(n.id, n); }
+    });
     fill(state.folders, folders, 'id');
     fill(state.canvases, canvases, 'id');
     fill(state.stickies, stickies, 'id');
@@ -8798,18 +8860,56 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return (folder ? folder + '/' : '') + safe + '.md';
   }
 
+  /** "Meeting (2)" -> "Meeting". Only applied once a name is known to be taken. */
+  function stripDupSuffix(title) {
+    const s = String(title || '').trim();
+    const out = s.replace(/\s*\(\d+\)\s*$/, '').trim();
+    return out || s;
+  }
+
+  /*
+   * De-duplication, the way a filesystem does it: the first collision becomes
+   * "Meeting (1)", the next "Meeting (2)".
+   *
+   * Two rules worth knowing:
+   *
+   * 1. The requested name is tried VERBATIM first. A note deliberately called
+   *    "Chapter (1)" keeps that name when it is free; the suffix is only
+   *    stripped and recounted when there is an actual clash. Stripping first
+   *    would quietly rename notes nobody asked to rename.
+   *
+   * 2. With settings.uniqueTitles === 'vault' (the default) titles are unique
+   *    across the whole vault, not just per folder. [[wikilinks]] resolve by
+   *    TITLE, so two notes called "Meeting" in different folders make every
+   *    [[Meeting]] link ambiguous - it silently lands on whichever note the
+   *    scan reaches first. Set it to 'folder' to allow that.
+   */
   function uniquePath(folder, title, exceptId) {
-    let candidate = buildPath(folder, title);
-    const taken = new Set();
-    state.notes.forEach(function (n) { if (n.id !== exceptId) taken.add(n.path.toLowerCase()); });
-    if (!taken.has(candidate.toLowerCase())) return candidate;
-    let i = 2;
-    while (i < 9999) {
-      candidate = buildPath(folder, title + ' ' + i);
-      if (!taken.has(candidate.toLowerCase())) return candidate;
-      i++;
+    const wanted = String(title || '').trim() || 'Untitled';
+    const vaultWide = (state.settings.uniqueTitles || 'vault') === 'vault';
+
+    const takenPaths = new Set();
+    const takenTitles = new Set();
+    state.notes.forEach(function (n) {
+      if (n.id === exceptId) return;
+      takenPaths.add(String(n.path).toLowerCase());
+      takenTitles.add(noteTitle(n).trim().toLowerCase());
+    });
+
+    const free = function (candidateTitle) {
+      if (takenPaths.has(buildPath(folder, candidateTitle).toLowerCase())) return false;
+      if (vaultWide && takenTitles.has(candidateTitle.trim().toLowerCase())) return false;
+      return true;
+    };
+
+    if (free(wanted)) return buildPath(folder, wanted);
+
+    const base = stripDupSuffix(wanted) || 'Untitled';
+    for (let i = 1; i < 9999; i++) {
+      const candidate = base + ' (' + i + ')';
+      if (free(candidate)) return buildPath(folder, candidate);
     }
-    return buildPath(folder, title + ' ' + U.uid(''));
+    return buildPath(folder, base + ' (' + U.uid('') + ')');
   }
 
   /** Recompute every derived field on a note. Cheap enough to always run. */
@@ -8873,6 +8973,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     await db.put('notes', note);
     if (folder) await ensureFolderChain(folder);
     if (N.vault) N.vault.saveNote(note);
+
+    /*
+     * The name was taken and had to be changed. The store has no business
+     * showing UI, so it says so and features/titles.js does the telling.
+     */
+    if (finalTitle !== title && !o.path && !o.silent) {
+      bus.emit('note:title-adjusted', { note: note, requested: title });
+    }
 
     if (!o.silent) {
       pushUndo('Create note', async function () { await deleteNote(note.id, { skipUndo: true, skipConfirm: true }); },
@@ -9684,6 +9792,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     renameNote: renameNote, deleteNote: deleteNote, deleteNotes: deleteNotes, duplicateNote: duplicateNote,
     moveNote: moveNote, togglePin: togglePin, setNoteColor: setNoteColor, touchNoteOpened: touchNoteOpened,
     findNoteByTitle: findNoteByTitle, getNote: getNote, allNotes: allNotes, notesInFolder: notesInFolder,
+    uniquePathFor: uniquePath, stripDupSuffix: stripDupSuffix,
     allTags: allTags, notesWithTag: notesWithTag, buildLinkGraph: buildLinkGraph, backlinksFor: backlinksFor,
     rewriteLinks: rewriteLinks,
 
@@ -12370,11 +12479,59 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
   }
 
+  /*
+   * `recent` is in memory and resets every reload, so the palette forgot you
+   * overnight. This keeps a small count-and-timestamp per command in settings
+   * (so it syncs and persists like everything else) and scores it with decay:
+   * a command used once today outranks one used three times last month, which
+   * is what "the thing I want" usually means. A raw count would freeze the
+   * ordering after a week.
+   */
+  let usage = null;
+
+  function usageMap() {
+    if (usage) return usage;
+    try { usage = (N.store && N.store.state.settings.commandUsage) || {}; }
+    catch (err) { usage = {}; }
+    return usage;
+  }
+
+  const persistUsage = N.util.debounce(function () {
+    try { if (N.store && N.store.setSetting) N.store.setSetting('commandUsage', usage || {}); }
+    catch (err) { /* a lost preference is not worth surfacing */ }
+  }, 2500);
+
+  /** 0 when never used. Halves every 10 days. */
+  function usageScore(id) {
+    const row = usageMap()[id];
+    if (!row || !row.n) return 0;
+    const days = Math.max(0, (Date.now() - (row.at || 0)) / 86400000);
+    return row.n * Math.pow(0.5, days / 10);
+  }
+
+  /** Seed the in-memory recency list from what was persisted last session. */
+  function primeRecent() {
+    if (recent.length) return;
+    const scored = Object.keys(usageMap())
+      .map(function (id) { return { id: id, s: usageScore(id) }; })
+      .filter(function (r) { return r.s > 0; })
+      .sort(function (a, b) { return b.s - a.s; })
+      .slice(0, RECENT_LIMIT);
+    scored.forEach(function (r) { if (registry.has(r.id)) recent.push(r.id); });
+  }
+
   function trackRecent(id) {
     const idx = recent.indexOf(id);
     if (idx !== -1) recent.splice(idx, 1);
     recent.unshift(id);
     if (recent.length > RECENT_LIMIT) recent.pop();
+
+    const u = usageMap();
+    const row = u[id] || { n: 0, at: 0 };
+    row.n = (row.n || 0) + 1;
+    row.at = Date.now();
+    u[id] = row;
+    persistUsage();
   }
 
   function recentIds() { return recent.slice(); }
@@ -12384,6 +12541,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const list = available();
     const q = String(query || '').trim();
     if (!q) {
+      primeRecent();
       const recentSet = new Set(recent);
       return list
         .slice()
@@ -12391,6 +12549,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           const ar = recentSet.has(a.id) ? recent.indexOf(a.id) : 999;
           const br = recentSet.has(b.id) ? recent.indexOf(b.id) : 999;
           if (ar !== br) return ar - br;
+          // Then by how much you have used it across every previous session,
+          // which is the part that used to be forgotten on reload.
+          const au = usageScore(a.id), bu = usageScore(b.id);
+          if (au !== bu) return bu - au;
           return a.group.localeCompare(b.group) || a.title.localeCompare(b.title);
         })
         .map(function (c) { return { cmd: c, score: 0, indices: [] }; });
@@ -12403,6 +12565,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (!anyMatch) return;
       let score = titleMatch ? titleMatch.score + 40 : anyMatch.score;
       if (recent.indexOf(cmd.id) !== -1) score += 25;
+      // Small on purpose: what you typed still decides the order. This only
+      // separates two equally-good matches, using the one you actually open.
+      score += Math.min(12, usageScore(cmd.id) * 3);
       results.push({ cmd: cmd, score: score, indices: titleMatch ? titleMatch.indices : [] });
     });
     return results.sort(function (a, b) { return b.score - a.score; });
@@ -12421,6 +12586,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   N.commands = {
     register: register, registerMany: registerMany, get: get, all: all, has: has,
     available: available, run: run, search: search, groups: groups, recentIds: recentIds,
+    usageScore: usageScore,
   };
 })(window.NODALIS = window.NODALIS || {});
 
@@ -12542,16 +12708,33 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /* ------------------------------------------------------------ registry */
 
+  /*
+   * Collisions found while rebuilding. The old version used a plain
+   * bindings.set(), so a second command on the same key silently overwrote the
+   * first and one of the two shortcuts just stopped working with no warning
+   * anywhere. Now the first registration keeps the key and the loser is
+   * recorded here, where the health check can report it.
+   */
+  let collisions = [];
+
   function rebuild() {
     bindings.clear();
     chords.clear();
+    collisions = [];
     const overrides = (N.store && N.store.state.settings.keymap) || {};
     const commands = N.commands ? N.commands.all() : [];
 
     commands.forEach(function (cmd) {
       const accel = Object.prototype.hasOwnProperty.call(overrides, cmd.id) ? overrides[cmd.id] : cmd.accel;
       if (!accel) return;
-      register(normalize(accel), cmd.id);
+      const key = normalize(accel);
+      const owner = conflictFor(key, cmd.id);
+      if (owner) {
+        collisions.push({ accel: key, keeps: owner, blocked: cmd.id });
+        console.warn('[shortcuts] ' + format(key) + ' is already "' + owner + '", so "' + cmd.id + '" did not get it');
+        return;
+      }
+      register(key, cmd.id);
     });
   }
 
@@ -12587,14 +12770,39 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return cmd ? cmd.accel : null;
   }
 
-  async function rebind(commandId, accel) {
+  /**
+   * rebind(commandId, accel, opts) -> { ok, reason, owner }
+   *
+   * The guard lives HERE rather than only in the settings screen, so no code
+   * path - a command, an import, a future feature - can create a duplicate
+   * binding. Pass { force: true } when the caller has already dealt with the
+   * conflict (the swap in Settings, and the health-check fixer, both do).
+   */
+  async function rebind(commandId, accel, opts) {
     const store = N.store;
-    if (!store) return;
+    if (!store) return { ok: false, reason: 'no-store' };
+    const clearing = (accel === null || accel === '');
+
+    if (!clearing && !(opts && opts.force)) {
+      const owner = conflictFor(accel, commandId);
+      if (owner) return { ok: false, reason: 'taken', owner: owner, accel: normalize(accel) };
+    }
+
     if (!store.state.settings.keymap) store.state.settings.keymap = {};
-    if (accel === null || accel === '') store.state.settings.keymap[commandId] = '';
-    else store.state.settings.keymap[commandId] = normalize(accel);
+    store.state.settings.keymap[commandId] = clearing ? '' : normalize(accel);
     await store.saveSettings();
     rebuild();
+    return { ok: true, accel: clearing ? '' : normalize(accel) };
+  }
+
+  /** Trade two commands' keys, so neither is left without one. */
+  async function swap(commandIdA, commandIdB) {
+    const a = accelFor(commandIdA);
+    const b = accelFor(commandIdB);
+    await rebind(commandIdB, '', { force: true });
+    await rebind(commandIdA, b || '', { force: true });
+    await rebind(commandIdB, a || '', { force: true });
+    return { a: accelFor(commandIdA), b: accelFor(commandIdB) };
   }
 
   async function resetBinding(commandId) {
@@ -12730,6 +12938,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     init: init, rebuild: rebuild, normalize: normalize, format: format, fromEvent: fromEvent,
     accelFor: accelFor, rebind: rebind, resetBinding: resetBinding, resetAll: resetAll,
     conflictFor: conflictFor, capture: capture, inTextInput: inTextInput,
+    collisions: function () { return collisions.slice(); }, swap: swap,
     setEnabled: function (v) { enabled = !!v; },
     isMac: IS_MAC,
     bindings: bindings,
@@ -14513,9 +14722,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (N.store.state.settings.confirmDelete !== false) {
       const ok = await N.modal.confirm({
         title: 'Delete "' + N.store.noteTitle(note) + '"?',
-        message: N.vault.isFolderMode()
-          ? 'The file will be removed from your folder on disk. You can undo this straight away with Ctrl/Cmd+Z.'
-          : 'You can undo this straight away with Ctrl/Cmd+Z.',
+        message: (N.trash && N.trash.enabled())
+          ? 'It goes to the trash and is kept for ' +
+            (N.store.state.settings.trashRetentionDays || 30) + ' days, so you can restore it any time. Ctrl/Cmd+Z undoes this immediately.'
+          : (N.vault.isFolderMode()
+            ? 'The file will be removed from your folder on disk. You can undo this straight away with Ctrl/Cmd+Z.'
+            : 'You can undo this straight away with Ctrl/Cmd+Z.'),
         confirmLabel: 'Delete', danger: true,
       });
       if (!ok) return;
@@ -14919,11 +15131,71 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     wordCount.textContent = parts.join(' · ');
   }
 
+  /*
+   * Aliases are the feature nobody discovers. They already worked - the parser
+   * reads an `aliases` property and findNoteByTitle matches against it - but
+   * the only way to add one was to type front matter by hand, so almost nobody
+   * did. This puts it two clicks from the note.
+   */
+  async function editAliases(note) {
+    const current = (note.aliases || []).join(', ');
+    const raw = await N.modal.prompt({
+      title: 'Other names for "' + N.store.noteTitle(note) + '"',
+      message: 'Separate them with commas. Any of these will resolve in a [[link]], and they are searchable too.',
+      placeholder: 'the plan, Q3 launch, launch doc',
+      value: current,
+    });
+    if (raw === null) return;
+    const list = String(raw).split(',').map(function (s2) { return s2.trim(); }).filter(Boolean);
+
+    // An alias that is already a real note title would make links ambiguous in
+    // exactly the way unique titles are meant to prevent.
+    const clashing = list.filter(function (a) {
+      const found = N.store.findNoteByTitle(a);
+      return found && found.id !== note.id;
+    });
+    if (clashing.length) {
+      const go = await N.modal.confirm({
+        title: 'Some of those names are taken',
+        message: clashing.join(', ') + ' already ' + (clashing.length === 1 ? 'names' : 'name') +
+          ' another note. Links using them would be ambiguous.',
+        detail: 'They will be left out; the rest will be saved.',
+        confirmLabel: 'Save the others', cancelLabel: 'Let me edit them',
+      });
+      if (!go) return editAliases(note);
+    }
+    const keep = list.filter(function (a) { return clashing.indexOf(a) === -1; });
+
+    const props = Object.assign({}, note.properties || {});
+    if (keep.length) props.aliases = keep; else delete props.aliases;
+    await N.store.updateNoteProperties(note.id, props, { replace: true });
+    N.bus.emit('vault:changed');
+    N.toast.success(keep.length
+      ? 'Saved. ' + N.store.noteTitle(note) + ' also answers to ' + keep.join(', ') + '.'
+      : 'Other names removed.', { ms: 5000 });
+  }
+
   async function commitTitle() {
     const note = current();
     if (!note) return;
     const next = titleInput.value.trim();
     if (!next || next === N.store.noteTitle(note)) { renderTitle(); return; }
+
+    // Say what is about to happen before it happens, rather than letting the
+    // name change under the user and explaining afterwards.
+    const clash = N.titles && N.titles.preview ? N.titles.preview(next, note.folder, note.id) : null;
+    if (clash) {
+      const go = await N.modal.confirm({
+        title: '"' + clash.wanted + '" is already used',
+        message: 'There ' + (clash.count === 1 ? 'is already a note' : 'are already ' + clash.count + ' notes') +
+          ' with that name, so this one will be saved as "' + clash.willBe + '".',
+        detail: 'Note titles are kept unique so that [[links]] always point at one note.',
+        confirmLabel: 'Use "' + clash.willBe + '"',
+        cancelLabel: 'Let me change it',
+      });
+      if (!go) { titleInput.focus(); titleInput.select(); return; }
+    }
+
     await N.store.renameNote(note.id, next);
     renderTitle();
   }
@@ -15628,6 +15900,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       { label: 'Remind me about this…', icon: 'clock', onClick: function () {
         if (N.remind && N.remind.setFor) N.remind.setFor('note', note.id, N.store.noteTitle(note), note.folder || '');
       } },
+      { label: 'Other names for this note…', icon: 'tags',
+        hint: (note.aliases && note.aliases.length) ? String(note.aliases.length) : '',
+        onClick: function () { editAliases(note); } },
+      { label: 'Insert a template here…', icon: 'file-text',
+        onClick: function () { if (N.templates) N.templates.pick('insert'); } },
       { separator: true },
       { label: 'Copy link to note', icon: 'link', onClick: function () { N.commands.run('note.copyLink'); } },
       { label: 'Copy as markdown', icon: 'copy', onClick: function () { N.commands.run('note.copyMarkdown'); } },
@@ -23624,19 +23901,48 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         N.toast.info('"' + cmd.title + '" now has no shortcut.', { ms: 2400 });
         return;
       }
+      /*
+       * A taken key is REFUSED by default. Cancelling leaves both commands
+       * exactly as they were, which is what "that shortcut already exists"
+       * should mean. Swapping is offered because the alternative - the old
+       * behaviour - silently left the other command with no shortcut at all.
+       */
       const conflict = N.shortcuts.conflictFor(accel, cmd.id);
       if (conflict) {
         const other = N.commands.get(conflict);
-        const ok = await N.modal.confirm({
-          title: 'That shortcut is taken',
-          message: N.shortcuts.format(accel) + ' is currently "' + (other ? other.title : conflict) + '".',
-          detail: 'Assigning it here will leave that command without a shortcut.',
-          confirmLabel: 'Reassign it',
+        const otherName = other ? other.title : conflict;
+        const mine = N.shortcuts.accelFor(cmd.id);
+        const swapIt = await N.modal.confirm({
+          title: N.shortcuts.format(accel) + ' is already taken',
+          message: 'It belongs to "' + otherName + '". Nothing has been changed.',
+          detail: mine
+            ? 'Swap them and "' + otherName + '" gets ' + N.shortcuts.format(mine) + ' instead, so neither command loses its shortcut.'
+            : 'Swapping would leave "' + otherName + '" without a shortcut, so pick a different key instead.',
+          confirmLabel: mine ? 'Swap them' : 'Take it anyway',
+          cancelLabel: 'Leave it as it is',
         });
-        if (!ok) { button.textContent = original; return; }
-        await N.shortcuts.rebind(conflict, '');
+        if (!swapIt) {
+          button.textContent = original;
+          N.toast.info(N.shortcuts.format(accel) + ' still belongs to "' + otherName + '". Nothing changed.', { ms: 4000 });
+          return;
+        }
+        if (mine) {
+          await N.shortcuts.swap(cmd.id, conflict);
+          button.textContent = N.shortcuts.format(accel);
+          N.toast.success('Swapped: "' + cmd.title + '" is ' + N.shortcuts.format(accel) +
+            ', "' + otherName + '" is ' + N.shortcuts.format(mine) + '.', { ms: 5000 });
+          render();
+          return;
+        }
+        await N.shortcuts.rebind(conflict, '', { force: true });
       }
-      await N.shortcuts.rebind(cmd.id, accel);
+
+      const result = await N.shortcuts.rebind(cmd.id, accel, { force: true });
+      if (!result || !result.ok) {
+        button.textContent = original;
+        N.toast.error('That shortcut could not be set.', { ms: 3000 });
+        return;
+      }
       button.textContent = N.shortcuts.format(accel);
       N.toast.success('"' + cmd.title + '" is now ' + N.shortcuts.format(accel), { ms: 2400 });
       render();
@@ -28817,8 +29123,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     if (N.commands && N.commands.registerMany) {
       N.commands.registerMany([
+        // Mod+Shift+R already belonged to "Open daily review"; this one yields.
         { id: 'remind.current', title: 'Remind me about this', group: 'Create', icon: 'clock',
-          accel: 'Mod+Shift+R', run: remindCurrent },
+          accel: 'Mod+Alt+R', run: remindCurrent },
         { id: 'remind.list', title: 'Reminders', group: 'View', icon: 'clock', run: openList },
         { id: 'remind.permission', title: 'Enable reminder notifications', group: 'App', icon: 'info',
           run: async function () {
@@ -29512,7 +29819,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   function registerCommands() {
     N.commands.registerMany([
-      { id: 'calendar.open', title: 'Open calendar', group: 'View', icon: 'calendar', accel: 'Mod+Shift+C',
+      // Mod+Shift+C already belonged to "Quick capture a thought". Whoever
+      // registered second used to silently win; the older binding keeps it.
+      { id: 'calendar.open', title: 'Open calendar', group: 'View', icon: 'calendar', accel: 'Mod+Shift+A',
         run: function () { N.app.setView('calendar'); } },
       { id: 'calendar.today', title: 'Calendar: jump to today', group: 'View', icon: 'calendar',
         when: function () { return N.store.state.activeView === 'calendar'; },
@@ -29658,17 +29967,22 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const o = opts || {};
       const note = N.store.getNote(id);
 
-      // A bulk wipe (import "replace everything") passes skipUndo. There is
-      // nothing to tidy when the whole vault is going, and rewriting notes that
-      // are about to be deleted anyway would just be slow.
-      if (!note || o.skipUndo || o.skipLinkCleanup || mode() === 'off') {
-        return original(id, opts);
-      }
+      /*
+       * A bulk wipe (import "replace everything") passes skipUndo. Nothing to
+       * tidy when the whole vault is going, and nothing should land in the
+       * trash either - you would be restoring the vault you just replaced.
+       */
+      if (!note || o.skipUndo) return original(id, opts);
 
-      const plan = planFor(note);
-      if (!plan.length) return original(id, opts);
+      /*
+       * The link plan and the trash are INDEPENDENT decisions. An earlier
+       * version returned early when a note had no inbound links, which meant a
+       * note nothing pointed at skipped the trash entirely and was erased -
+       * exactly the notes most likely to be deleted by accident.
+       */
+      let plan = (o.skipLinkCleanup || mode() === 'off') ? [] : planFor(note);
 
-      if (mode() === 'ask') {
+      if (plan.length && mode() === 'ask') {
         const go = await N.modal.confirm({
           title: 'Clean up ' + U.pluralize(totalLinks(plan), 'link') + '?',
           message: U.pluralize(plan.length, 'other note') + ' link' + (plan.length === 1 ? 's' : '') +
@@ -29676,14 +29990,28 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           detail: 'Choosing Keep links leaves them in place, showing as unresolved.',
           confirmLabel: 'Turn into plain text', cancelLabel: 'Keep links',
         });
-        if (!go) return original(id, opts);
+        if (!go) plan = [];
       }
 
       const snapshot = U.deepClone(note);
 
-      // The delete itself, with its own undo suppressed - one combined entry is
-      // pushed below so a single Ctrl/Cmd+Z restores the note AND the links.
-      const removed = await original(id, Object.assign({}, o, { skipUndo: true }));
+      /*
+       * The delete itself, with the store's own undo suppressed - one combined
+       * entry is pushed below, so a single Ctrl/Cmd+Z restores the note AND
+       * every link that was rewritten with it.
+       *
+       * With the trash on, the note is moved there rather than erased.
+       * softDelete returns false if anything at all goes wrong and we fall
+       * through to the real delete, so a failure can never leave a note
+       * half-removed.
+       */
+      let viaTrash = false;
+      let removed = false;
+      if (N.trash && N.trash.enabled()) {
+        viaTrash = await N.trash.softDelete(id);
+        removed = viaTrash;
+      }
+      if (!removed) removed = await original(id, Object.assign({}, o, { skipUndo: true }));
       if (!removed) return removed;
 
       let touched = 0;
@@ -29699,11 +30027,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
       N.store.pushUndo('Delete "' + N.store.noteTitle(snapshot) + '"',
         async function () {
-          // put the note back...
-          N.store.state.notes.set(snapshot.id, snapshot);
-          await N.db.put('notes', snapshot);
-          if (N.vault) N.vault.saveNote(snapshot);
-          N.bus.emit('note:created', snapshot);
+          // Put the note back - out of the trash if that is where it went, so
+          // undo never leaves a copy sitting in two places at once.
+          if (viaTrash && N.trash) await N.trash.restore(snapshot.id);
+          else {
+            N.store.state.notes.set(snapshot.id, snapshot);
+            await N.db.put('notes', snapshot);
+            if (N.vault) N.vault.saveNote(snapshot);
+            N.bus.emit('note:created', snapshot);
+          }
           // ...and put the links back with it
           for (const step of plan) {
             try { await N.store.updateNoteContent(step.id, step.before, { quiet: true }); }
@@ -29756,7 +30088,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       going.forEach(function (n2) { namesFor(n2).forEach(function (nm) { names.push(nm); }); });
       const goingIds = new Set(going.map(function (n2) { return n2.id; }));
 
-      const plan = [];
+      let plan = [];
       N.store.allNotes().forEach(function (other) {
         if (goingIds.has(other.id)) return;               // it is going too
         if (String(other.content || '').indexOf('[[') === -1) return;
@@ -29766,21 +30098,37 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         }
       });
 
-      if (!plan.length) return original(id, opts);
-
-      if (mode() === 'ask') {
+      /*
+       * As with a single note, the link plan and the trash are independent.
+       * Returning early on an empty plan would mean a folder whose notes
+       * nothing links to bypassed the trash and was erased outright.
+       */
+      if (plan.length && mode() === 'ask') {
         const go = await N.modal.confirm({
           title: 'Clean up ' + U.pluralize(totalLinks(plan), 'link') + '?',
           message: 'Notes outside "' + folder.name + '" link to notes inside it. Turn those links into plain text?',
           confirmLabel: 'Turn into plain text', cancelLabel: 'Keep links',
         });
-        if (!go) return original(id, opts);
+        if (!go) plan = [];
       }
 
       const noteSnaps = going.map(U.deepClone);
       const folderSnaps = Array.from(N.store.state.folders.values())
         .filter(function (f) { return f.path === path || String(f.path).indexOf(path + '/') === 0; })
         .map(U.deepClone);
+
+      /*
+       * Move the notes to the trash first, then let the original remove the
+       * folder records. By then allNotes() no longer contains them, so it
+       * finds nothing to erase and only the folders go.
+       */
+      let viaTrash = false;
+      if (N.trash && N.trash.enabled()) {
+        viaTrash = true;
+        for (const n2 of going) {
+          if (!(await N.trash.softDelete(n2.id))) viaTrash = false;
+        }
+      }
 
       const done = await original(id, Object.assign({}, o, { skipUndo: true }));
       if (!done) return done;
@@ -29799,6 +30147,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
             if (N.vault) N.vault.saveFolder(f.path);
           }
           for (const n2 of noteSnaps) {
+            if (viaTrash && N.trash) { await N.trash.restore(n2.id); continue; }
             N.store.state.notes.set(n2.id, n2);
             await N.db.put('notes', n2);
             if (N.vault) N.vault.saveNote(n2);
@@ -29906,1158 +30255,119 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   };
 })(window.NODALIS = window.NODALIS || {});
 
-/* ===== js/app.js ===== */
+/* ===== js/features/titles.js ===== */
 /* =========================================================================
- * Nodalis — app.js
- * Boot sequence, view routing, layout state, global commands and the
- * top-level error net. Everything below is defensive on purpose: a single
- * failing module must never take the whole app down with it.
+ * Nodalis - features/titles.js
+ *
+ * Note titles are unique, the way filenames are unique in a folder: the first
+ * collision becomes "Meeting (1)", the next "Meeting (2)".
+ *
+ * Why titles and not just paths: [[wikilinks]] resolve by TITLE, not by id or
+ * path. Two notes called "Meeting" in different folders make every [[Meeting]]
+ * link in the vault ambiguous - it silently resolves to whichever note the
+ * scan happens to reach first. Unique titles are what makes linking honest.
+ * (Set uniqueTitles to 'folder' if you would rather allow it per folder.)
+ *
+ * This module owns the human side of that rule:
+ *   - a live warning under the title box while you type a name already in use,
+ *     naming exactly what it will become
+ *   - a message when a name was adjusted on creation, offering to rename
+ *   - a command that finds and fixes duplicates already in the vault
  * ========================================================================= */
 (function (N) {
   'use strict';
 
   const U = N.util;
   const el = U.el;
-  const bus = N.bus;
 
-  const VIEWS = ['editor', 'graph', 'canvas', 'database', 'tasks', 'calendar', 'matrix', 'sticky', 'scratch', 'review', 'search', 'settings'];
-  let booted = false;
-  let deferredInstallPrompt = null;
+  let warnEl = null;
 
-  /* ------------------------------------------------------------------ boot */
+  /* ---------------------------------------------------------------- helpers */
 
-  /* ------------------------------------------------------------ resilience */
-
-  const BOOT_BUDGET_MS = 20000;   // hard ceiling for the whole sequence
-  let bootWatchdog = null;
-  let bootStage = 'starting';
-  let bootDegradations = [];
-
-  // Resolves if the user asks to skip the intro. Every boot wait races it, so
-  // "Skip" genuinely means "get me in now" rather than "hide the animation and
-  // leave me looking at a shell that does nothing".
-  let releaseSkip = function () {};
-  const skipRequested = new Promise(function (resolve) { releaseSkip = resolve; });
-  let userSkipped = false;
-  let skipGraceUsed = false;
-  bus.on('loader:skip', function () { userSkipped = true; releaseSkip({ __skipped: true }); });
-
-  /**
-   * Await a promise, but give up after `ms`.
-   *
-   * Every await in boot goes through this. A browser that stalls on storage —
-   * WebKit dropping an IndexedDB request, a blocked upgrade in another tab,
-   * a permission prompt nobody answers — must degrade the app, never freeze it.
-   */
-  function withTimeout(promise, ms, label) {
-    let timer = null;
-    const timeout = new Promise(function (resolve) {
-      timer = setTimeout(function () {
-        console.warn('[nodalis] "' + label + '" timed out after ' + ms + 'ms — continuing without it');
-        bootDegradations.push(label);
-        resolve({ __timedOut: true });
-      }, ms);
-    });
-    return Promise.race([
-      Promise.resolve(promise).then(
-        function (v) { clearTimeout(timer); return v; },
-        function (err) {
-          clearTimeout(timer);
-          console.warn('[nodalis] "' + label + '" failed — continuing without it', err);
-          bootDegradations.push(label);
-          return { __failed: true, error: err };
-        }
-      ),
-      timeout,
-      // After Skip, give the stage in flight a short grace period to finish on
-      // its own — but only once. Every later stage bails immediately, so Skip
-      // means "in now" rather than "in, one grace period per remaining step".
-      skipRequested.then(function () {
-        const grace = skipGraceUsed ? 0 : 1200;
-        skipGraceUsed = true;
-        return new Promise(function (resolve) {
-          setTimeout(function () {
-            clearTimeout(timer);
-            bootDegradations.push(label);
-            resolve({ __skipped: true });
-          }, grace);
-        });
-      }),
-    ]);
+  /** "Meeting (2)" -> "Meeting". Only used once a name is known to be taken. */
+  function stripSuffix(title) {
+    const s = String(title || '').trim();
+    const out = s.replace(/\s*\(\d+\)\s*$/, '').trim();
+    return out || s;
   }
 
-  function stage(name, ratio, step, progress) {
-    bootStage = name;
-    progress(ratio, step);
+  function sameTitle(a, b) {
+    return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
   }
 
-  async function boot() {
-    if (booted) return;
-    booted = true;
-
-    installErrorNet();
-
-    const wantsLoader = readLoaderPreference();
-    if (wantsLoader) N.loader.start();
-    const progress = function (ratio, step) { if (wantsLoader) N.loader.progress(ratio, step); };
-
-    // These must be listening before the database is touched, because a
-    // failure to open it is reported during that very call.
-    bus.on('db:quota-exceeded', onQuotaExceeded);
-    bus.on('db:degraded', onDbDegraded);
-    bus.on('db:blocked', onDbBlocked);
-
-    // Last line of defence. If anything below wedges despite the per-stage
-    // timeouts, tear the loader down and hand the user a working shell with an
-    // explanation rather than an animation that never ends.
-    bootWatchdog = setTimeout(function () {
-      console.error('[nodalis] boot exceeded its budget at stage "' + bootStage + '"');
-      forceUsableShell('Startup took longer than expected and was cut short at "' + bootStage + '".');
-    }, BOOT_BUDGET_MS);
-
-    try {
-      stage('preparing', 0.08, 0, progress);
-      N.icons.hydrate(document);
-
-      stage('opening local database', 0.18, 1, progress);
-      await withTimeout(N.db.open(), 9000, 'opening local database');
-
-      stage('reading your vault', 0.34, 2, progress);
-      await withTimeout(N.store.loadAll(), 9000, 'reading your vault');
-
-      stage('applying theme', 0.5, 2, progress);
-      try { N.theme.init(); } catch (err) { console.error('[nodalis] theme failed', err); }
-
-      stage('reconnecting your folder', 0.58, 3, progress);
-      await withTimeout(restoreVault(), 8000, 'reconnecting your folder');
-
-      stage('starting features', 0.7, 3, progress);
-      initModules();
-
-      stage('building the interface', 0.86, 3, progress);
-      wireShell();
-      if (N.db.isDegraded()) onDbDegraded(N.db.degradedReason());
-      N.shortcuts.init();
-      N.menu.initTooltips();
-      registerGlobalCommands();
-      rebuildNav();
-      updateVaultStatus();
-      applyInitialView();
-      N.nav.init();
-      N.haptics.init();
-
-      stage('ready', 0.96, 4, progress);
-      clearTimeout(bootWatchdog);
-      bootWatchdog = null;
-      await N.loader.finish();
-
-      afterBoot();
-      reportDegradations();
-    } catch (err) {
-      clearTimeout(bootWatchdog);
-      bootWatchdog = null;
-      console.error('[nodalis] boot failed at stage "' + bootStage + '"', err);
-      await N.loader.finish(true);
-      // Even a hard failure should leave something usable if the shell exists.
-      if (!forceUsableShell(U.describeError(err))) showFatal(err);
-    }
+  function vaultWide() {
+    return (N.store.state.settings.uniqueTitles || 'vault') === 'vault';
   }
 
   /**
-   * Bring the app up as far as it will go after a stalled or failed start.
-   * Returns true if the user is left with a working interface.
+   * What would happen if you saved this title here right now.
+   * Returns null when the name is free, so callers can treat null as "fine".
    */
-  let forced = false;
-  function forceUsableShell(reason) {
-    if (forced) return true;
-    forced = true;
-    clearTimeout(bootWatchdog);
-    bootWatchdog = null;
+  function preview(title, folder, exceptId) {
+    const wanted = String(title || '').trim();
+    if (!wanted) return null;
+    const clashes = [];
+    N.store.allNotes().forEach(function (n2) {
+      if (n2.id === exceptId) return;
+      if (!sameTitle(N.store.noteTitle(n2), wanted)) return;
+      if (!vaultWide() && (n2.folder || '') !== (folder || '')) return;
+      clashes.push(n2);
+    });
+    if (!clashes.length) return null;
+    const path = N.store.uniquePathFor(folder || '', wanted, exceptId);
+    const willBe = String(path).split('/').pop().replace(/\.md$/i, '');
+    return { wanted: wanted, willBe: willBe, clashes: clashes, count: clashes.length };
+  }
 
-    try { N.loader.finish(true); } catch (err) { /* loader may not exist */ }
+  /* ------------------------------------------------- the live title warning */
 
-    let usable = false;
-    try {
-      if (!N.store.state.loaded) {
-        // Nothing was read from storage. Run entirely from memory so the user
-        // can at least write, and make the risk unmistakable.
-        N.store.state.loaded = true;
-        bus.emit('vault:loaded', { notes: N.store.state.notes.size });
-      }
-      try { N.theme.init(); } catch (err) { /* colours already have CSS defaults */ }
-      initModules();
-      wireShell();
-      N.shortcuts.init();
-      N.menu.initTooltips();
-      registerGlobalCommands();
-      rebuildNav();
-      updateVaultStatus();
-      applyInitialView();
-      N.nav.init();
-      N.haptics.init();
-      if (!N.store.state.notes.size) N.store.seedWelcomeVault().then(function () { N.sidebar.render(); openFirstNote(); });
-      else openFirstNote();
-      usable = true;
-    } catch (err) {
-      console.error('[nodalis] could not force a usable shell', err);
+  function ensureWarnEl() {
+    if (warnEl && warnEl.isConnected) return warnEl;
+    warnEl = document.getElementById('note-title-warn');
+    return warnEl;
+  }
+
+  function clearWarning() {
+    const node = ensureWarnEl();
+    if (node) {
+      node.classList.remove('is-on');
+      U.clear(node);
     }
-
-    if (usable) {
-      showRecoveryBanner(reason);
-    } else {
-      showFatal(new Error(reason));
-    }
-    return usable;
+    const input = document.getElementById('note-title');
+    if (input) input.classList.remove('is-duplicate');
   }
 
-  /** A persistent, actionable explanation — not a toast that fades away. */
-  function showRecoveryBanner(reason) {
-    if (document.getElementById('recovery-banner')) return;
-
-    const bar = el('div#recovery-banner', {
-      style: {
-        position: 'fixed', left: '0', right: '0', bottom: '0',
-        zIndex: 'var(--z-toast)',
-        display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
-        padding: '12px 16px calc(12px + var(--safe-bottom))',
-        background: 'var(--bg-0)', borderTop: '2px solid #f59e0b',
-        boxShadow: 'var(--shadow-lg)', fontSize: 'var(--text-base)',
-      },
-      role: 'alert',
-    });
-    bar.appendChild(N.icons.node('warning', { size: 20 }));
-
-    const main = el('div', { style: { flex: '1 1 320px', minWidth: '0', lineHeight: '1.5' } });
-    main.appendChild(el('div', { style: { fontWeight: '600' } }, 'Nodalis started in safe mode'));
-    main.appendChild(el('div.muted', null,
-      reason + ' You can write normally, but nothing is being saved to this device — export before you close the tab.'));
-    bar.appendChild(main);
-
-    const actions = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
-    actions.appendChild(el('button.btn.btn-sm.btn-primary', {
-      type: 'button',
-      onclick: async function () {
-        const closing = N.toast.info('Trying local storage again…', { ms: 0, key: 'retry-db' });
-        const ok = await N.db.retryOpen();
-        closing();
-        if (ok) {
-          N.toast.success('Local storage is working again. Reloading to pick everything up.', { ms: 3000 });
-          setTimeout(function () { location.reload(); }, 900);
-        } else {
-          N.toast.error('Still cannot reach local storage. Export your work to keep it.', { ms: 8000 });
-        }
-      },
-    }, 'Try storage again'));
-    actions.appendChild(el('button.btn.btn-sm', {
-      type: 'button', onclick: function () { N.commands.run('export.vault'); },
-    }, 'Export now'));
-    if (U.supports.fileSystemAccess) {
-      actions.appendChild(el('button.btn.btn-sm', {
-        type: 'button', onclick: function () { N.commands.run('vault.connect'); },
-      }, 'Save to a folder'));
-    }
-    actions.appendChild(el('button.btn.btn-sm', {
-      type: 'button', onclick: function () { location.reload(); },
-    }, 'Reload'));
-    const dismiss = el('button.icon-btn.icon-btn-sm', {
-      type: 'button', title: 'Dismiss', onclick: function () { bar.remove(); },
-    });
-    dismiss.appendChild(N.icons.node('close', { size: 15 }));
-    actions.appendChild(dismiss);
-    bar.appendChild(actions);
-
-    document.body.appendChild(bar);
-  }
-
-  /** Softer notice for stages that timed out but left the app fully working. */
-  function reportDegradations() {
-    if (!bootDegradations.length) return;
-    const list = Array.from(new Set(bootDegradations)).join(', ');
-    if (userSkipped) {
-      N.toast.info('Started early because you skipped ahead. Reload if anything looks incomplete.', { ms: 6000 });
-      return;
-    }
-    if (N.db.isDegraded()) return;   // already reported, more seriously
-    N.toast.warn('Some startup steps were slow and were skipped: ' + list + '. Everything else is working.', {
-      title: 'Slow start', ms: 9000,
-    });
-  }
-
-  function onDbBlocked() {
-    N.toast.warn('Another Nodalis tab is holding local storage open. Close the other tabs, then reload.', {
-      title: 'Storage is busy', ms: 0, key: 'db-blocked',
-      action: { label: 'Reload', onClick: function () { location.reload(); } },
-    });
-  }
-
-  /** Read the loader preference straight from IndexedDB is too slow; use a hint. */
-  function readLoaderPreference() {
-    try {
-      const hint = localStorage.getItem('nodalis-loader');
-      return hint !== '0';
-    } catch (err) {
-      return true;   // private mode without localStorage — show it, it is harmless
-    }
-  }
-
-  function persistLoaderHint() {
-    try { localStorage.setItem('nodalis-loader', N.store.state.settings.showLoaderOnStart === false ? '0' : '1'); }
-    catch (err) { /* nothing depends on this succeeding */ }
-  }
-
-  async function restoreVault() {
-    try {
-      const result = await N.vault.restore();
-      if (result.restored) {
-        // Disk is the source of truth: read it back before the user types.
-        try { await N.vault.pullAll(); }
-        catch (err) { console.warn('[nodalis] initial pull failed', err); }
-      }
-    } catch (err) {
-      console.warn('[nodalis] vault restore failed', err);
-    }
-  }
-
-  function initModules() {
-    const modules = [
-      ['editor', N.editor], ['sidebar', N.sidebar], ['panels', N.panels], ['search', N.search],
-      ['graph', N.graph], ['canvas', N.canvas], ['database', N.database], ['tasks', N.tasks],
-      ['matrix', N.matrix], ['sticky', N.sticky], ['scratch', N.scratch], ['daily', N.daily],
-      ['ocr', N.ocr], ['exporter', N.exporter], ['settings', N.settings], ['help', N.help],
-      ['history', N.history], ['writing', N.writing], ['github', N.github], ['capture', N.capture],
-      ['related', N.related], ['intel', N.intel], ['intelExtra', N.intelExtra],
-      ['remind', N.remind], ['selectionBar', N.selectionBar], ['calendar', N.calendar],
-      ['linkcare', N.linkcare],
-      ['tools', N.tools],
-    ];
-    modules.forEach(function (entry) {
-      const name = entry[0], mod = entry[1];
-      if (!mod || typeof mod.init !== 'function') {
-        console.warn('[nodalis] module "' + name + '" is missing');
-        return;
-      }
-      try { mod.init(); }
-      catch (err) {
-        console.error('[nodalis] module "' + name + '" failed to start', err);
-        N.toast.error('The ' + name + ' feature could not start. The rest of the app is fine.', { ms: 8000 });
-      }
-    });
-  }
-
-  async function afterBoot() {
-    persistLoaderHint();
-    registerServiceWorker();
-    watchInstallPrompt();
-    watchConnectivity();
-    watchVisibility();
-    watchUnload();
-
-    if (await N.onboarding.shouldRun()) {
-      await N.onboarding.run();
-      N.sidebar.render();
-      openFirstNote();
-    } else {
-      openFirstNote();
-      setTimeout(function () { N.onboarding.maybeRemindBackup(); }, 4000);
-    }
-
-    N.daily.recordActivity();
-    bus.emit('app:ready');
-
-    // Deliberately after the interface is up and after onboarding: the probe
-    // is a real write, and we do not want it competing with the first paint.
-    setTimeout(function () { checkStorageDurability().catch(function () {}); }, 1500);
-  }
-
-  function openFirstNote() {
-    if (N.store.state.activeNoteId) return;
-    const recent = N.store.state.recentNoteIds.map(N.store.getNote).filter(Boolean)[0];
-    const pinned = N.store.allNotes().filter(function (n) { return n.pinned; })[0];
-    const newest = N.store.allNotes().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0];
-    const target = recent || pinned || newest;
-    if (target) openNote(target.id);
-  }
-
-  /* --------------------------------------------------------------- shell */
-
-  function wireShell() {
-    const app = document.getElementById('app');
-
-    /* sidebar */
-    document.getElementById('btn-sidebar').addEventListener('click', toggleSidebar);
-    document.getElementById('scrim').addEventListener('click', function () {
-      if (window.innerWidth <= 900) {
-        app.dataset.sidebar = 'closed';
-        app.dataset.right = 'closed';
-        updateScrim();
-      }
-    });
-
-    /* right panel */
-    const rightBtn = document.getElementById('btn-right-panel');
-    if (rightBtn) rightBtn.addEventListener('click', toggleRightPanel);
-
-    /* view tabs */
-    const tabs = document.getElementById('view-tabs');
-    if (tabs) U.delegate(tabs, 'click', 'button', function (e, btn) { setView(btn.dataset.view); });
-
-    /* mobile nav */
-    const nav = document.getElementById('mobile-nav');
-    if (nav) U.delegate(nav, 'click', '.mobile-nav-btn', function (e, btn) {
-      if (btn.dataset.view) { setView(btn.dataset.view); return; }
-      const action = btn.dataset.action;
-      if (action === 'search') N.palette.open('all');
-      else if (action === 'capture') N.scratch.openQuickCapture();
-      else if (action === 'more') openMoreSheet();
-    });
-
-    /* topbar buttons */
-    document.getElementById('btn-search').addEventListener('click', function () { N.palette.open('all'); });
-    const backBtn = document.getElementById('btn-back');
-    if (backBtn) {
-      // Always pressable: at the start it explains where you are rather than
-      // being a dead grey button with no explanation.
-      backBtn.addEventListener('click', function () {
-        if (!N.nav.back()) N.nav.confirmLeave();
-      });
-      bus.on('nav:changed', function (can) {
-        backBtn.classList.toggle('is-dim', !can);
-        backBtn.title = can ? 'Back' : 'You are at the start';
-      });
-    }
-
-    document.getElementById('btn-theme').addEventListener('click', function () { N.theme.toggleMode(); updateThemeIcon(); });
-    document.getElementById('btn-settings').addEventListener('click', function () { N.settings.open(); });
-    document.getElementById('btn-capture').addEventListener('click', function () { N.scratch.openQuickCapture(); });
-    const moreBtn = document.getElementById('btn-more');
-    if (moreBtn) moreBtn.addEventListener('click', openMoreSheet);
-
-    /* vault status */
-    document.getElementById('vault-status').addEventListener('click', function () { N.settings.open('storage'); });
-
-    /* buttons wired by data-command */
-    U.delegate(document, 'click', '[data-command]', function (e, node) {
-      e.preventDefault();
-      N.commands.run(node.dataset.command, { source: 'ui' });
-    });
-
-    /* ripples */
-    document.addEventListener('pointerdown', function (e) {
-      const btn = e.target.closest ? e.target.closest('.btn') : null;
-      if (!btn || N.store.state.settings.animations === 'none') return;
-      const r = btn.getBoundingClientRect();
-      btn.style.setProperty('--ripple-x', (e.clientX - r.left) + 'px');
-      btn.style.setProperty('--ripple-y', (e.clientY - r.top) + 'px');
-      btn.classList.remove('is-rippling');
-      void btn.offsetWidth;
-      btn.classList.add('is-rippling');
-      setTimeout(function () { btn.classList.remove('is-rippling'); }, 500);
-    });
-
-    /* sidebar resizing */
-    installSidebarResizer();
-
-    /* responsive defaults */
-    applyResponsiveDefaults();
-    window.addEventListener('resize', U.debounce(applyResponsiveDefaults, 200));
-
-    /* status + theme reactions */
-    bus.on('vault:status', updateVaultStatus);
-    bus.on('vault:connected', function (info) {
-      updateVaultStatus();
-      // Say where the files went, once, so nobody has to go looking.
-      if (info && info.createdContainer) {
-        N.toast.success('Your notes are in a "Nodalis" folder inside the one you picked.', {
-          ms: 6000, key: 'vault-container',
-        });
-      }
-    });
-    bus.on('vault:disconnected', updateVaultStatus);
-    bus.on('db:write-error', function (d) { onStorageFailure(d, false); });
-    bus.on('db:quota-exceeded', function (d) { onStorageFailure(d, true); });
-    bus.on('db:degraded', function () { onStorageFailure({ message: N.db.degradedReason() }, false); });
-    bus.on('db:write-recovered', onStorageRecovered);
-    bus.on('theme:applied', updateThemeIcon);
-    bus.on('settings:changed', function () { rebuildNav(); persistLoaderHint(); });
-    bus.on('db:versionchange', function () {
-      N.toast.warn('Nodalis was updated in another tab. Reload to continue safely.', {
-        ms: 0, title: 'Reload needed',
-        action: { label: 'Reload', onClick: function () { location.reload(); } },
-      });
-    });
-
-    updateThemeIcon();
-    updateSearchKbd();
-  }
-
-  function installSidebarResizer() {
-    const sidebar = document.getElementById('sidebar');
-    if (!sidebar) return;
-    const grip = el('div.sidebar-resizer', { title: 'Drag to resize' });
-    sidebar.appendChild(grip);
-
-    let start = null;
-    grip.addEventListener('pointerdown', function (e) {
-      if (window.innerWidth <= 900) return;
-      e.preventDefault();
-      grip.setPointerCapture(e.pointerId);
-      grip.classList.add('is-dragging');
-      start = { x: e.clientX, width: sidebar.getBoundingClientRect().width };
-      document.body.style.userSelect = 'none';
-    });
-    grip.addEventListener('pointermove', function (e) {
-      if (!start) return;
-      const next = U.clamp(start.width + (e.clientX - start.x), 190, 460);
-      document.documentElement.style.setProperty('--sidebar-w', next + 'px');
-    });
-    grip.addEventListener('pointerup', function (e) {
-      if (!start) return;
-      start = null;
-      grip.classList.remove('is-dragging');
-      document.body.style.userSelect = '';
-      try { grip.releasePointerCapture(e.pointerId); } catch (err) {}
-      const width = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'), 10);
-      if (width) N.db.setMeta('sidebar-width', width);
-    });
-
-    N.db.getMeta('sidebar-width', null).then(function (width) {
-      if (width) document.documentElement.style.setProperty('--sidebar-w', width + 'px');
-    });
-  }
-
-  function applyResponsiveDefaults() {
-    const app = document.getElementById('app');
-    const narrow = window.innerWidth <= 900;
-    if (narrow) {
-      if (!app.dataset.sidebarUserSet) app.dataset.sidebar = 'closed';
-      app.dataset.right = app.dataset.right === 'open' ? 'open' : 'closed';
-    } else {
-      if (!app.dataset.sidebarUserSet) app.dataset.sidebar = 'open';
-    }
-    updateScrim();
-    if (N.store.state.activeView === 'graph') N.graph.resize();
-  }
-
-  function toggleSidebar() {
-    const app = document.getElementById('app');
-    app.dataset.sidebar = app.dataset.sidebar === 'open' ? 'closed' : 'open';
-    app.dataset.sidebarUserSet = '1';
-    updateScrim();
-  }
-
-  function toggleRightPanel() {
-    const app = document.getElementById('app');
-    app.dataset.right = app.dataset.right === 'open' ? 'closed' : 'open';
-    updateScrim();
-  }
-
-  function updateScrim() {
-    const app = document.getElementById('app');
-    const scrim = document.getElementById('scrim');
-    if (!scrim) return;
-    const narrow = window.innerWidth <= 900;
-    const drawerOpen = narrow && (app.dataset.sidebar === 'open' || app.dataset.right === 'open');
-    if (drawerOpen && !N.modal.anyOpen() && !N.palette.isOpen()) scrim.classList.add('is-open');
-    else if (!N.modal.anyOpen() && !N.palette.isOpen()) scrim.classList.remove('is-open');
-  }
-
-  function updateThemeIcon() {
-    const btn = document.getElementById('btn-theme');
-    if (!btn) return;
-    const mode = document.body.dataset.mode;
-    btn.innerHTML = '';
-    btn.appendChild(N.icons.node(mode === 'dark' ? 'moon' : 'sun', { size: 18 }));
-    const setting = N.store.state.settings.themeMode;
-    btn.title = mode === 'dark' ? 'Switch to light' : 'Switch to dark';
-    if (setting.startsWith('auto')) {
-      btn.title += ' — currently following ' + (setting === 'auto-time' ? 'the clock' : 'your system');
-    }
-    btn.setAttribute('aria-label', btn.title);
-  }
-
-  function updateSearchKbd() {
-    const kbd = document.getElementById('search-kbd');
-    if (kbd) kbd.textContent = N.shortcuts.format('Mod+K');
-  }
-
-  function updateVaultStatus() {
-    const node = document.getElementById('vault-status');
+  function showWarning(p) {
+    const node = ensureWarnEl();
     if (!node) return;
-    const info = N.vault.describe();
-    const state = N.vault.state;
-    const label = node.querySelector('.vault-status-label');
-    const folder = N.vault.isFolderMode();
-
-    node.classList.remove('is-ok', 'is-syncing', 'is-warn', 'is-error');
-
-    if (folder) {
-      // Only a connected folder can have folder-write problems. Reporting
-      // "Write failed — open storage" on a browser-only vault was wrong:
-      // there was no storage to open.
-      if (navigator.onLine === false && N.github && N.github.isConnected() && N.store.state.settings.githubDirty) {
-        node.classList.add('is-warn');
-        label.textContent = 'Offline — saved here';
-        node.title = 'No connection. Everything is saved to ' + state.name +
-          ' and will go to GitHub automatically when you are back online.';
-        return;
-      }
-      if (state.status === 'syncing') {
-        node.classList.add('is-syncing');
-        label.textContent = 'Saving to disk…';
-      } else if (state.status === 'error') {
-        node.classList.add('is-error');
-        label.textContent = 'Disk write failed';
-      } else if (state.status === 'permission') {
-        node.classList.add('is-warn');
-        label.textContent = 'Reconnect "' + state.name + '"';
-      } else {
-        node.classList.add('is-ok');
-        label.textContent = 'Saved to ' + state.name;
-      }
-      node.title = info.reason || 'Your notes are written to ' + state.name;
-      return;
-    }
-
-    // Browser mode: the only thing that matters is whether this browser is
-    // actually keeping the data.
-    if (navigator.onLine === false && N.github && N.github.isConnected() && N.store.state.settings.githubDirty) {
-      node.classList.add('is-warn');
-      label.textContent = 'Offline — saved here';
-      node.title = 'No connection. Your work is saved on this device and will go to GitHub when you are back online.';
-      return;
-    }
-
-    if (info.broken) {
-      node.classList.add('is-error');
-      label.textContent = info.label;
-    } else {
-      node.classList.add('is-warn');
-      label.textContent = info.label || 'This device only';
-    }
-    node.title = info.reason || 'Your notes live in this browser.';
+    U.clear(node);
+    node.appendChild(N.icons.node('warning', { size: 13 }));
+    const where = vaultWide() ? 'in your vault' : 'in this folder';
+    node.appendChild(el('span', null,
+      (p.count === 1 ? 'A note called "' : p.count + ' notes called "') + p.wanted +
+      (p.count === 1 ? '" already exists ' : '" already exist ') + where +
+      '. This one will be saved as "' + p.willBe + '".'));
+    node.classList.add('is-on');
+    const input = document.getElementById('note-title');
+    if (input) input.classList.add('is-duplicate');
   }
 
-  /**
-   * Everywhere this data currently exists, in one line. Appended to the status
-   * chip so "am I safe?" is answerable at a glance rather than by opening
-   * settings and reasoning about it.
-   */
-  function describeSafety() {
-    const places = [];
-    if (N.vault.isFolderMode()) places.push('a folder on this device');
-    if (!N.db.isDegraded()) places.push('this browser');
-    if (N.github && N.github.isConnected()) {
-      places.push(N.store.state.settings.githubDirty ? 'GitHub (waiting)' : 'GitHub');
-    }
-    return places;
-  }
+  const checkTitleInput = U.debounce(function () {
+    const input = document.getElementById('note-title');
+    const note = N.store.getNote(N.store.state.activeNoteId);
+    if (!input || !note) { clearWarning(); return; }
+    const typed = input.value.trim();
+    if (!typed || sameTitle(typed, N.store.noteTitle(note))) { clearWarning(); return; }
+    const p = preview(typed, note.folder, note.id);
+    if (p) showWarning(p); else clearWarning();
+  }, 220);
 
-  /* ------------------------------------------------- storage health watch */
+  /* ---------------------------------------------------- fixing the existing */
 
-  let storageWarned = false;
-
-  function onStorageFailure(detail, quota) {
-    updateVaultStatus();
-    if (storageWarned) return;
-    storageWarned = true;
-    const msg = quota
-      ? 'This browser has run out of room for Nodalis. Nothing new is being saved.'
-      : ((detail && detail.message) || 'This browser refused to save.') +
-        ' Recent changes are only in this tab.';
-    N.toast.error(msg, {
-      ms: 0, key: 'storage-failed', title: quota ? 'Storage full' : 'Not saving',
-      action: {
-        label: N.util.supports.fileSystemAccess ? 'Connect a folder' : 'Export a backup',
-        onClick: function () {
-          if (N.util.supports.fileSystemAccess) N.vault.connectFolder();
-          else if (N.exporter) N.exporter.exportVaultZip();
-        },
-      },
-    });
-  }
-
-  function onStorageRecovered() {
-    storageWarned = false;
-    N.toast.dismiss('storage-failed');
-    updateVaultStatus();
-  }
-
-  /**
-   * Private windows are the awkward case: IndexedDB opens, writes usually
-   * work, and then the whole thing is discarded when the window closes. We
-   * detect it once, say so once, and never nag again in the session.
-   */
-  async function checkStorageDurability() {
-    if (!N.db.probeWrite) return;
-    const probe = await N.db.probeWrite();
-    if (!probe.ok) {
-      N.db.setConstrained(probe.reason);
-      onStorageFailure({ message: probe.reason }, false);
-      return;
-    }
-    let quota = 0;
-    try { quota = (await N.db.estimate()).quota || 0; } catch (err) { quota = 0; }
-    let persisted = false;
-    try {
-      persisted = !!(navigator.storage && navigator.storage.persisted && await navigator.storage.persisted());
-    } catch (err) { persisted = false; }
-
-    // Chromium hands private windows a small, non-persistable quota. ~120 MB
-    // is comfortably below a normal profile and above anything a real one has.
-    const looksPrivate = quota > 0 && quota < 120 * 1024 * 1024 && !persisted;
-    if (!looksPrivate || N.vault.isFolderMode()) return;
-
-    N.db.setConstrained(
-      'This looks like a private window. Anything stored here is thrown away when you close it.'
-    );
-    updateVaultStatus();
-    N.toast.warn(
-      'Private windows discard storage when they close. Nodalis will keep working — just export before you finish.',
-      { ms: 0, key: 'private-window', title: 'Nothing will survive this window' }
-    );
-  }
-
-  /* --------------------------------------------------------------- views */
-
-  function setView(view) {
-    if (VIEWS.indexOf(view) === -1) return;
-    const visible = N.store.state.settings.visibleViews || {};
-    if (visible[view] === false && view !== 'editor' && view !== 'settings' && view !== 'search') {
-      N.toast.info('That view is switched off in Settings → Features.', { ms: 3000 });
-      return;
-    }
-
-    const previous = N.store.state.activeView;
-    if (previous === view) return;
-    N.store.state.activeView = view;
-
-    VIEWS.forEach(function (v) {
-      const node = document.getElementById('view-' + v);
-      if (node) node.classList.toggle('is-active', v === view);
-    });
-
-    const active = document.getElementById('view-' + view);
-    if (active && N.store.state.settings.animations !== 'none') {
-      active.classList.remove('is-entering');
-      void active.offsetWidth;
-      active.classList.add('is-entering');
-    }
-
-    U.$$('#view-tabs button').forEach(function (b) { b.classList.toggle('is-active', b.dataset.view === view); });
-    U.$$('.mobile-nav-btn').forEach(function (b) { b.classList.toggle('is-active', b.dataset.view === view); });
-
-    // Close drawers on a phone so the view is actually visible.
-    if (window.innerWidth <= 900) {
-      const app = document.getElementById('app');
-      app.dataset.sidebar = 'closed';
-      app.dataset.right = 'closed';
-      updateScrim();
-    }
-
-    try { history.replaceState(null, '', '#' + view); } catch (err) { /* file:// blocks this */ }
-    bus.emit('view:changed', view);
-  }
-
-  function applyInitialView() {
-    let target = 'editor';
-    try {
-      const hash = (location.hash || '').replace('#', '');
-      if (VIEWS.indexOf(hash) !== -1) target = hash;
-    } catch (err) { /* ignore */ }
-    N.store.state.activeView = null;
-    setView(target);
-  }
-
-  function rebuildNav() {
-    const visible = N.store.state.settings.visibleViews || {};
-    U.$$('#view-tabs button[data-feature]').forEach(function (btn) {
-      btn.style.display = visible[btn.dataset.feature] === false ? 'none' : '';
-    });
-    U.$$('.mobile-nav-btn[data-view]').forEach(function (btn) {
-      const v = btn.dataset.view;
-      if (v === 'editor') return;
-      btn.style.display = visible[v] === false ? 'none' : '';
-    });
-  }
-
-  function openNote(id) {
-    const note = N.store.getNote(id);
-    if (!note) { N.toast.warn('That note no longer exists.'); return; }
-    if (N.store.state.activeView !== 'editor') setView('editor');
-    N.store.setActiveNote(id);
-    N.sidebar.expandTo(note.folder);
-  }
-
-  async function createNoteIn(folder) {
-    const note = await N.store.createNote({ folder: folder || '' });
-    N.sidebar.expandTo(folder);
-    openNote(note.id);
-    setTimeout(function () {
-      const title = document.getElementById('note-title');
-      if (title) { title.focus(); title.select(); }
-    }, 120);
-    return note;
-  }
-
-  /* ---------------------------------------------------------- more sheet */
-
-  function openMoreSheet() {
-    const visible = N.store.state.settings.visibleViews || {};
-    const items = [];
-    const addView = function (view, label, icon) {
-      if (visible[view] === false) return;
-      items.push({ label: label, icon: icon, onClick: function () { setView(view); } });
-    };
-    addView('graph', 'Knowledge graph', 'graph');
-    addView('canvas', 'Canvas', 'canvas');
-    addView('database', 'Database', 'database');
-    addView('calendar', 'Calendar', 'calendar');
-    addView('matrix', 'Priority matrix', 'matrix');
-    addView('sticky', 'Sticky wall', 'sticky');
-    addView('scratch', 'Scratchpad', 'inbox');
-    addView('review', 'Daily review', 'flame');
-    items.push({ separator: true });
-    items.push({ label: "Today's daily note", icon: 'calendar', onClick: function () { N.daily.openToday(); } });
-    items.push({ label: 'Scan a page (OCR)', icon: 'scan', onClick: function () { N.ocr.scanToNote(); } });
-    items.push({ label: 'Backlinks and outline', icon: 'link', onClick: function () {
-      const app = document.getElementById('app');
-      app.dataset.right = 'open';
-      updateScrim();
-    } });
-    items.push({ separator: true });
-    items.push({ label: 'Settings', icon: 'settings', onClick: function () { N.settings.open(); } });
-    items.push({ label: 'Help and tour', icon: 'help', onClick: function () { N.help.open(); } });
-    items.push({ label: 'Share Nodalis', icon: 'share', onClick: function () { N.exporter.shareApp(); } });
-
-    N.menu.show(items, { title: 'More', allowSheet: true });
-  }
-
-  /* --------------------------------------------------------- global cmds */
-
-  function registerGlobalCommands() {
-    N.commands.registerMany([
-      { id: 'palette.open', title: 'Command palette', group: 'App', icon: 'command', accel: 'Mod+K', allowInInput: true,
-        run: function () { N.palette.open('all'); } },
-      { id: 'palette.notes', title: 'Jump to a note', group: 'App', icon: 'search', accel: 'Mod+O', allowInInput: true,
-        run: function () { N.palette.open('notes'); } },
-      { id: 'palette.commands', title: 'Run a command', group: 'App', icon: 'command', accel: 'Mod+Shift+P', allowInInput: true,
-        run: function () { N.palette.open('commands'); } },
-
-      { id: 'note.new', title: 'New note', group: 'Create', icon: 'file-plus', accel: 'Mod+N',
-        run: function () { return createNoteIn(N.store.state.settings.defaultNewNoteFolder || ''); } },
-      { id: 'folder.new', title: 'New folder', group: 'Create', icon: 'folder-plus',
-        run: async function () {
-          const name = await N.modal.prompt({ title: 'New folder', placeholder: 'Folder name' });
-          if (!name) return;
-          const folder = await N.store.createFolder(name, '');
-          if (folder) N.sidebar.render();
-        } },
-
-      { id: 'note.pin', title: 'Pin or unpin this note', group: 'Note', icon: 'pin',
-        when: function () { return !!N.store.state.activeNoteId; },
-        run: async function () {
-          const pinned = await N.store.togglePin(N.store.state.activeNoteId);
-          N.toast.success(pinned ? 'Pinned' : 'Unpinned', { ms: 1400 });
-        } },
-      { id: 'note.duplicate', title: 'Duplicate this note', group: 'Note', icon: 'duplicate',
-        when: function () { return !!N.store.state.activeNoteId; },
-        run: async function () {
-          const copy = await N.store.duplicateNote(N.store.state.activeNoteId);
-          if (copy) openNote(copy.id);
-        } },
-      { id: 'note.delete', title: 'Delete this note', group: 'Note', icon: 'trash', danger: true,
-        when: function () { return !!N.store.state.activeNoteId; },
-        run: async function () {
-          const note = N.store.getNote(N.store.state.activeNoteId);
-          if (!note) return;
-          if (N.store.state.settings.confirmDelete !== false) {
-            const ok = await N.modal.confirm({
-              title: 'Delete "' + N.store.noteTitle(note) + '"?',
-              message: N.vault.isFolderMode() ? 'The file will be removed from your folder.' : 'This can be undone straight away.',
-              confirmLabel: 'Delete', danger: true,
-            });
-            if (!ok) return;
-          }
-          await N.store.deleteNote(note.id);
-          N.toast.show('Note deleted', {
-            kind: 'info', ms: 7000,
-            action: { label: 'Undo', onClick: function () { N.store.undo(); } },
-          });
-        } },
-      { id: 'note.move', title: 'Move this note to a folder', group: 'Note', icon: 'folder',
-        when: function () { return !!N.store.state.activeNoteId; },
-        run: async function () {
-          const note = N.store.getNote(N.store.state.activeNoteId);
-          const target = await N.sidebar.pickFolder('Move "' + N.store.noteTitle(note) + '" to…', note.folder);
-          if (target === null) return;
-          await N.store.moveNote(note.id, target);
-          N.toast.success('Moved', { ms: 1600 });
-        } },
-      { id: 'note.copyLink', title: 'Copy a link to this note', group: 'Note', icon: 'link',
-        when: function () { return !!N.store.state.activeNoteId; },
-        run: async function () {
-          const note = N.store.getNote(N.store.state.activeNoteId);
-          const ok = await U.copyToClipboard('[[' + N.store.noteTitle(note) + ']]');
-          N.toast[ok ? 'success' : 'error'](ok ? 'Link copied' : 'Could not copy', { ms: 1600 });
-        } },
-      { id: 'note.copyMarkdown', title: 'Copy this note as markdown', group: 'Note', icon: 'copy',
-        when: function () { return !!N.store.state.activeNoteId; },
-        run: async function () {
-          const note = N.store.getNote(N.store.state.activeNoteId);
-          const ok = await U.copyToClipboard(N.exporter.toMarkdown(note));
-          N.toast[ok ? 'success' : 'error'](ok ? 'Copied' : 'Could not copy', { ms: 1600 });
-        } },
-      { id: 'note.popout', title: 'Open this note in a new window', group: 'Note', icon: 'external',
-        when: function () { return !!N.store.state.activeNoteId; },
-        run: async function () {
-          const note = N.store.getNote(N.store.state.activeNoteId);
-          const html = N.exporter.toStandaloneHtml(note, { includeMeta: true, followTheme: true });
-          const win = window.open('', '_blank', 'width=760,height=900');
-          if (!win) { N.toast.warn('Your browser blocked the pop-up.'); return; }
-          win.document.write(html);
-          win.document.close();
-        } },
-
-      { id: 'view.sidebar', title: 'Toggle the sidebar', group: 'View', icon: 'sidebar', accel: 'Mod+B', run: toggleSidebar },
-      { id: 'view.rightPanel', title: 'Toggle the right panel', group: 'View', icon: 'sidebar-right', accel: 'Mod+Alt+\\',
-        run: toggleRightPanel },
-      { id: 'view.editor', title: 'Go to notes', group: 'View', icon: 'note', accel: 'Mod+1', run: function () { setView('editor'); } },
-      { id: 'view.focusMode', title: 'Focus mode', group: 'View', icon: 'target', accel: 'Mod+Shift+Z',
-        run: function () {
-          const app = document.getElementById('app');
-          const on = app.dataset.focus === 'on';
-          app.dataset.focus = on ? 'off' : 'on';
-          N.toast.info(on ? 'Focus mode off' : 'Focus mode on — everything but the page is dimmed', { ms: 2200, key: 'focus' });
-        } },
-
-      { id: 'theme.toggle', title: 'Switch light / dark', group: 'Appearance', icon: 'contrast', accel: 'Mod+Shift+L',
-        run: function () { N.theme.toggleMode(); } },
-      { id: 'theme.cycle', title: 'Cycle through themes', group: 'Appearance', icon: 'palette',
-        run: function () { N.theme.cycleStyle(); } },
-      { id: 'theme.nodalis', title: 'Theme: Nodalis paper', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('nodalis'); } },
-      { id: 'theme.notion', title: 'Theme: Notion', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('notion'); } },
-      { id: 'theme.nothing', title: 'Theme: Nothing', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('nothing'); } },
-      { id: 'theme.slate', title: 'Theme: Slate', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('slate'); } },
-      { id: 'theme.aurora', title: 'Theme: Schematic', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('aurora'); } },
-      { id: 'theme.terminal', title: 'Theme: Terminal', group: 'Appearance', icon: 'droplet', run: function () { N.theme.setStyle('terminal'); } },
-      { id: 'theme.biggerText', title: 'Increase text size', group: 'Appearance', icon: 'font-size', accel: 'Mod+=',
-        run: function () { N.theme.set('fontSize', U.clamp(N.store.state.settings.fontSize + 1, 12, 26)); } },
-      { id: 'theme.smallerText', title: 'Decrease text size', group: 'Appearance', icon: 'font-size', accel: 'Mod+-',
-        run: function () { N.theme.set('fontSize', U.clamp(N.store.state.settings.fontSize - 1, 12, 26)); } },
-
-      { id: 'app.undo', title: 'Undo the last vault action', group: 'App', icon: 'undo', accel: 'Mod+Shift+U',
-        when: function () { return N.store.canUndo(); },
-        run: async function () {
-          const label = await N.store.undo();
-          N.toast.info(label ? 'Undone: ' + label : 'Nothing to undo', { ms: 2000 });
-        } },
-      { id: 'app.redo', title: 'Redo', group: 'App', icon: 'redo', accel: 'Mod+Shift+Y',
-        when: function () { return N.store.canRedo(); },
-        run: async function () {
-          const label = await N.store.redo();
-          N.toast.info(label ? 'Redone: ' + label : 'Nothing to redo', { ms: 2000 });
-        } },
-      { id: 'app.install', title: 'Install Nodalis as an app', group: 'App', icon: 'download',
-        when: function () { return !!deferredInstallPrompt; },
-        run: promptInstall },
-      { id: 'app.reload', title: 'Reload Nodalis', group: 'App', icon: 'refresh',
-        run: async function () {
-          if (N.editor.isDirty()) N.editor.flushSave();
-          await N.vault.flushNow();
-          location.reload();
-        } },
-    ]);
-  }
-
-  /* ------------------------------------------------------------ platform */
-
-  function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
-    if (location.protocol === 'file:') return;   // service workers cannot run from file://
-    navigator.serviceWorker.register('sw.js').then(function (reg) {
-      reg.addEventListener('updatefound', function () {
-        const installing = reg.installing;
-        if (!installing) return;
-        installing.addEventListener('statechange', function () {
-          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-            N.toast.info('A new version of Nodalis is ready.', {
-              ms: 0, title: 'Update available',
-              action: { label: 'Reload', onClick: function () { location.reload(); } },
-            });
-          }
-        });
-      });
-    }).catch(function (err) {
-      console.warn('[nodalis] service worker not registered', err);
-    });
-  }
-
-  /* Install lives in js/features/pwa.js — it is a whole surface, not a button. */
-  function watchInstallPrompt() { if (N.pwa) N.pwa.init(); }
-
-  function promptInstall() { if (N.pwa) N.pwa.show(); }
-
-  /**
-   * Offline is a state, not an event.
-   *
-   * A toast that fades is no use ten minutes later when someone is wondering
-   * whether their work is safe. The status chip in the sidebar foot carries
-   * the truth continuously: where the data is, and whether anything is
-   * waiting to go out.
-   */
-  function watchConnectivity() {
-    const paint = function () {
-      const app = document.getElementById('app');
-      if (app) app.dataset.network = navigator.onLine === false ? 'offline' : 'online';
-      updateVaultStatus();
-    };
-
-    window.addEventListener('offline', function () {
-      paint();
-      N.toast.info(
-        'You are offline. Everything still works and nothing is lost — Nodalis saves to this device first.',
-        { ms: 6000, key: 'offline' }
-      );
-    });
-
-    window.addEventListener('online', function () {
-      paint();
-      N.toast.dismiss('offline');
-    });
-
-    bus.on('sync:queued', paint);
-    bus.on('sync:done', paint);
-    bus.on('sync:offline', paint);
-    paint();
-  }
-
-  function watchVisibility() {
-    document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState !== 'hidden') return;
-      // Leaving the tab is the last safe moment to get everything on disk.
-      try { N.editor.flushSave(); } catch (err) { /* editor may not be up */ }
-      N.vault.flushNow();
-    });
-  }
-
-  function watchUnload() {
-    window.addEventListener('beforeunload', function (e) {
-      let pending = 0;
-      try { pending = N.vault.pending(); } catch (err) { pending = 0; }
-      if (N.editor.isDirty() || pending > 0) {
-        try { N.editor.flushSave(); } catch (err) {}
-        e.preventDefault();
-        e.returnValue = '';
-        return '';
-      }
-    });
-  }
-
-  /* --------------------------------------------------------- error paths */
-
-  function onQuotaExceeded() {
-    N.toast.error('This device has run out of storage for Nodalis. Export your vault, then remove some large attachments.', {
-      title: 'Storage full', ms: 0,
-      action: { label: 'Export now', onClick: function () { N.commands.run('export.vault'); } },
-    });
-  }
-
-  function onDbDegraded(reason) {
-    N.toast.error((reason || 'The local database is unavailable.') +
-      ' Nodalis is running from memory — nothing will survive a reload. Export your work now.', {
-      title: 'Storage unavailable', ms: 0,
-      action: { label: 'Export', onClick: function () { N.commands.run('export.vault'); } },
-    });
-  }
-
-  function installErrorNet() {
-    window.addEventListener('error', function (e) {
-      // Resource load failures (a missing image) are noisy and not fatal.
-      if (e.target && e.target !== window && e.target.tagName) return;
-      console.error('[nodalis] uncaught error', e.error || e.message);
-      reportSoftError(e.error || new Error(e.message));
-    });
-    window.addEventListener('unhandledrejection', function (e) {
-      console.error('[nodalis] unhandled rejection', e.reason);
-      reportSoftError(e.reason);
-    });
-  }
-
-  let errorBurst = 0;
-  let errorBurstReset = null;
-
-  function reportSoftError(err) {
-    if (!booted) return;
-    errorBurst++;
-    clearTimeout(errorBurstReset);
-    errorBurstReset = setTimeout(function () { errorBurst = 0; }, 5000);
-    // A storm of errors means something structural broke; say so once.
-    if (errorBurst === 4) {
-      N.toast.error('Something has gone wrong repeatedly. Your notes are safe — reloading usually clears it.', {
-        title: 'Nodalis hit a problem', ms: 0,
-        action: { label: 'Reload', onClick: function () { location.reload(); } },
-      });
-      return;
-    }
-    if (errorBurst > 4) return;
-    if (N.toast) N.toast.error(U.describeError(err), { ms: 7000, key: 'soft-error' });
-  }
-
-  function showFatal(err) {
-    const wrap = el('div', {
-      style: {
-        position: 'fixed', inset: '0', zIndex: '9999',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '24px', background: '#16161f', color: '#f2f2f8',
-        font: "15px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      },
-    });
-    const card = el('div', { style: { maxWidth: '460px', textAlign: 'center' } });
-    card.appendChild(el('h1', { style: { fontSize: '22px', marginBottom: '12px' } }, 'Nodalis could not start'));
-    card.appendChild(el('p', { style: { opacity: '0.85', marginBottom: '10px' } }, U.describeError(err)));
-    card.appendChild(el('p', { style: { opacity: '0.6', fontSize: '13px', marginBottom: '20px' } },
-      'Your notes are almost certainly fine — this is a startup problem, not a data problem. If a folder was connected, the files are still on your disk.'));
-    const actions = el('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' } });
-    actions.appendChild(el('button', {
-      style: { padding: '10px 18px', borderRadius: '10px', background: '#6c5ce7', color: '#fff', border: 'none', cursor: 'pointer' },
-      onclick: function () { location.reload(); },
-    }, 'Try again'));
-    actions.appendChild(el('button', {
-      style: { padding: '10px 18px', borderRadius: '10px', background: 'transparent', color: '#f2f2f8', border: '1px solid #3d3d50', cursor: 'pointer' },
-      onclick: async function () {
-        try {
-          const dump = await N.db.exportAll();
-          U.downloadText(JSON.stringify(dump), 'nodalis-recovery.json', 'application/json');
-        } catch (e2) {
-          alert('Recovery export failed: ' + U.describeError(e2));
-        }
-      },
-    }, 'Download a recovery file'));
-    card.appendChild(actions);
-    wrap.appendChild(card);
-    document.body.appendChild(wrap);
-  }
-
-  /* ---------------------------------------------------------------- start */
-
-  N.app = {
-    boot: boot, setView: setView, openNote: openNote, createNoteIn: createNoteIn,
-    toggleSidebar: toggleSidebar, toggleRightPanel: toggleRightPanel,
-    rebuildNav: rebuildNav, updateVaultStatus: updateVaultStatus, updateScrim: updateScrim,
-    describeSafety: describeSafety,
-    checkStorageDurability: checkStorageDurability,
-    openMoreSheet: openMoreSheet,
-    // Exposed so the recovery path can be exercised by tests and triggered by
-    // hand from the console if someone is ever stuck on a stalled start.
-    forceUsableShell: forceUsableShell,
-    bootStage: function () { return bootStage; },
-    version: '2.6.0',
-  };
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
-})(window.NODALIS = window.NODALIS || {});
-
-</script>
-</body>
-</html>
+  /** Groups of notes that share a title, oldest first inside each group. */
+  function duplicateGroups() {
+    const byKey = new Map();
+    N.store.allNotes().forEach(function (n2) {
+      const t = String(N.store.noteTitle(n2)).trim().toLowerCase();
+      if (!t) return;
+      const key = vaultWide() ? t : ((n2.folder || '') + '
