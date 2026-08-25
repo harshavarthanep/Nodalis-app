@@ -8030,9 +8030,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 (function (N) {
   'use strict';
 
-  N.version = '8.0.0';
-  N.versionName = 'v8';
-  N.built = '2026-08-24';
+  N.version = '8.1.0';
+  N.versionName = 'v8.1';
+  N.built = '2026-08-25';
 
   /** "v8.0.0" - what goes on screen. */
   N.versionLabel = function () { return 'v' + N.version; };
@@ -9634,6 +9634,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (!ok) {
       flushing = false;
       setStatus('permission', 'Nodalis lost write access to your folder. Reconnect it to resume saving to disk.');
+      /*
+       * v8.1: this used to be the end of it. The status line changed, the queue
+       * sat there, and every subsequent edit was accepted and dropped - with no
+       * route back to a working folder short of finding the reconnect button in
+       * Settings. Arm the recovery so the next tap can fix it.
+       */
+      armSilentReconnect();
       return;
     }
 
@@ -9819,6 +9826,19 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     await N.db.setSetting('vault-mode', 'folder');
     await N.db.setSetting('vault-name', root.name);
     setStatus('ok', '');
+    /*
+     * v8.1: two things have to happen the moment a folder is adopted.
+     *
+     * The handle written on the line above lives in IndexedDB, which browsers
+     * are free to evict under storage pressure unless asked not to. Losing it
+     * does not lose a cache - it forgets which folder is yours, which is one
+     * of the ways this connection kept disappearing. keepStorage() asks.
+     *
+     * And the grant has to be watched from here on, so a lapse is noticed and
+     * recovered rather than discovered later as writes that never landed.
+     */
+    keepStorage();
+    installConnectionWatch();
     bus.emit('vault:connected', { name: root.name, createdContainer: root.created });
     return root.handle;
   }
@@ -9883,46 +9903,201 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     bus.emit('vault:disconnected');
   }
 
-  /*
-   * When the grant really has expired, requestPermission() needs a user
-   * gesture - it cannot be called from page load. Rather than leave a chip
-   * that has to be hunted down in Settings, the very first thing the user does
-   * on the page is borrowed to ask for the folder back.
+  /* ===================================================================== *
+   * v8.1: STAYING CONNECTED
    *
-   * It asks once. If they decline, it does not ask again this session, because
-   * a permission dialog on every tap is worse than a broken folder.
+   * The old version of this did one thing and then gave up. Read it in order:
+   *
+   *     const attempt = async function () {
+   *       document.removeEventListener('pointerdown', attempt, true);
+   *       document.removeEventListener('keydown', attempt, true);
+   *       if (vault.status !== 'permission' || !vault.handle) return;
+   *
+   * The listeners came off on the FIRST gesture, before anything was even
+   * checked. So the first tap after load - a tap on the sidebar, a keypress in
+   * the editor, anything at all - burned the one and only attempt. If that tap
+   * happened before the status had settled to 'permission', the recovery never
+   * ran at all and the folder stayed disconnected for the rest of the session
+   * with no way back except Settings. That is why it "keeps disconnecting".
+   *
+   * Three things are wrong with only asking once, and all three are fixed here:
+   *
+   *   1. THE FREE PATH WAS NEVER TRIED. Browsers hand the grant back on their
+   *      own more often than you would think - a new tab, a fresh session, a
+   *      site permission the user allowed permanently. queryPermission() costs
+   *      nothing and needs no gesture. Ask that first, every time, and most
+   *      reconnections happen with no dialog and no click.
+   *
+   *   2. NOTHING WATCHED FOR THE GRANT COMING BACK. There was one attempt at
+   *      one moment. Now the tab checks whenever it is brought back to the
+   *      front, whenever it regains focus, and on a slow timer while visible -
+   *      so a folder that becomes reachable again gets picked up by itself.
+   *
+   *   3. NOTHING NOTICED IT GOING AWAY. If the grant lapsed mid-session the
+   *      queue kept accepting writes and quietly dropping them at flush time.
+   *      The same watcher now catches that and re-arms the recovery.
+   *
+   * What has NOT changed is the manners. A permission dialog on every tap is
+   * worse than a broken folder, so an actual prompt is still gesture-driven,
+   * one at a time, and rate-limited. The difference is that declining once no
+   * longer ends the conversation forever.
+   * ===================================================================== */
+
+  let reconnectArmed = false;      // are we listening for a gesture?
+  let reconnectAsking = false;     // is a prompt on screen right now?
+  let lastAskAt = 0;               // when we last put a dialog in front of them
+  let watchInstalled = false;
+  let checking = false;
+  let storageAsked = false;
+
+  const ASK_COOLDOWN = 45000;      // never prompt twice inside this window
+  const WATCH_INTERVAL = 45000;    // and re-check quietly this often
+
+  /**
+   * Ask the browser to keep this origin's data. It matters far more than it
+   * looks: the folder handle itself lives in IndexedDB, so if this data is
+   * evicted under storage pressure the app does not just lose its cache - it
+   * forgets which folder is yours and has to be re-linked from scratch. This
+   * needs no gesture and no permission dialog on any current browser.
    */
-  let reconnectArmed = false;
+  function keepStorage() {
+    if (storageAsked) return;
+    storageAsked = true;
+    try {
+      if (!N.db || !N.db.requestPersistence) return;
+      N.db.requestPersistence().then(function (r) {
+        if (!r || !r.granted) console.info('[vault] the browser would not mark this data persistent');
+      }).catch(function () { /* advisory only */ });
+    } catch (err) { /* advisory only */ }
+  }
+
+  async function queryGrant() {
+    if (!vault.handle || !vault.handle.queryPermission) return 'denied';
+    try { return await vault.handle.queryPermission({ mode: 'readwrite' }); }
+    catch (err) { return 'denied'; }
+  }
+
+  /** Take the grant we have been given and start using the folder again. */
+  async function adoptGrant(opts) {
+    const o = opts || {};
+    vault.mode = 'folder';
+    try { await N.db.setSetting('vault-mode', 'folder'); } catch (err) { /* not fatal */ }
+    disarmSilentReconnect();
+    setStatus('ok', '');
+    keepStorage();
+    bus.emit('vault:connected', { name: vault.name, restored: true });
+    if (o.toast && N.toast) {
+      N.toast.success('Reconnected to "' + vault.name + '". Saving to your folder again.', { ms: 4000 });
+    }
+    /*
+     * Catch up, in this order and for this reason.
+     *
+     * flushNow() first: when the grant lapsed, flush() bailed out and left
+     * whatever it was carrying in the queue - and because it bailed it also
+     * never rescheduled itself, so those writes would have sat there until the
+     * next unrelated edit happened to kick the timer. They are the newest
+     * version of anything they touch, so they go to disk before anything is
+     * read back.
+     *
+     * Then pull, which is timestamp-aware as of v8.1 and so can no longer
+     * overwrite an edit made while the folder was away, and finally push, which
+     * puts everything else on disk.
+     */
+    try { await flushNow(); } catch (err) { console.warn('[vault] catch-up flush failed', err); }
+    try { await pullAll(); } catch (err) { console.warn('[vault] catch-up pull failed', err); }
+    try { await pushAll(); } catch (err) { console.warn('[vault] catch-up push failed', err); }
+  }
+
+  /** The no-dialog path: only acts if the browser already says yes. */
+  async function adoptIfGranted(opts) {
+    if (!vault.handle) return false;
+    if ((await queryGrant()) !== 'granted') return false;
+    await adoptGrant(opts || {});
+    return true;
+  }
+
+  async function onReconnectGesture() {
+    if (!vault.handle) { disarmSilentReconnect(); return; }
+    if (vault.mode === 'folder' && vault.status !== 'permission') { disarmSilentReconnect(); return; }
+    if (reconnectAsking) return;
+
+    // Free first, always.
+    if (await adoptIfGranted({ toast: true })) return;
+
+    if (Date.now() - lastAskAt < ASK_COOLDOWN) return;
+    reconnectAsking = true;
+    lastAskAt = Date.now();
+    try {
+      const ok = await requestPermissionFor(vault.handle);
+      if (!ok) {
+        setStatus('permission', 'Nodalis cannot write to "' + vault.name + '" until you allow it again.');
+        return;
+      }
+      await adoptGrant({ toast: true });
+    } catch (err) {
+      console.warn('[vault] reconnect attempt failed', err);
+    } finally {
+      reconnectAsking = false;
+    }
+  }
+
   function armSilentReconnect() {
+    installConnectionWatch();
     if (reconnectArmed) return;
     reconnectArmed = true;
+    // Capture phase: the gesture still does whatever it was going to do.
+    document.addEventListener('pointerdown', onReconnectGesture, true);
+    document.addEventListener('keydown', onReconnectGesture, true);
+  }
 
-    const attempt = async function () {
-      document.removeEventListener('pointerdown', attempt, true);
-      document.removeEventListener('keydown', attempt, true);
-      if (vault.status !== 'permission' || !vault.handle) return;
-      try {
-        const ok = await requestPermissionFor(vault.handle);
-        if (!ok) {
-          setStatus('permission', 'Nodalis cannot write to "' + vault.name + '" until you allow it again.');
+  function disarmSilentReconnect() {
+    if (!reconnectArmed) return;
+    reconnectArmed = false;
+    document.removeEventListener('pointerdown', onReconnectGesture, true);
+    document.removeEventListener('keydown', onReconnectGesture, true);
+  }
+
+  /**
+   * The quiet half. No dialogs ever come from here - it only reads the grant
+   * and reacts, which is what makes it safe to run on a timer.
+   */
+  async function checkConnection() {
+    if (checking || !vault.handle || document.hidden) return;
+    checking = true;
+    try {
+      if (vault.mode === 'folder') {
+        const st = await queryGrant();
+        if (st === 'granted') {
+          if (vault.status === 'permission') setStatus('ok', '');
+          keepStorage();
           return;
         }
-        vault.mode = 'folder';
-        setStatus('ok', '');
-        bus.emit('vault:connected', { name: vault.name, restored: true });
-        if (N.toast) {
-          N.toast.success('Reconnected to "' + vault.name + '". Saving to your folder again.', { ms: 4000 });
-        }
-        try { await pullAll(); } catch (err) { console.warn('[vault] catch-up pull failed', err); }
-        try { await pushAll(); } catch (err) { console.warn('[vault] catch-up push failed', err); }
-      } catch (err) {
-        console.warn('[vault] silent reconnect failed', err);
+        // It lapsed under us. Say so, stop pretending writes are landing, and
+        // arm the recovery instead of silently dropping everything at flush.
+        vault.mode = 'browser';
+        setStatus('permission', 'Reconnect "' + vault.name + '" to resume saving to your folder.');
+        armSilentReconnect();
+        return;
       }
-    };
+      // We still hold the handle but are not using it. If the browser has
+      // handed the grant back, take it - silently, with no dialog.
+      await adoptIfGranted({ toast: true });
+    } catch (err) {
+      console.warn('[vault] connection check failed', err);
+    } finally {
+      checking = false;
+    }
+  }
 
-    // Capture phase and once: the gesture still does whatever it was going to.
-    document.addEventListener('pointerdown', attempt, true);
-    document.addEventListener('keydown', attempt, true);
+  function installConnectionWatch() {
+    if (watchInstalled) return;
+    watchInstalled = true;
+    const check = function () { checkConnection(); };
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+    window.addEventListener('focus', check);
+    window.addEventListener('online', check);
+    window.addEventListener('pageshow', check);
+    setInterval(check, WATCH_INTERVAL);
   }
 
   async function requestPermissionFor(handle) {
@@ -9991,6 +10166,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     if (granted) {
       setStatus('ok', '');
+      /* v8.1: same two duties as connectFolder - see the note there. */
+      keepStorage();
+      installConnectionWatch();
       bus.emit('vault:connected', { name: vault.name, restored: true });
       return { restored: true, name: vault.name };
     }
@@ -10125,7 +10303,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       await writeFile(APP_DIR + '/tasks.json', JSON.stringify(Array.from(s.tasks.values()), null, 2));
       await writeFile(APP_DIR + '/scratch.json', JSON.stringify(Array.from(s.scratch.values()), null, 2));
       await writeFile(APP_DIR + '/journal.json', JSON.stringify(Array.from(s.journal.values()), null, 2));
-      await writeFile(APP_DIR + '/settings.json', JSON.stringify(s.settings, null, 2));
+      /*
+       * v8.1: the wrapped, secret-free copy - see saveSettings() in store.js.
+       * Writing s.settings straight out put the GitHub token and every
+       * share-link password into the folder.
+       */
+      await writeFile(APP_DIR + '/settings.json', JSON.stringify(
+        N.store.settingsEnvelope ? N.store.settingsEnvelope() : s.settings, null, 2));
       for (const canvas of s.canvases.values()) {
         await writeFile(APP_DIR + '/canvases/' + canvas.id + '.json', JSON.stringify(canvas, null, 2));
       }
@@ -10176,6 +10360,38 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const data = await readAppData(name);
       if (data) { try { await apply(data); } catch (err) { console.warn('[vault] apply ' + name, err); } }
     };
+    /* ===================================================================== *
+     * v8.1: THE MISSING LINE.
+     *
+     * pushAppData() has always written .nodalis/settings.json. Every theme
+     * change, every font, every accent colour, every keyboard override went
+     * into that file on the way out. This function read stickies.json,
+     * tasks.json, scratch.json, journal.json and every canvas on the way back
+     * in - and never once read settings.json.
+     *
+     * So the data was there the whole time and nothing ever looked at it. Reset
+     * the app, point it at the same folder, and the notes came back because
+     * those are real markdown files, while every preference stayed at its
+     * default with the real values sitting unread a few bytes away. That is the
+     * entire reported bug, and this is where it lived.
+     *
+     * Settings are read FIRST, before the collections, so the theme is right
+     * before anything is painted with it.
+     * ===================================================================== */
+    await load('settings.json', async function (data) {
+      const parsed = N.store.readSettingsEnvelope ? N.store.readSettingsEnvelope(data) : null;
+      if (!parsed) return;
+      const mine = Number(N.store.state.settings.settingsSavedAt) || 0;
+      // This device is at least as up to date: leave it alone. Without this an
+      // offline change would be reverted every time the folder was re-read.
+      if (parsed.savedAt <= mine) return;
+      await N.store.applyRestoredSettings(parsed.settings, {
+        savedAt: parsed.savedAt,
+        writeBack: false,          // it came FROM this file; do not rewrite it
+      });
+      bus.emit('vault:settings-restored', { savedAt: parsed.savedAt, device: parsed.device });
+    });
+
     await load('stickies.json', (d) => N.store.replaceCollection('stickies', d));
     await load('tasks.json', (d) => N.store.replaceCollection('tasks', d));
     await load('scratch.json', (d) => N.store.replaceCollection('scratch', d));
@@ -10288,6 +10504,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     shouldRemindSnapshot: shouldRemindSnapshot, markSnapshotTaken: markSnapshotTaken,
     pending: function () { return queue.size; },
     armSilentReconnect: armSilentReconnect,
+    /* v8.1 */
+    checkConnection: checkConnection, keepStorage: keepStorage,
+    installConnectionWatch: installConnectionWatch,
   };
 })(window.NODALIS = window.NODALIS || {});
 
@@ -10389,6 +10608,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     /* keymap overrides: commandId -> "Mod+Shift+K" */
     keymap: {},
+
+    /*
+     * v8.1: when these preferences were last changed, on whichever device
+     * changed them.
+     *
+     * This one number is what makes "restore my settings from the folder" a
+     * decision rather than a guess. Without it there are only two options and
+     * both are wrong: let the folder always win, and an offline change is
+     * silently reverted the next time you connect; let the folder never win,
+     * and a freshly reset app comes up with default colours while your real
+     * preferences sit unread in a file inside the folder you just picked.
+     * With it, the later copy wins, which is what anyone would expect.
+     */
+    settingsSavedAt: 0,
   };
 
   const state = {
@@ -10514,10 +10747,183 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return s;
   }
 
+  /* ===================================================================== *
+   * v8.1: WHICH SETTINGS TRAVEL, AND WHICH STAY ON THIS DEVICE
+   *
+   * THE BUG THIS EXISTS TO FIX.
+   *
+   * pushAppData() wrote .nodalis/settings.json into the vault folder on every
+   * change - so your theme, fonts, density, accent, keyboard overrides and
+   * every other preference genuinely WERE in the folder, exactly as you would
+   * expect. And pullAppData() read stickies.json, tasks.json, scratch.json,
+   * journal.json and every canvas... and never read settings.json. Not once.
+   *
+   * So the data was being saved and never loaded. Reset the app, point it back
+   * at the same folder, and the notes and folders came back - because those are
+   * real markdown files - while every preference stayed at its default, sitting
+   * unread in a file six inches away. That is the whole of the reported bug.
+   *
+   * Fixing the read is one function call. The interesting part is deciding what
+   * SHOULD be in that file, because "all of it" is the wrong answer:
+   *
+   *   SECRETS must not go in. A vault folder gets synced to Dropbox, put in a
+   *   git repository, copied to a USB stick and shared with people. Writing a
+   *   GitHub token into it - and worse, writing the passwords for encrypted
+   *   share links into the same account that holds the encrypted notes - would
+   *   hand over the keys along with the locks. The GitHub backup path already
+   *   stripped these; the folder path stripped nothing.
+   *
+   *   PER-DEVICE SYNC BOOKKEEPING must not go in. githubRev and githubManifest
+   *   record what THIS device last pushed. Restoring another device's copy
+   *   would make the conflict detector compare against a revision this device
+   *   never sent, and it would either re-upload everything or refuse to push.
+   *
+   *   THE REPOSITORY ADDRESS should go in, but only as a SEED. Knowing which
+   *   repository your notes belong to is not a secret, and having it already
+   *   filled in after a reset turns "run the whole five-step wizard again"
+   *   into "paste your token". But it must never overwrite a connection that
+   *   is already working on this device.
+   *
+   * Everything else - which is to say all of the actual customisation - travels.
+   * ===================================================================== */
+
+  /* Never leave this device. Not to the folder, not to GitHub, not anywhere. */
+  const SECRET_SETTINGS = ['githubToken', 'sharePasswords'];
+
+  /* This device's own sync bookkeeping. Portable in form, meaningless - and
+     actively harmful - anywhere else. */
+  const DEVICE_SETTINGS = [
+    'githubRev', 'githubSyncedAt', 'githubDirty', 'githubManifest',
+    'githubCommit', 'deviceName',
+  ];
+
+  /* Filled in from a restore only when this device has nothing of its own. */
+  const SEED_ONLY_SETTINGS = ['githubOwner', 'githubRepo', 'githubBranch'];
+
+  /* How much clock skew to forgive when comparing a file's modification time
+     against a note's own updatedAt. Two different clocks wrote them, and some
+     filesystems round to the nearest second or two. */
+  const DISK_CLOCK_SLACK = 2500;
+
+  /** The copy that is safe to write into a folder or a repository. */
+  function portableSettings(settings) {
+    const out = U.deepClone(settings || state.settings);
+    SECRET_SETTINGS.concat(DEVICE_SETTINGS).forEach(function (k) { delete out[k]; });
+    return out;
+  }
+
+  /**
+   * Merge a restored copy over what this device has, honouring the three rules
+   * above. Returns a new object; nothing is written.
+   */
+  function mergeRestoredSettings(current, incoming) {
+    const next = U.deepClone(current || {});
+    if (!incoming || typeof incoming !== 'object') return next;
+    Object.keys(incoming).forEach(function (key) {
+      if (SECRET_SETTINGS.indexOf(key) !== -1) return;      // never
+      if (DEVICE_SETTINGS.indexOf(key) !== -1) return;      // never
+      if (SEED_ONLY_SETTINGS.indexOf(key) !== -1) {
+        if (!current || !current[key]) next[key] = incoming[key];
+        return;
+      }
+      next[key] = incoming[key];
+    });
+    return next;
+  }
+
+  /**
+   * The file that goes into the folder. Wrapped rather than bare so it carries
+   * its own timestamp - which is what lets a restore tell whether the folder's
+   * copy is newer than this device's, instead of guessing. A bare object (what
+   * every build before this one wrote) is still understood on the way in.
+   */
+  function settingsEnvelope() {
+    return {
+      nodalis: 'settings',
+      version: N.version || '',
+      savedAt: state.settings.settingsSavedAt || Date.now(),
+      device: state.settings.deviceName || '',
+      note: 'Your Nodalis preferences. Secrets (GitHub token, share-link passwords) are deliberately NOT in here.',
+      settings: portableSettings(state.settings),
+    };
+  }
+
+  /** Read either shape back. */
+  function readSettingsEnvelope(data) {
+    if (!data || typeof data !== 'object') return null;
+    if (data.nodalis === 'settings' && data.settings && typeof data.settings === 'object') {
+      return { settings: data.settings, savedAt: Number(data.savedAt) || 0, device: data.device || '' };
+    }
+    // Pre-8.1: the file was the settings object itself, with no timestamp. Treat
+    // it as older than anything this device has done, so it only wins when this
+    // device has no history of its own - which is exactly the after-a-reset case
+    // it needs to win in.
+    if (data.themeStyle || data.uiFont || data.keymap) {
+      return { settings: data, savedAt: 1, device: '' };
+    }
+    return null;
+  }
+
+  function writeSettingsToFolder() {
+    if (!N.vault || !N.vault.isFolderMode || !N.vault.isFolderMode()) return;
+    try { N.vault.saveAppData('settings.json', settingsEnvelope()); }
+    catch (err) { console.warn('[store] could not queue settings for the folder', err); }
+  }
+
+  /**
+   * Fill in anything the restored copy did not carry, and run it through the
+   * same migration every locally-loaded settings object goes through, so a file
+   * written by an older build cannot leave the app holding a half-shaped object.
+   */
+  function normalizeSettings(raw) {
+    const merged = U.deepMerge(U.deepClone(DEFAULT_SETTINGS), raw || {});
+    migrateSettings(merged);
+    return merged;
+  }
+
+  /**
+   * Take a restored set of preferences and make them live: merged, saved, and
+   * re-applied. Re-applying matters - the theme, fonts, density and keyboard
+   * map are all read at apply time, so without this the right values would sit
+   * in memory behind the wrong-looking screen.
+   *
+   *   opts.savedAt    - the timestamp the restored copy carried, so this device
+   *                     does not claim the change as its own
+   *   opts.writeBack  - false when the copy came FROM the folder, so reading it
+   *                     does not immediately rewrite the file it came from
+   */
+  async function applyRestoredSettings(incoming, opts) {
+    const o = opts || {};
+    const merged = mergeRestoredSettings(state.settings, incoming);
+    merged.settingsSavedAt = o.savedAt || Date.now();
+    state.settings = normalizeSettings(merged);
+    await db.setSetting('settings', state.settings);
+    if (o.writeBack !== false) writeSettingsToFolder();
+
+    bus.emit('settings:changed', state.settings);
+    // Everything that is read rather than watched has to be told again.
+    try { if (N.theme && N.theme.apply) N.theme.apply(); } catch (err) { console.warn('[store] theme re-apply', err); }
+    try { if (N.shortcuts && N.shortcuts.rebuild) N.shortcuts.rebuild(); } catch (err) { console.warn('[store] shortcut rebuild', err); }
+    bus.emit('settings:restored', state.settings);
+    return state.settings;
+  }
+
   async function saveSettings(patch) {
     if (patch) U.deepMerge(state.settings, patch);
+    /*
+     * v8.1: stamp the change, then write the WRAPPED copy.
+     *
+     * The line this replaces handed state.settings to the folder verbatim -
+     * GitHub token and share-link passwords included - into a directory that
+     * people deliberately sync to Dropbox, commit to git, and copy onto USB
+     * sticks. Backing up the password for an encrypted note beside the
+     * encrypted note makes the encryption decorative.
+     *
+     * The stamp is the other half: see settingsSavedAt in DEFAULT_SETTINGS.
+     */
+    state.settings.settingsSavedAt = Date.now();
     await db.setSetting('settings', state.settings);
-    if (N.vault && N.vault.isFolderMode()) N.vault.saveAppData('settings.json', state.settings);
+    writeSettingsToFolder();
     bus.emit('settings:changed', state.settings);
   }
 
@@ -11275,6 +11681,33 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const sameBody = existing.content === parsed.content;
       const sameProps = JSON.stringify(existing.properties || {}) === JSON.stringify(parsed.properties || {});
       if (sameBody && sameProps) return 'unchanged';
+
+      /*
+       * v8.1: DISK WINS, BUT ONLY WHEN DISK IS ACTUALLY NEWER.
+       *
+       * The comment on pullAll() says "disk wins on conflict - the folder is
+       * the source of truth, so an edit made in Obsidian survives", and that
+       * is the right rule. But it was implemented as "disk wins, full stop",
+       * with lastModified accepted as a parameter and then never looked at.
+       *
+       * That is fine on a normal read and quietly destructive on a reconnect.
+       * When the folder permission lapses the app keeps working - notes are
+       * still written to IndexedDB, the user has no idea anything is wrong.
+       * Reconnecting then runs pullAll() before pushAll(), so every note
+       * edited while disconnected was overwritten by the older copy still on
+       * disk, and then that older copy was pushed back out. The edit was gone
+       * from both places, with no error and nothing to undo.
+       *
+       * So compare the two clocks and let the newer side win. A tie, or
+       * anything inside the slack, still goes to disk - that keeps the
+       * external-editor promise intact, which is the case this rule exists for.
+       */
+      const diskAt = Number(lastModified) || 0;
+      const localAt = Number(existing.updatedAt) || 0;
+      if (diskAt && localAt && (localAt - diskAt) > DISK_CLOCK_SLACK) {
+        return 'local-newer';
+      }
+
       existing.content = parsed.content;
       existing.properties = parsed.properties;
       existing.pinned = parsed.pinned;
@@ -11506,6 +11939,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     state: state,
     DEFAULT_SETTINGS: DEFAULT_SETTINGS,
     loadAll: loadAll, load: loadAll, replaceAllNotes: replaceAllNotes, saveSettings: saveSettings, setSetting: setSetting, getSetting: getSetting,
+    /* v8.1: one settings-restore path, shared by the folder and by GitHub. */
+    applyRestoredSettings: applyRestoredSettings, portableSettings: portableSettings,
+    settingsEnvelope: settingsEnvelope, readSettingsEnvelope: readSettingsEnvelope,
+    writeSettingsToFolder: writeSettingsToFolder, normalizeSettings: normalizeSettings,
     seedWelcomeVault: seedWelcomeVault,
 
     noteTitle: noteTitle, buildPath: buildPath, uniquePath: uniquePath, reindexNote: reindexNote,
@@ -28100,19 +28537,32 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const vaultFile = await readFile(VAULT_PATH);
       if (vaultFile) {
         const dump = JSON.parse(vaultFile.text);
-        // Keep this device's own GitHub credentials — they are not portable.
+        /*
+         * v8.1: ONE RESTORE PATH, NOT TWO.
+         *
+         * What this replaced worked, but it was a second hand-written copy of
+         * the same rules - which fields are secret, which belong to this device
+         * and which travel - kept in a different module from the folder path.
+         * Two lists of the same thing drift: this one never learned about
+         * sharePasswords, and had no idea githubRev and githubManifest describe
+         * what THIS device last pushed, so a restore could leave the conflict
+         * detector comparing against a revision this device had never sent.
+         *
+         * store.applyRestoredSettings() is now the only thing that knows those
+         * rules, and it also re-applies the theme and rebuilds the keyboard map
+         * afterwards - which the old code did not, so a restored theme sat in
+         * memory behind an unchanged screen until the next reload.
+         */
         const keep = Object.assign({}, N.store.state.settings);
         await N.db.importAll(dump, { replace: true });
         await N.store.load();
-        const restored = Object.assign({}, N.store.state.settings, {
-          githubToken: keep.githubToken,
-          githubOwner: keep.githubOwner,
-          githubRepo: keep.githubRepo,
-          githubBranch: keep.githubBranch,
-          deviceName: keep.deviceName,
+        const incoming = Object.assign({}, N.store.state.settings);
+        // Start from what this device had - token, repository address and sync
+        // bookkeeping intact - then let the restored copy through the filter.
+        N.store.state.settings = keep;
+        await N.store.applyRestoredSettings(incoming, {
+          savedAt: Number(incoming.settingsSavedAt) || Date.now(),
         });
-        N.store.state.settings = restored;
-        await N.store.saveSettings();
       }
 
       // Notes come back from the markdown files, which are the real record.
@@ -38983,6 +39433,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
       stage('opening local database', 0.18, 1, progress);
       await withTimeout(N.db.open(), 9000, 'opening local database');
+      /*
+       * v8.1: ask once, as early as possible, and never block on the answer.
+       *
+       * Everything this app owns is in the database that just opened - notes,
+       * settings, and the handle for the folder you picked. A browser is
+       * entitled to evict all of it under storage pressure unless it has been
+       * asked not to, and until v8.1 the only thing that ever asked was a
+       * button buried in Settings that almost nobody presses. Eviction is the
+       * quiet version of "it keeps disconnecting": the folder handle goes, so
+       * the app comes up with no folder and no explanation.
+       */
+      N.db.requestPersistence().catch(function () { /* advisory only */ });
 
       stage('reading your vault', 0.34, 2, progress);
       await withTimeout(N.store.loadAll(), 9000, 'reading your vault');
