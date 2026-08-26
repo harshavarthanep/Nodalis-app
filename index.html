@@ -7553,6 +7553,308 @@ html[data-printing] .guest-flash { display: none !important; }
   .sel-bar { transition: opacity 1ms linear; transform: none !important; }
 }
 
+/* =========================================================================
+ * v9.1 — the highlighter, the formatting bar, find & replace, reading
+ * chrome, tag colours, and the layout fixes that go with them.
+ * ========================================================================= */
+
+/* ---------------------------------------------------------- highlighter ---
+ * Five colours, mixed into the surface rather than painted over it, so one
+ * palette works on paper-white and on the Nothing theme's pure black without
+ * a second set of values per theme. The text colour is inherited, never set,
+ * which is what keeps a highlight readable in dark mode.
+ */
+:root {
+  --hl-yellow: #ffd23d;
+  --hl-green:  #46d17a;
+  --hl-blue:   #46b4ff;
+  --hl-pink:   #ff77b0;
+  --hl-purple: #a97dff;
+}
+.prose mark,
+.guest-body mark {
+  background: color-mix(in srgb, var(--hl-yellow) 42%, transparent);
+  color: inherit;
+  padding: 0.05em 0.18em;
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+[data-mode='dark'] .prose mark,
+[data-mode='dark'] .guest-body mark,
+html[data-guest][data-mode='dark'] .guest-body mark {
+  background: color-mix(in srgb, var(--hl-yellow) 30%, transparent);
+}
+.prose mark[data-hl='green'],  .guest-body mark[data-hl='green']  { background: color-mix(in srgb, var(--hl-green) 40%, transparent); }
+.prose mark[data-hl='blue'],   .guest-body mark[data-hl='blue']   { background: color-mix(in srgb, var(--hl-blue) 38%, transparent); }
+.prose mark[data-hl='pink'],   .guest-body mark[data-hl='pink']   { background: color-mix(in srgb, var(--hl-pink) 38%, transparent); }
+.prose mark[data-hl='purple'], .guest-body mark[data-hl='purple'] { background: color-mix(in srgb, var(--hl-purple) 38%, transparent); }
+[data-mode='dark'] .prose mark[data-hl='green'],  [data-mode='dark'] .guest-body mark[data-hl='green']  { background: color-mix(in srgb, var(--hl-green) 28%, transparent); }
+[data-mode='dark'] .prose mark[data-hl='blue'],   [data-mode='dark'] .guest-body mark[data-hl='blue']   { background: color-mix(in srgb, var(--hl-blue) 28%, transparent); }
+[data-mode='dark'] .prose mark[data-hl='pink'],   [data-mode='dark'] .guest-body mark[data-hl='pink']   { background: color-mix(in srgb, var(--hl-pink) 28%, transparent); }
+[data-mode='dark'] .prose mark[data-hl='purple'], [data-mode='dark'] .guest-body mark[data-hl='purple'] { background: color-mix(in srgb, var(--hl-purple) 28%, transparent); }
+
+/* It paints itself in, once, when it first renders. */
+@keyframes nd-hl-in { from { background-size: 0 100%; } to { background-size: 100% 100%; } }
+.prose mark { background-repeat: no-repeat; animation: nd-hl-in calc(320ms * var(--motion-scale)) var(--ease-out) both; }
+[data-animations='none'] .prose mark { animation: none; }
+@media (prefers-reduced-motion: reduce) { .prose mark { animation: none; } }
+
+/* ------------------------------------------------- the formatting bar --- */
+.sel-scroll {
+  display: flex; align-items: center; gap: 2px;
+  max-width: min(560px, calc(100vw - 28px));
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+.sel-scroll::-webkit-scrollbar { display: none; }
+.sel-sep { flex: none; width: 1px; height: 20px; margin: 0 3px; background: var(--border); }
+.sel-text { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
+.sel-hl { position: relative; display: inline-flex; align-items: center; }
+.sel-btn-hl svg { color: var(--hl-yellow); }
+.sel-caret {
+  width: 16px; height: 32px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; color: var(--text-2);
+  border-radius: var(--r-sm, 6px); cursor: pointer;
+}
+.sel-caret:hover { background: var(--bg-2); color: var(--text-0); }
+.sel-stats {
+  flex: none; padding: 0 8px 0 6px; margin-left: 2px;
+  border-left: 1px solid var(--border);
+  font-size: 11px; color: var(--text-3); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sel-tray {
+  position: fixed;
+  z-index: var(--z-tooltip, 951);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md, 10px);
+  box-shadow: var(--shadow-lg, 0 10px 30px -12px rgba(0,0,0,.45));
+  padding: 6px;
+  opacity: 0; transform: translateY(-4px) scale(0.97);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-spring);
+}
+.sel-tray.is-in { opacity: 1; transform: translateY(0) scale(1); }
+.sel-tray-colours { display: flex; gap: 6px; }
+.sel-swatch {
+  width: 26px; height: 26px; border-radius: var(--r-sm, 6px);
+  border: 1px solid var(--border); cursor: pointer;
+  transition: transform 120ms var(--ease-spring), box-shadow 120ms var(--ease-out);
+}
+.sel-swatch:hover { transform: scale(1.12); box-shadow: var(--shadow-sm); }
+.sel-swatch[data-hl='yellow'] { background: color-mix(in srgb, var(--hl-yellow) 70%, transparent); }
+.sel-swatch[data-hl='green']  { background: color-mix(in srgb, var(--hl-green) 70%, transparent); }
+.sel-swatch[data-hl='blue']   { background: color-mix(in srgb, var(--hl-blue) 70%, transparent); }
+.sel-swatch[data-hl='pink']   { background: color-mix(in srgb, var(--hl-pink) 70%, transparent); }
+.sel-swatch[data-hl='purple'] { background: color-mix(in srgb, var(--hl-purple) 70%, transparent); }
+
+.sel-tray-menu { display: flex; flex-direction: column; min-width: 208px; max-height: 62vh; overflow-y: auto; }
+.sel-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; min-height: 34px;
+  border: 0; background: transparent; color: var(--text-1);
+  border-radius: var(--r-sm, 6px);
+  font-size: var(--text-sm); text-align: left; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.sel-row:hover { background: var(--bg-2); color: var(--text-0); }
+.sel-row .icon { color: var(--text-3); flex: none; }
+.sel-row-sep { display: block; height: 1px; margin: 5px 4px; background: var(--border); }
+
+/* ------------------------------------------------- find and replace ----- */
+.find-bar {
+  position: absolute;
+  top: 8px; right: 12px; left: auto;
+  z-index: 60;
+  width: min(430px, calc(100% - 24px));
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md, 10px);
+  box-shadow: var(--shadow-lg, 0 12px 34px -14px rgba(0,0,0,.5));
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-spring);
+}
+.find-bar.is-in { opacity: 1; transform: translateY(0); }
+.find-row { display: flex; align-items: center; gap: 6px; }
+.find-row > .icon { color: var(--text-3); flex: none; }
+.find-input {
+  flex: 1 1 auto; min-width: 0;
+  height: 30px; padding: 0 8px;
+  border: 1px solid var(--border); border-radius: var(--r-sm, 6px);
+  background: var(--bg-0); color: var(--text-0);
+  font-size: var(--text-sm); font-family: inherit;
+}
+.find-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.find-count {
+  flex: none; font-size: 11px; color: var(--text-3);
+  font-variant-numeric: tabular-nums; min-width: 62px; text-align: right;
+}
+.find-bar.is-empty .find-count { color: var(--accent); }
+.find-bar.is-empty .find-input:first-of-type { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+.find-btn {
+  width: 28px; height: 28px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; color: var(--text-2);
+  border-radius: var(--r-sm, 6px); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.find-btn:hover { background: var(--bg-2); color: var(--text-0); }
+.find-toggle {
+  flex: none; height: 24px; padding: 0 7px;
+  border: 1px solid var(--border); border-radius: var(--r-sm, 6px);
+  background: var(--bg-0); color: var(--text-3);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+.find-toggle:hover { color: var(--text-1); border-color: var(--border-strong); }
+.find-toggle.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.find-row .btn-sm { flex: none; }
+@media (max-width: 700px) {
+  .find-bar { left: 12px; right: 12px; width: auto; }
+  .find-toggle { height: 30px; }
+  .find-btn { width: 34px; height: 34px; }
+  .find-input { height: 36px; }
+}
+
+/* --------------------------------------------- reading chrome ----------- */
+.read-progress {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  z-index: 40; pointer-events: none;
+  opacity: 0; transition: opacity var(--dur-base) var(--ease-out);
+}
+.read-progress.is-on { opacity: 1; }
+.read-progress-fill {
+  display: block; height: 100%; width: 100%;
+  transform-origin: 0 50%; transform: scaleX(0);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--accent) 55%, transparent), var(--accent));
+  transition: transform 90ms linear;
+}
+.sticky-head {
+  position: absolute; top: 2px; left: 0; right: 0;
+  z-index: 39; pointer-events: none;
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px var(--sp-6);
+  font-size: 11px; letter-spacing: var(--tracking-caps, 0.06em);
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: color-mix(in srgb, var(--bg-editor) 88%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+  opacity: 0; transform: translateY(-6px);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-spring);
+}
+.sticky-head.is-on { opacity: 1; transform: translateY(0); }
+.sticky-head-level { color: var(--accent); font-weight: 700; flex: none; }
+.sticky-head-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-animations='none'] .read-progress-fill,
+[data-animations='none'] .sticky-head { transition: none; }
+.glass-only .sticky-head { backdrop-filter: none; }
+[data-style='nothing'] .sticky-head { backdrop-filter: none; background: var(--bg-editor); }
+@media (max-width: 700px) { .sticky-head { padding-left: var(--sp-5); padding-right: var(--sp-5); } }
+
+/* ------------------------------------------------------ tag colours ----- */
+[data-tag-colour] { --tagc: var(--text-2); }
+[data-tag-colour='grey']   { --tagc: #8b8b96; }
+[data-tag-colour='red']    { --tagc: #e5484d; }
+[data-tag-colour='amber']  { --tagc: #d99100; }
+[data-tag-colour='green']  { --tagc: #30a46c; }
+[data-tag-colour='teal']   { --tagc: #12a594; }
+[data-tag-colour='blue']   { --tagc: #3b82f6; }
+[data-tag-colour='violet'] { --tagc: #8b5cf6; }
+[data-tag-colour='pink']   { --tagc: #e93d82; }
+.tag-inline[data-tag-colour] {
+  color: var(--tagc);
+  background: color-mix(in srgb, var(--tagc) 12%, transparent);
+  border-color: color-mix(in srgb, var(--tagc) 34%, transparent);
+}
+.tree-row[data-tag-colour] .chip-dot { background: var(--tagc) !important; }
+.tree-row[data-tag-colour] .tree-label { color: color-mix(in srgb, var(--tagc) 78%, var(--text-1)); }
+[data-mode='dark'] .tag-inline[data-tag-colour] {
+  background: color-mix(in srgb, var(--tagc) 20%, transparent);
+  color: color-mix(in srgb, var(--tagc) 82%, white);
+}
+
+/* ------------------------------------- the editor head, on one line ----
+ * The head is flex-wrap: wrap so a long title can take the width it needs.
+ * That is right on a laptop and wrong on a phone: the moment a note is
+ * published, the share chip pushes the actions past the 200px the title
+ * demands and the whole action group drops to a second row - which is the
+ * "write/view symbol comes down" misalignment. Below 620px the title yields
+ * instead, and the chip keeps its icon and drops its label.
+ */
+@media (max-width: 620px) {
+  .editor-head { flex-wrap: nowrap; gap: var(--sp-2); row-gap: 0; }
+  .note-title-input { flex: 1 1 0; min-width: 48px; }
+  .editor-actions { gap: 1px; flex: none; }
+  .share-state { padding: 0 7px; gap: 0; }
+  .share-state .share-state-label { display: none; }
+  .share-state.is-stale::after {
+    content: ''; width: 5px; height: 5px; border-radius: 50%;
+    background: currentColor; margin-left: 4px;
+  }
+  #note-title-warn { order: 3; flex: 1 0 100%; }
+}
+/* Touch targets stay honest: the chip grows rather than the row. */
+@media (max-width: 620px), (pointer: coarse) {
+  .share-state { min-height: 34px; min-width: 34px; justify-content: center; }
+}
+
+/* ------------------------------------ no sideways twitch on theme change */
+.view-body, .settings-body, .sheet-body, .modal-body, .palette-list, .sel-tray-menu {
+  scrollbar-gutter: stable;
+}
+/*
+ * A theme change swaps the UI font, the corner radii and the letter spacing at
+ * once, so every label in the app re-measures in the same frame. Nothing is
+ * broken by that, but it reads as a twitch. A 160ms settle makes the same
+ * reflow look like the app changing its mind on purpose.
+ */
+html[data-theming] #app { transition: opacity 160ms var(--ease-out); opacity: 0.86; }
+[data-animations='none'] html[data-theming] #app { transition: none; opacity: 1; }
+@media (prefers-reduced-motion: reduce) { html[data-theming] #app { transition: none; opacity: 1; } }
+
+/* ----------------------------------------- a sheet that follows a mouse */
+.sheet-grip { cursor: grab; }
+.sheet.is-dragging, .guest-sheet-panel.is-dragging { transition: none !important; }
+.guest-sheet-grip { cursor: grab; touch-action: none; }
+.guest-sheet-panel { touch-action: pan-y; }
+
+/* --------------------------------------------------------- more motion -- */
+@keyframes nd-tray-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+.sel-tray-menu .sel-row { animation: nd-tray-in calc(180ms * var(--motion-scale)) var(--ease-out) both; }
+.sel-tray-menu .sel-row:nth-child(2) { animation-delay: 14ms; }
+.sel-tray-menu .sel-row:nth-child(3) { animation-delay: 24ms; }
+.sel-tray-menu .sel-row:nth-child(4) { animation-delay: 32ms; }
+.sel-tray-menu .sel-row:nth-child(n+5) { animation-delay: 38ms; }
+[data-animations='none'] .sel-tray-menu .sel-row { animation: none; }
+@media (prefers-reduced-motion: reduce) { .sel-tray-menu .sel-row { animation: none; } }
+.find-bar .find-row:nth-child(2) { animation: nd-tray-in calc(220ms * var(--motion-scale)) var(--ease-out) 40ms both; }
+[data-animations='none'] .find-bar .find-row:nth-child(2) { animation: none; }
+
+/* --------------------------- the install prompt knows its place --------- *
+ * .pwa-prompt lives at --z-toast (180), above --z-modal (120), and is pinned
+ * to the bottom right. On a phone that is exactly where a bottom sheet's grip
+ * is, so the install banner was sitting on top of it: elementFromPoint on the
+ * grip returned the banner, which is why the sheet could not be dragged at all
+ * while it was showing. It steps aside for anything modal and comes back after.
+ */
+body:has(.sheet) .pwa-prompt,
+body:has(.modal) .pwa-prompt,
+body:has(.palette) .pwa-prompt,
+body:has(.guest-sheet) .pwa-prompt {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(14px) scale(0.98);
+}
+
 </style>
 </head>
 
@@ -8030,9 +8332,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 (function (N) {
   'use strict';
 
-  N.version = '9.0.0';
-  N.versionName = 'v9';
-  N.built = '2026-08-26';
+  N.version = '9.1.0';
+  N.versionName = 'v9.1';
+  N.built = '2026-08-27';
 
   /** "v8.0.0" - what goes on screen. */
   N.versionLabel = function () { return 'v' + N.version; };
@@ -9592,7 +9894,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   const bus = N.bus;
 
   const APP_DIR = '.nodalis';
-  const WRITE_DELAY = 650;          // debounce window for coalescing edits
+  /*
+   * v9.1: 650ms -> 260ms.
+   *
+   * The debounce exists so a burst of keystrokes becomes one file write rather
+   * than forty, and that is worth keeping - but 650ms is over half a second of
+   * "is this saved?" after every pause, which is long enough to feel like the
+   * app is thinking about it. 260ms still coalesces normal typing (people pause
+   * far longer than that between words) while landing the write inside the
+   * window where nobody notices a delay at all.
+   *
+   * The other half of making it feel fast is not doing the work: see the
+   * identical-content guard in writeFile.
+   */
+  const WRITE_DELAY = 260;          // debounce window for coalescing edits
   const MAX_RETRIES = 3;
 
   const vault = {
@@ -9703,11 +10018,40 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return dir;
   }
 
+  /*
+   * v9.1: what we last wrote to each path, so we can decline to write it again.
+   *
+   * v9 gave the folder four more files - folders, trash, view state and
+   * versions - and wired three of them to bus events that fire constantly.
+   * Most of those writes were byte-identical to the file already on disk.
+   * Opening a note fired a vault:changed, which rewrote viewstate.json, which
+   * queued a flush, which showed "syncing" in the status line: work nobody
+   * asked for, and the reason saving started to feel slower than it did in v8.
+   *
+   * A length-and-hash pair per path is enough to spot it. Strings only - a Blob
+   * is an attachment, written once, and hashing it would cost more than the
+   * write. The map is cleared when the folder changes so a new vault never
+   * inherits another one's fingerprints.
+   */
+  const lastWritten = new Map();
+
+  function fingerprint(text) {
+    let h = 5381;
+    for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+    return text.length + ':' + h.toString(36);
+  }
+
   async function writeFile(path, contents) {
     if (vault.mode !== 'folder' || !vault.handle) return false;
     const parts = String(path).split('/').filter(Boolean);
     const filename = parts.pop();
     if (!filename) throw new Error('Refusing to write a file with no name.');
+
+    let stamp = null;
+    if (typeof contents === 'string') {
+      stamp = fingerprint(contents);
+      if (lastWritten.get(path) === stamp) return true;   // already on disk
+    }
     const dir = await getDir(vault.handle, parts.join('/'), true);
     const fileHandle = await dir.getFileHandle(filename, { create: true });
     const writable = await fileHandle.createWritable();
@@ -9716,8 +10060,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       await writable.close();
     } catch (err) {
       try { await writable.abort(); } catch (e2) { /* stream already dead */ }
+      lastWritten.delete(path);       // we no longer know what is in there
       throw err;
     }
+    if (stamp !== null) lastWritten.set(path, stamp);
     return true;
   }
 
@@ -9742,6 +10088,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     try {
       const dir = await getDir(vault.handle, parts.join('/'), false);
       await dir.removeEntry(filename);
+      lastWritten.delete(path);     /* v9.1: gone, so the next write must land */
       return true;
     } catch (err) {
       // Already gone is a success from the caller's point of view.
@@ -9819,6 +10166,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
      */
     const root = await resolveVaultRoot(handle);
 
+    lastWritten.clear();          /* v9.1: a different folder, different files */
     vault.handle = root.handle;
     vault.name = root.name;
     vault.mode = 'folder';
@@ -9921,6 +10269,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   async function disconnectFolder() {
     await flushNow();
+    lastWritten.clear();
     vault.handle = null;
     vault.mode = 'browser';
     vault.name = '';
@@ -13218,7 +13567,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     };
 
     node.addEventListener('pointerdown', function (e) {
-      if (e.pointerType === 'mouse' && !e.altKey) return;   // a touch gesture
+      /*
+       * v9.1: a mouse can drag it too.
+       *
+       * This used to bail out on any mouse press without Alt held, so on a
+       * laptop the sheet had a grip that looked draggable and was not. The
+       * gesture is safe to allow because canStart() already refuses to claim a
+       * press on a control, a link or inside a scrolled body - and the 6px
+       * slack below means a click is still a click.
+       */
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (!canStart(e.target)) return;
       dragging = true;
       decided = false;
@@ -13238,6 +13596,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         if (Math.abs(delta) < 6) return;
         if (delta < 0 && startedInBody(e.target)) { dragging = false; return; }
         decided = true;
+        node.classList.add('is-dragging');
         node.style.transition = 'none';
         node.style.willChange = 'transform';
         try { node.setPointerCapture(pointerId); } catch (err) { /* not fatal */ }
@@ -13258,6 +13617,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const release = function (e) {
       if (!dragging || (e && e.pointerId !== pointerId)) return;
       dragging = false;
+      node.classList.remove('is-dragging');
       try { node.releasePointerCapture(pointerId); } catch (err) { /* already gone */ }
       node.style.transition = '';
       node.style.opacity = '';
@@ -14912,6 +15272,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return 'light';
   }
 
+  let themingTimer = null;
+
   /** The one function that writes appearance to the DOM. */
   function apply() {
     const s = settings();
@@ -15049,17 +15411,39 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const previous = s.themeStyle;
     s.themeStyle = style;
 
-    // The Nothing look is a black OLED interface with one red. Landing on it in
-    // light mode misses the point entirely, so the first switch adopts dark —
-    // but only while the user is on an automatic mode, never overriding a
-    // deliberate light/dark choice.
-    if (style === 'nothing' && previous !== 'nothing' && String(s.themeMode).startsWith('auto')) {
-      s.rememberedThemeMode = s.themeMode;
-      s.themeMode = 'dark';
-    } else if (previous === 'nothing' && style !== 'nothing' && s.rememberedThemeMode) {
-      s.themeMode = s.rememberedThemeMode;
-      delete s.rememberedThemeMode;
-    }
+    /*
+     * v9.1: THE NOTHING THEME NO LONGER DRAGS YOU INTO DARK MODE.
+     *
+     * What was here forced themeMode to 'dark' when you picked Nothing while on
+     * any automatic mode, on the reasoning that a black OLED interface with one
+     * red is the point of the design. The reasoning is fine and the behaviour is
+     * wrong: "follow my system" is a choice, and it was being overwritten. Pick
+     * Nothing at two in the afternoon on a light system and the app went black
+     * and stayed black, with no obvious way to work out why.
+     *
+     * Both palettes exist - [data-style='nothing'][data-mode='light'] has been
+     * in the stylesheet all along - so honouring the mode costs nothing. Anyone
+     * who wants the black version can say so, once, in Light or dark.
+     *
+     * The remembered-mode dance goes with it: with nothing to restore there is
+     * nothing to remember, and a stale rememberedThemeMode left over from an
+     * older build is cleared on the way past so it cannot resurface.
+     */
+    if (s.rememberedThemeMode) delete s.rememberedThemeMode;
+
+    /*
+     * And a 160ms settle over the swap. Changing style changes the UI font, the
+     * corner radii and the letter spacing in one frame, so every label in the
+     * app re-measures at once. Nothing is broken by that - but it reads as a
+     * twitch, which is the "wobbling" in the settings screen. Fading very
+     * slightly through the reflow makes the same work look deliberate.
+     */
+    try {
+      const root = document.documentElement;
+      root.dataset.theming = '1';
+      clearTimeout(themingTimer);
+      themingTimer = setTimeout(function () { delete root.dataset.theming; }, 200);
+    } catch (err) { /* cosmetic only */ }
 
     await N.store.saveSettings();
     apply();
@@ -16267,7 +16651,22 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     src = src.replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])/g, '$1<em>$2</em>');
     src = src.replace(/(^|[^\w_])_(?=\S)([^_\n]*?\S)_(?![\w_])/g, '$1<em>$2</em>');
     src = src.replace(/~~(?=\S)([\s\S]*?\S)~~/g, '<del>$1</del>');
-    src = src.replace(/==(?=\S)([\s\S]*?\S)==/g, '<mark>$1</mark>');
+    /*
+     * v9.1: ==text== stays exactly as it was, and ==green: text== is new.
+     *
+     * The colour is written inside the marks rather than as an attribute, so
+     * the note is still a plain markdown file that reads correctly in any other
+     * editor: what you see there is "==green: still legible==", not a tag. An
+     * unknown word before the colon is left alone and treated as text, so a
+     * highlight that happens to start "TODO: " is not mistaken for a colour.
+     */
+    src = src.replace(/==(?=\S)([\s\S]*?\S)==/g, function (whole, inner) {
+      const m = /^([a-z]{3,7}):[ \t]*([\s\S]+)$/.exec(inner);
+      if (m && ['yellow', 'green', 'blue', 'pink', 'purple'].indexOf(m[1]) !== -1) {
+        return '<mark data-hl="' + m[1] + '">' + m[2] + '</mark>';
+      }
+      return '<mark>' + inner + '</mark>';
+    });
     src = src.replace(/\^([\w+-]+)\^/g, '<sup>$1</sup>');
     src = src.replace(/(?:^|[^~])~([\w+-]+)~(?!~)/g, '<sub>$1</sub>');
 
@@ -17396,6 +17795,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     row.appendChild(el('span.tree-meta', null, String(count)));
     row.addEventListener('click', function () { N.search.openTag(tag); });
     row.addEventListener('keydown', function (e) { if (e.key === 'Enter') N.search.openTag(tag); });
+    /* v9.1: right-click, or long-press on a phone, to colour it. */
+    row.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+      if (N.reading && N.reading.pickColour) N.reading.pickColour(tag);
+    });
+    if (N.reading && N.reading.colourFor) {
+      const c = N.reading.colourFor(tag);
+      if (c) row.setAttribute('data-tag-colour', c);
+    }
     return row;
   }
 
@@ -25315,6 +25723,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       'pre{background:' + (dark ? '#1e1e2b' : '#f3efe4') + ';padding:14px 16px;border-radius:8px;overflow:auto}',
       'pre code{background:none;padding:0}',
       'blockquote{border-left:3px solid ' + (dark ? '#3d3d50' : '#d8d0bd') + ';margin-left:0;padding-left:1em;color:' + (dark ? '#c6c6d4' : '#5a5344') + '}',
+      /* v9.1: a highlight has to survive leaving the app, or it was never real. */
+      'mark{padding:.05em .18em;border-radius:3px;color:inherit;background:' + (dark ? 'rgba(255,210,61,.30)' : 'rgba(255,210,61,.45)') + '}',
+      'mark[data-hl=green]{background:' + (dark ? 'rgba(70,209,122,.28)' : 'rgba(70,209,122,.42)') + '}',
+      'mark[data-hl=blue]{background:' + (dark ? 'rgba(70,180,255,.28)' : 'rgba(70,180,255,.40)') + '}',
+      'mark[data-hl=pink]{background:' + (dark ? 'rgba(255,119,176,.28)' : 'rgba(255,119,176,.40)') + '}',
+      'mark[data-hl=purple]{background:' + (dark ? 'rgba(169,125,255,.28)' : 'rgba(169,125,255,.40)') + '}',
       'table{border-collapse:collapse;width:100%}th,td{border:1px solid ' + (dark ? '#2b2b3a' : '#e8e4da') + ';padding:8px 12px;text-align:left}',
       'th{background:' + (dark ? '#1c1c27' : '#faf6ed') + '}',
       'img{max-width:100%;border-radius:8px}',
@@ -26191,8 +26605,30 @@ https://github.com/nodeca/pako/blob/main/LICENSE
    * marooned on an empty page. Every setting is reachable by scrolling, the
    * index highlights whatever you are looking at, and there is no dead space.
    */
-  function render() {
+  function render(opts) {
     if (!body) return;
+    /*
+     * v9.1: KEEPING THE PLACE, NOT THE SCROLL OFFSET.
+     *
+     * Restoring body.scrollTop is not the same as keeping the screen still.
+     * Changing the theme changes the UI font, so the panel's own content height
+     * changes with it - by more than a thousand pixels between Nodalis paper and
+     * Terminal. Put the same scrollTop back under different content and the card
+     * you just pressed is somewhere else, which is exactly what "the settings
+     * section is wobbling" looks like from the outside.
+     *
+     * So an ANCHOR is measured instead: where a named element sat on screen
+     * before the rebuild, and where it sits after. The difference is added to
+     * the scroll position. It is corrected again on the next two frames, and
+     * once more when the webfont has finished loading, because a font swap
+     * reflows everything a second time several hundred milliseconds later.
+     */
+    const anchorSel = (opts && opts.anchor) || null;
+    const anchorTop = anchorSel ? (function () {
+      const n = body.querySelector(anchorSel);
+      return n ? n.getBoundingClientRect().top : null;
+    })() : null;
+
     const previousScroll = body.scrollTop;
     U.clear(body);
 
@@ -26230,6 +26666,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     body.appendChild(layout);
     installScrollSpy();
     body.scrollTop = previousScroll;
+
+    if (anchorSel && anchorTop !== null) {
+      const settle = function () {
+        const n = body.querySelector(anchorSel);
+        if (!n) return;
+        const delta = n.getBoundingClientRect().top - anchorTop;
+        if (Math.abs(delta) > 1) body.scrollTop += delta;
+      };
+      settle();
+      requestAnimationFrame(function () { settle(); requestAnimationFrame(settle); });
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () { setTimeout(settle, 30); }).catch(function () {});
+      }
+    }
   }
 
   function goToSection(id) {
@@ -26554,7 +27004,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       label.appendChild(el('span', null, theme.name));
       if (s().themeStyle === theme.id) label.appendChild(N.icons.node('check-small', { size: 15 }));
       card.appendChild(label);
-      card.addEventListener('click', async function () { await N.theme.setStyle(theme.id); render(); });
+      card.addEventListener('click', async function () {
+        await N.theme.setStyle(theme.id);
+        // The picker itself is the anchor: whichever card you pressed stays
+        // under your finger while the whole app re-measures around it.
+        render({ anchor: '.theme-picker' });
+      });
       picker.appendChild(card);
     });
     wrap.appendChild(picker);
@@ -33355,6 +33810,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   let bar = null;
   let hideTimer = null;
+  let sub = null;              // the open colour or "more" tray
 
   function textarea() {
     return (N.editor && N.editor.getTextarea && N.editor.getTextarea()) || null;
@@ -33412,41 +33868,220 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /* ---------------------------------------------------------------- bar */
 
+  /*
+   * v9.1: the bar is now a formatting toolbar.
+   *
+   * It used to carry three vault actions - extract, remind, copy - which are
+   * good but are not what a hand reaches for when it has just selected a
+   * sentence. Everything that acts on a selection now lives here, grouped, in
+   * the order people use it: inline marks, then the highlighter, then block
+   * level, then the things that send the selection somewhere else.
+   *
+   * On a phone the bar scrolls horizontally rather than wrapping, because a
+   * toolbar that changes height as you drag a selection is worse than one you
+   * have to swipe.
+   */
   function build(sel) {
-    const node = el('div.sel-bar', { role: 'toolbar', 'aria-label': 'Selection actions' });
+    const node = el('div.sel-bar', { role: 'toolbar', 'aria-label': 'Formatting' });
+    const scroll = el('div.sel-scroll');
 
-    function action(icon, label, fn) {
-      const b = el('button.sel-btn', { type: 'button', title: label, 'aria-label': label });
-      b.appendChild(N.icons.node(icon, { size: 15 }));
-      b.addEventListener('mousedown', function (e) { e.preventDefault(); }); // keep the selection
+    const action = function (icon, label, fn, opts) {
+      const o = opts || {};
+      const b = el('button.sel-btn' + (o.className ? '.' + o.className : ''), {
+        type: 'button', title: label + (o.accel ? '  ' + accel(o.accel) : ''), 'aria-label': label,
+      });
+      if (o.text) b.appendChild(el('span.sel-text', null, o.text));
+      else b.appendChild(N.icons.node(icon, { size: 15 }));
+      // mousedown default would blur the textarea and drop the selection
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
         try { fn(); } catch (err) { console.error('[selection-bar]', err); }
-        hide();
+        if (!o.keepOpen) hide();
+        else reposition();
       });
       return b;
-    }
+    };
 
+    const accel = function (id) {
+      if (!N.shortcuts || !N.shortcuts.accelFor) return '';
+      const a = N.shortcuts.accelFor(id);
+      return a ? N.shortcuts.format(a) : '';
+    };
+    const sep = function () { return el('span.sel-sep'); };
+    const F = N.format;
+
+    scroll.appendChild(action('bold', 'Bold', function () { F.toggleWrap('**'); }, { keepOpen: true, accel: 'format.bold' }));
+    scroll.appendChild(action('italic', 'Italic', function () { F.toggleWrap('*'); }, { keepOpen: true, accel: 'format.italic' }));
+    scroll.appendChild(action('strikethrough', 'Strikethrough', function () { F.toggleWrap('~~'); }, { keepOpen: true, accel: 'format.strike' }));
+    scroll.appendChild(action('code', 'Inline code', function () { F.toggleWrap('`'); }, { keepOpen: true, accel: 'format.code' }));
+
+    /* the highlighter, with its colours one tap away */
+    const hl = action('highlight', 'Highlight', function () { F.highlight('yellow'); }, { keepOpen: true, accel: 'format.highlight' });
+    hl.classList.add('sel-btn-hl');
+    const hlWrap = el('span.sel-hl');
+    hlWrap.appendChild(hl);
+    const more = el('button.sel-caret', { type: 'button', title: 'Highlight colour', 'aria-label': 'Highlight colour' });
+    more.appendChild(N.icons.node('chevron-down', { size: 11 }));
+    more.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    more.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      openColours(more);
+    });
+    hlWrap.appendChild(more);
+    scroll.appendChild(hlWrap);
+
+    scroll.appendChild(sep());
+    scroll.appendChild(action('heading-1', 'Heading 1', function () { F.setBlock('# '); }, { keepOpen: true }));
+    scroll.appendChild(action('heading-2', 'Heading 2', function () { F.setBlock('## '); }, { keepOpen: true }));
+    scroll.appendChild(action('heading-3', 'Heading 3', function () { F.setBlock('### '); }, { keepOpen: true }));
+    scroll.appendChild(action('list', 'Bulleted list', function () { F.setBlock('- '); }, { keepOpen: true }));
+    scroll.appendChild(action('list-ordered', 'Numbered list', function () { F.setBlock('number'); }, { keepOpen: true }));
+    scroll.appendChild(action('list-check', 'Task list', function () { F.setBlock('- [ ] '); }, { keepOpen: true }));
+    scroll.appendChild(action('quote', 'Quote', function () { F.setBlock('> '); }, { keepOpen: true }));
+
+    scroll.appendChild(sep());
+    scroll.appendChild(action('link', 'Add a link', function () { F.makeLink(); }));
+    scroll.appendChild(action('eraser', 'Clear formatting', function () { F.clearFormatting(); }, { keepOpen: true }));
+    scroll.appendChild(action('more', 'More', function () {}, { keepOpen: true, className: 'is-more' }));
+
+    // the "more" button opens a tray rather than running anything
+    const moreBtn = scroll.querySelector('.sel-btn.is-more');
+    moreBtn.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      openMore(moreBtn, sel);
+    }, true);
+
+    node.appendChild(scroll);
+
+    /* the live count, which is the reason people select text in the first
+       place about a third of the time */
+    const st = N.format.stats();
+    if (st && st.words) {
+      node.appendChild(el('span.sel-stats', {
+        title: st.words + ' words, ' + st.chars + ' characters, about ' + st.minutes + ' min to read',
+      }, st.words + (st.words === 1 ? ' word' : ' words')));
+    }
+    return node;
+  }
+
+  function closeSub() {
+    if (!sub) return;
+    const node = sub;
+    sub = null;
+    node.classList.remove('is-in');
+    setTimeout(function () { if (node.parentNode) node.remove(); }, 160);
+  }
+
+  function trayAt(anchor, className) {
+    closeSub();
+    const node = el('div.sel-tray' + (className ? '.' + className : ''));
+    document.body.appendChild(node);
+    sub = node;
+    requestAnimationFrame(function () {
+      const box = anchor.getBoundingClientRect();
+      const w = node.offsetWidth;
+      let x = Math.max(8, Math.min(box.left + box.width / 2 - w / 2, window.innerWidth - w - 8));
+      let y = box.bottom + 8;
+      if (y + node.offsetHeight > window.innerHeight - 8) y = box.top - node.offsetHeight - 8;
+      node.style.left = Math.round(x) + 'px';
+      node.style.top = Math.round(y) + 'px';
+      node.classList.add('is-in');
+    });
+    return node;
+  }
+
+  function openColours(anchor) {
+    const tray = trayAt(anchor, 'sel-tray-colours');
+    N.format.HIGHLIGHTS.forEach(function (h) {
+      const b = el('button.sel-swatch', {
+        type: 'button', title: h.label, 'aria-label': 'Highlight ' + h.label,
+        'data-hl': h.id,
+      });
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        N.format.highlight(h.id);
+        closeSub();
+        reposition();
+      });
+      tray.appendChild(b);
+    });
+  }
+
+  function openMore(anchor, sel) {
+    const tray = trayAt(anchor, 'sel-tray-menu');
+    const F = N.format;
+    const row = function (icon, label, fn) {
+      const b = el('button.sel-row', { type: 'button' });
+      b.appendChild(N.icons.node(icon, { size: 15 }));
+      b.appendChild(el('span', null, label));
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        closeSub();
+        try { fn(); } catch (err) { console.error('[selection-bar]', err); }
+        hide();
+      });
+      tray.appendChild(b);
+    };
+    row('type', 'Title Case', function () { F.transformCase('title'); });
+    row('type', 'UPPERCASE', function () { F.transformCase('upper'); });
+    row('type', 'lowercase', function () { F.transformCase('lower'); });
+    row('type', 'Sentence case', function () { F.transformCase('sentence'); });
+    tray.appendChild(el('span.sel-row-sep'));
+    row('sort', 'Sort lines A to Z', function () { F.sortLines(false); });
+    row('filter', 'Remove duplicate lines', function () { F.dedupeLines(); });
+    row('table', 'Tidy up this table', function () { F.formatTable(); });
+    tray.appendChild(el('span.sel-row-sep'));
+    row('list-check', 'Make this a task', function () { F.sendToTask(); });
+    row('sticky', 'Pin as a sticky note', function () { F.sendToSticky(); });
     if (N.intelExtra && N.intelExtra.extract) {
-      node.appendChild(action('file-plus', 'Extract to a new note', function () {
-        N.intelExtra.extract();
-      }));
+      row('file-plus', 'Extract to a new note', function () { N.intelExtra.extract(); });
     }
     if (N.remind && N.remind.setFor) {
-      node.appendChild(action('clock', 'Remind me about this', function () {
+      row('clock', 'Remind me about this', function () {
         const t = sel.text.trim().replace(/\s+/g, ' ').slice(0, 80);
         const noteId = N.store.state.activeNoteId;
         const n2 = noteId && N.store.state.notes.get(noteId);
         N.remind.setFor('note', noteId, t, n2 ? n2.folder : '');
-      }));
+      });
     }
-    node.appendChild(action('copy', 'Copy', function () {
+    row('copy', 'Copy', function () {
       U.copyToClipboard(sel.text).then(function (ok) {
         if (ok) N.toast.success('Copied.', { ms: 1800 });
       });
-    }));
+    });
+  }
 
-    return node;
+  /* Re-measure without rebuilding, so a toggle does not make the bar blink. */
+  function reposition() {
+    const s = currentSelection();
+    if (!s || !bar) { return; }
+    const stats = bar.querySelector('.sel-stats');
+    const st = N.format.stats();
+    if (stats && st) stats.textContent = st.words + (st.words === 1 ? ' word' : ' words');
+    place(s);
+  }
+
+  function place(sel) {
+    const pt = selectionPoint(sel);
+    const w = bar.offsetWidth || 120;
+    const h = bar.offsetHeight || 40;
+    const x = Math.max(8, Math.min(pt.x, window.innerWidth - w - 8));
+
+    /*
+     * The floor is the top of the text, not the top of the window. Selecting
+     * the first line of a note leaves room above the caret in absolute terms -
+     * but that room belongs to the note's own header, and a toolbar sitting on
+     * top of the title looks like a bug even though the arithmetic was right.
+     */
+    const paneTop = sel.ta.getBoundingClientRect().top;
+    let y = pt.y - h - 10;
+    if (y < paneTop + 4) y = pt.y + 26;          // no room: flip below the line
+    y = Math.min(y, window.innerHeight - h - 8);
+    bar.style.left = Math.round(x) + 'px';
+    bar.style.top = Math.round(y) + 'px';
   }
 
   function show() {
@@ -33456,14 +34091,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     hide(true);
     bar = build(sel);
     document.body.appendChild(bar);
-
-    const pt = selectionPoint(sel);
-    const w = bar.offsetWidth || 120;
-    let x = Math.max(10, Math.min(pt.x, window.innerWidth - w - 10));
-    let y = pt.y - bar.offsetHeight - 10;
-    if (y < 8) y = pt.y + 26;                    // flip below if there is no room above
-    bar.style.left = Math.round(x) + 'px';
-    bar.style.top = Math.round(y) + 'px';
+    place(sel);
 
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { if (bar) bar.classList.add('is-in'); });
@@ -33472,6 +34100,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   function hide(immediate) {
     clearTimeout(hideTimer);
+    closeSub();
     const node = bar;
     bar = null;
     if (!node) return;
@@ -33490,14 +34119,21 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   function init() {
     document.addEventListener('selectionchange', function () {
       const ta = textarea();
-      if (!ta || document.activeElement !== ta) { hide(); return; }
+      if (!ta || document.activeElement !== ta) {
+        // Keep the bar while a tray from it has focus, or opening a colour
+        // would close the thing that opened it.
+        if (!sub) hide();
+        return;
+      }
       schedule();
     });
     document.addEventListener('pointerdown', function (e) {
-      if (bar && !bar.contains(e.target)) hide();
+      if (sub && sub.contains(e.target)) return;
+      if (bar && bar.contains(e.target)) return;
+      if (bar || sub) hide();
     }, true);
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') hide();
+      if (e.key === 'Escape') { if (sub) closeSub(); else hide(); }
     });
     window.addEventListener('scroll', function () { if (bar) hide(); }, true);
     window.addEventListener('resize', function () { if (bar) hide(); });
@@ -37041,7 +37677,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (state === 'none') { chip.title = 'Not shared'; return; }
     U.clear(chip);
     chip.appendChild(N.icons.node(state === 'stale' ? 'refresh' : 'link', { size: 14 }));
-    chip.appendChild(el('span', null, state === 'stale' ? 'Not published yet' : 'Shared'));
+    /* v9.1: the label is its own element so a phone can drop it and keep the
+       icon, instead of the whole action group wrapping to a second row. */
+    chip.appendChild(el('span.share-state-label', null, state === 'stale' ? 'Not published yet' : 'Shared'));
     chip.title = state === 'stale'
       ? 'Edited since publishing - readers still see the older version. Click for sharing options.'
       : 'Published. Readers see this version. Click for sharing options.';
@@ -39073,7 +39711,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const p = prefs();
     const sheet = el('div.guest-sheet#nd-guest-sheet');
     const panel = el('div.guest-sheet-panel');
-    panel.appendChild(el('div.guest-sheet-grip'));
+    const grip = el('div.guest-sheet-grip');
+    panel.appendChild(grip);
     panel.appendChild(el('div.guest-sheet-title', null, 'Reading options'));
 
     const body = el('div.guest-sheet-body');
@@ -39165,6 +39804,75 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     panel.appendChild(foot);
     sheet.appendChild(panel);
     sheet.addEventListener('click', function (e) { if (e.target === sheet) close(); });
+
+    /*
+     * v9.1: DRAG IT DOWN.
+     *
+     * The reader's sheet has always had a grip drawn on it and nothing behind
+     * that grip - it could only be dismissed by tapping the backdrop or the
+     * close button, which is not what a handle promises. This is the same
+     * gesture as the app's own sheets: it follows the pointer (finger OR
+     * mouse), the backdrop fades with it, and it either springs back or
+     * continues in the direction it was already going.
+     */
+    (function installDrag() {
+      let startY = 0, startAt = 0, offset = 0, pid = null;
+      let dragging = false, decided = false;
+
+      const canStart = function (t) {
+        if (!t || !t.closest) return true;
+        if (t.closest('button, a, input, select, textarea')) return false;
+        if (t === grip || t.closest('.guest-sheet-grip, .guest-sheet-title')) return true;
+        const body = panel.querySelector('.guest-sheet-body');
+        if (body && body.contains(t)) return panel.scrollTop <= 0;
+        return true;
+      };
+
+      panel.addEventListener('pointerdown', function (e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (!canStart(e.target)) return;
+        dragging = true; decided = false; pid = e.pointerId;
+        startY = e.clientY; startAt = Date.now(); offset = 0;
+      }, { passive: true });
+
+      panel.addEventListener('pointermove', function (e) {
+        if (!dragging || e.pointerId !== pid) return;
+        const delta = e.clientY - startY;
+        if (!decided) {
+          if (Math.abs(delta) < 6) return;
+          if (delta < 0) { dragging = false; return; }
+          decided = true;
+          panel.classList.add('is-dragging');
+          try { panel.setPointerCapture(pid); } catch (err) { /* not fatal */ }
+        }
+        if (e.cancelable) e.preventDefault();
+        offset = delta > 0 ? delta : delta / 4;
+        panel.style.transform = 'translate3d(0,' + offset.toFixed(1) + 'px,0)';
+        sheet.style.setProperty('--nd-sheet-fade', String(Math.max(0, 1 - offset / 320)));
+      }, { passive: false });
+
+      const release = function (e) {
+        if (!dragging || (e && e.pointerId !== pid)) return;
+        dragging = false;
+        try { panel.releasePointerCapture(pid); } catch (err) { /* gone */ }
+        panel.classList.remove('is-dragging');
+        sheet.style.removeProperty('--nd-sheet-fade');
+        if (!decided) { panel.style.transform = ''; return; }
+        const velocity = offset / Math.max(1, Date.now() - startAt);
+        if (offset > 120 || (velocity > 0.6 && offset > 40)) {
+          panel.style.transition = 'transform 180ms cubic-bezier(0.3,0,0.8,0.2)';
+          panel.style.transform = 'translate3d(0,110%,0)';
+          setTimeout(function () { close(); }, 160);
+          return;
+        }
+        panel.style.transition = 'transform 320ms cubic-bezier(0.2,1.2,0.3,1)';
+        panel.style.transform = '';
+        setTimeout(function () { panel.style.transition = ''; }, 340);
+      };
+      panel.addEventListener('pointerup', release, { passive: true });
+      panel.addEventListener('pointercancel', release, { passive: true });
+      panel.addEventListener('lostpointercapture', release, { passive: true });
+    })();
     document.addEventListener('keydown', function esc(e) {
       if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
     });
@@ -40072,6 +40780,1113 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   };
 })(window.NODALIS = window.NODALIS || {});
 
+
+/* ===== js/features/format.js ===== */
+/* =========================================================================
+ * Nodalis - features/format.js   (v9.1)
+ *
+ * Everything that edits the text of a note on purpose: the formatting the
+ * selection bar and the palette both drive, find and replace, the line tools,
+ * case transforms, the table aligner and smart paste.
+ *
+ * ONE RULE RUNS THROUGH ALL OF IT: every change goes through the browser's own
+ * insertText command rather than assigning to textarea.value.
+ *
+ * That matters more than it sounds. Assigning to .value wipes the browser's
+ * native undo stack, so Ctrl+Z after a formatting action would jump back past
+ * everything you had typed instead of undoing the one thing you just did -
+ * which is how a text tool loses people's work. insertText edits through the
+ * same path as typing, so undo, redo and the editor's own save listener all
+ * behave exactly as they do for a keystroke. Direct assignment is kept only as
+ * a fallback for the rare engine that refuses the command.
+ * ========================================================================= */
+(function (N) {
+  'use strict';
+
+  const U = N && N.util;
+  if (!U || typeof U.el !== 'function') return;
+  const el = U.el;
+
+  /* Five highlighter colours. Written into the note as `==colour: text==`,
+     which is deliberately readable: open the file in any other editor and you
+     see "==yellow: still legible==" rather than a broken tag. */
+  const HIGHLIGHTS = [
+    { id: 'yellow', label: 'Yellow' },
+    { id: 'green', label: 'Green' },
+    { id: 'blue', label: 'Blue' },
+    { id: 'pink', label: 'Pink' },
+    { id: 'purple', label: 'Purple' },
+  ];
+
+  /**
+   * Reading the clipboard needs permission and is refused outright in some
+   * contexts, so every caller has to cope with getting nothing back. The app
+   * has only ever needed to WRITE the clipboard, so there is no util for this.
+   */
+  function readClip() {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) return Promise.resolve('');
+      return navigator.clipboard.readText().catch(function () { return ''; });
+    } catch (err) { return Promise.resolve(''); }
+  }
+
+  function ta() {
+    return (N.editor && N.editor.getTextarea && N.editor.getTextarea()) || null;
+  }
+  function live() {
+    const t = ta();
+    return t && !t.readOnly && N.store.state.activeNoteId ? t : null;
+  }
+  function sel() {
+    const t = ta();
+    if (!t) return null;
+    return { t: t, start: t.selectionStart, end: t.selectionEnd,
+      text: t.value.slice(t.selectionStart, t.selectionEnd) };
+  }
+
+  /**
+   * Replace [start,end) with text, keeping native undo intact.
+   * `select` may be [a,b] absolute positions, or a number of characters to
+   * leave selected from the start of the inserted text.
+   */
+  function replace(start, end, text, select) {
+    const t = ta();
+    if (!t) return false;
+    t.focus();
+    t.setSelectionRange(start, end);
+    let ok = false;
+    try { ok = document.execCommand('insertText', false, text); }
+    catch (err) { ok = false; }
+    if (!ok) {
+      // Fallback: the change still lands, native undo is the casualty.
+      const before = t.value.slice(0, start);
+      const after = t.value.slice(end);
+      t.value = before + text + after;
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (Array.isArray(select)) t.setSelectionRange(select[0], select[1]);
+    else if (typeof select === 'number') t.setSelectionRange(start + select, start + select);
+    else t.setSelectionRange(start + text.length, start + text.length);
+    return true;
+  }
+
+  /* ------------------------------------------------------------ inline wrap */
+
+  /**
+   * Toggle a paired marker around the selection. Already wrapped? Unwrap.
+   * Nothing selected? Insert the pair and put the caret inside, so the button
+   * is useful before you have typed the words as well as after.
+   */
+  function toggleWrap(open, close) {
+    const t = live();
+    if (!t) return;
+    const s = sel();
+    const closeStr = close === undefined ? open : close;
+    const before = t.value.slice(Math.max(0, s.start - open.length), s.start);
+    const after = t.value.slice(s.end, s.end + closeStr.length);
+
+    if (before === open && after === closeStr) {
+      const text = s.text;
+      replace(s.start - open.length, s.end + closeStr.length, text, [s.start - open.length, s.start - open.length + text.length]);
+      return;
+    }
+    if (s.text.length >= open.length + closeStr.length &&
+        s.text.slice(0, open.length) === open && s.text.slice(-closeStr.length) === closeStr) {
+      const inner = s.text.slice(open.length, s.text.length - closeStr.length);
+      replace(s.start, s.end, inner, [s.start, s.start + inner.length]);
+      return;
+    }
+    /*
+     * Trailing spaces stay outside the markers. "**word **" renders as literal
+     * asterisks in every markdown engine there is, and selecting a word by
+     * double-clicking very often takes the space after it with it - so doing
+     * this is the difference between the button working and the button
+     * appearing to do nothing.
+     */
+    const lead = /^\s*/.exec(s.text)[0];
+    const tail = /\s*$/.exec(s.text)[0];
+    const core = s.text.slice(lead.length, s.text.length - tail.length);
+    if (!core) {
+      replace(s.start, s.end, open + closeStr, open.length);
+      return;
+    }
+    const text = lead + open + core + closeStr + tail;
+    const from = s.start + lead.length + open.length;
+    replace(s.start, s.end, text, [from, from + core.length]);
+  }
+
+  function highlight(colour) {
+    const t = live();
+    if (!t) return;
+    const s = sel();
+    const prefix = colour && colour !== 'yellow' ? colour + ': ' : '';
+    // Already highlighted, in any colour? Strip it, or recolour it.
+    const wrapped = /^==(?:([a-z]+):\s*)?([\s\S]*)==$/.exec(s.text);
+    if (wrapped) {
+      const inner = wrapped[2];
+      const had = wrapped[1] || 'yellow';
+      if (had === (colour || 'yellow')) {
+        replace(s.start, s.end, inner, [s.start, s.start + inner.length]);
+      } else {
+        const text = '==' + prefix + inner + '==';
+        replace(s.start, s.end, text, [s.start, s.start + text.length]);
+      }
+      return;
+    }
+    const outer = t.value.slice(Math.max(0, s.start - 12), s.start);
+    const m = /==(?:[a-z]+:\s*)?$/.exec(outer);
+    if (m && t.value.slice(s.end, s.end + 2) === '==') {
+      const from = s.start - m[0].length;
+      if ((colour || 'yellow') === 'yellow' && m[0] === '==') {
+        replace(from, s.end + 2, s.text, [from, from + s.text.length]);
+      } else {
+        const text = '==' + prefix + s.text + '==';
+        replace(from, s.end + 2, text, [from, from + text.length]);
+      }
+      return;
+    }
+    toggleWrap('==' + prefix, '==');
+  }
+
+  /* ------------------------------------------------------------ block level */
+
+  function lineRange(from, to) {
+    const t = ta();
+    const v = t.value;
+    let start = v.lastIndexOf('\n', Math.max(0, from - 1)) + 1;
+    let end = v.indexOf('\n', to);
+    if (end === -1) end = v.length;
+    return { start: start, end: end, text: v.slice(start, end) };
+  }
+
+  const BLOCK_RE = /^(\s*)(#{1,6}\s+|[-*+]\s+\[[ xX/-]\]\s+|[-*+]\s+|\d{1,9}[.)]\s+|>\s?)?/;
+
+  /**
+   * Apply a block marker to every selected line. Applying the marker a line
+   * already has removes it, so the same button is on and off - and any OTHER
+   * block marker is replaced rather than stacked, because "## - [ ] # text" is
+   * what happens when a formatter only ever prepends.
+   */
+  function setBlock(marker, opts) {
+    const t = live();
+    if (!t) return;
+    const o = opts || {};
+    const s = sel();
+    const r = lineRange(s.start, s.end);
+    const lines = r.text.split('\n');
+    const numbered = marker === 'number';
+
+    const strip = function (line) {
+      const m = BLOCK_RE.exec(line);
+      return { indent: m[1] || '', had: m[2] || '', rest: line.slice((m[0] || '').length) };
+    };
+    const already = lines.every(function (line) {
+      if (!line.trim()) return true;
+      const p = strip(line);
+      if (numbered) return /^\d{1,9}[.)]\s+$/.test(p.had);
+      return p.had === marker;
+    });
+
+    let n = 0;
+    const out = lines.map(function (line) {
+      if (!line.trim() && lines.length > 1) return line;
+      const p = strip(line);
+      if (already) return p.indent + p.rest;
+      n++;
+      const m = numbered ? (n + '. ') : marker;
+      return p.indent + m + p.rest;
+    });
+    const text = out.join('\n');
+    replace(r.start, r.end, text, [r.start, r.start + text.length]);
+    if (o.quiet !== true && N.haptics) N.haptics.buzz('tap');
+  }
+
+  function clearFormatting() {
+    const t = live();
+    if (!t) return;
+    const s = sel();
+    if (!s.text) return;
+    const cleaned = s.text
+      .replace(/^(\s*)(#{1,6}\s+|[-*+]\s+\[[ xX/-]\]\s+|[-*+]\s+|\d{1,9}[.)]\s+|>\s?)/gm, '$1')
+      .replace(/==(?:[a-z]+:\s*)?([\s\S]*?)==/g, '$1')
+      .replace(/\*\*\*([\s\S]*?)\*\*\*/g, '$1')
+      .replace(/\*\*([\s\S]*?)\*\*/g, '$1')
+      .replace(/(^|[^\\*])\*([^*\n]+)\*/g, '$1$2')
+      .replace(/~~([\s\S]*?)~~/g, '$1')
+      .replace(/`([^`\n]+)`/g, '$1')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/!?\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g, function (_, a, b) { return b || a; });
+    replace(s.start, s.end, cleaned, [s.start, s.start + cleaned.length]);
+  }
+
+  async function makeLink() {
+    const t = live();
+    if (!t) return;
+    const s = sel();
+    let url = '';
+    try {
+      const clip = await readClip();
+      if (clip && /^(https?:\/\/|mailto:)\S+$/i.test(clip.trim())) url = clip.trim();
+    } catch (err) { /* no clipboard read permission - ask instead */ }
+    if (!url) {
+      url = await N.modal.prompt({
+        title: 'Link', message: 'Where should "' + (s.text || 'this').slice(0, 40) + '" point?',
+        placeholder: 'https://', confirmLabel: 'Add link',
+      });
+      if (!url) return;
+    }
+    const label = s.text || url;
+    const text = '[' + label + '](' + url.trim() + ')';
+    replace(s.start, s.end, text, [s.start + 1, s.start + 1 + label.length]);
+  }
+
+  /* ------------------------------------------------------------- line tools */
+
+  function selectedLines() {
+    const s = sel();
+    const r = lineRange(s.start, s.end);
+    return { s: s, r: r, lines: r.text.split('\n') };
+  }
+
+  function moveLines(dir) {
+    const t = live();
+    if (!t) return;
+    const v = t.value;
+    const { s, r } = selectedLines();
+    if (dir < 0) {
+      if (r.start === 0) return;
+      const prev = lineRange(r.start - 1, r.start - 1);
+      const text = r.text + '\n' + prev.text;
+      replace(prev.start, r.end, text,
+        [s.start - (prev.text.length + 1), s.end - (prev.text.length + 1)]);
+    } else {
+      if (r.end >= v.length) return;
+      const next = lineRange(r.end + 1, r.end + 1);
+      const text = next.text + '\n' + r.text;
+      replace(r.start, next.end, text,
+        [s.start + next.text.length + 1, s.end + next.text.length + 1]);
+    }
+  }
+
+  function duplicateLines() {
+    const t = live();
+    if (!t) return;
+    const { s, r } = selectedLines();
+    const text = r.text + '\n' + r.text;
+    const shift = r.text.length + 1;
+    replace(r.start, r.end, text, [s.start + shift, s.end + shift]);
+    N.toast.show('Duplicated.', { kind: 'info', ms: 1200, key: 'fmt' });
+  }
+
+  function deleteLines() {
+    const t = live();
+    if (!t) return;
+    const { r } = selectedLines();
+    const end = Math.min(t.value.length, r.end + 1);
+    replace(r.start, end, '', [r.start, r.start]);
+  }
+
+  function joinLines() {
+    const t = live();
+    if (!t) return;
+    const { s, r, lines } = selectedLines();
+    if (lines.length < 2) {
+      // Nothing selected: join this line with the next, like every editor does.
+      if (r.end >= t.value.length) return;
+      const next = lineRange(r.end + 1, r.end + 1);
+      const text = r.text.replace(/\s+$/, '') + ' ' + next.text.replace(/^\s+/, '');
+      replace(r.start, next.end, text, [r.start + text.length, r.start + text.length]);
+      return;
+    }
+    const text = lines.map(function (l, i) {
+      return i === 0 ? l.replace(/\s+$/, '') : l.trim();
+    }).filter(function (l, i) { return i === 0 || l; }).join(' ');
+    replace(r.start, r.end, text, [r.start, r.start + text.length]);
+  }
+
+  function rewriteLines(fn, label) {
+    const t = live();
+    if (!t) return;
+    const { r, lines } = selectedLines();
+    const out = fn(lines.slice());
+    const text = out.join('\n');
+    if (text === r.text) { N.toast.show('Nothing to change.', { kind: 'info', ms: 1600, key: 'fmt' }); return; }
+    replace(r.start, r.end, text, [r.start, r.start + text.length]);
+    if (label) N.toast.success(label, { ms: 1800, key: 'fmt' });
+  }
+
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+  function sortLines(desc) {
+    rewriteLines(function (lines) {
+      // Blank lines are kept at the bottom rather than sorted into the middle.
+      const body = lines.filter(function (l) { return l.trim(); });
+      const blanks = lines.length - body.length;
+      body.sort(function (a, b) { return collator.compare(a.trim(), b.trim()); });
+      if (desc) body.reverse();
+      for (let i = 0; i < blanks; i++) body.push('');
+      return body;
+    }, desc ? 'Sorted Z to A.' : 'Sorted A to Z.');
+  }
+
+  function dedupeLines() {
+    let removed = 0;
+    rewriteLines(function (lines) {
+      const seen = new Set();
+      const out = [];
+      lines.forEach(function (l) {
+        const key = l.trim();
+        if (!key) { out.push(l); return; }
+        if (seen.has(key)) { removed++; return; }
+        seen.add(key); out.push(l);
+      });
+      return out;
+    }, null);
+    if (removed) N.toast.success('Removed ' + U.pluralize(removed, 'duplicate line') + '.', { ms: 2200, key: 'fmt' });
+  }
+
+  function trimLines() {
+    rewriteLines(function (lines) {
+      return lines.map(function (l) { return l.replace(/[ \t]+$/, ''); });
+    }, 'Trailing spaces removed.');
+  }
+
+  /* ------------------------------------------------------------ case shifts */
+
+  const SMALL_WORDS = ['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'if', 'in', 'nor',
+    'of', 'on', 'or', 'per', 'the', 'to', 'v', 'via', 'vs'];
+
+  function titleCase(text) {
+    return text.replace(/[^\s]+/g, function (word, index) {
+      const lower = word.toLowerCase();
+      // An all-caps word is almost always an acronym; leave it be.
+      if (word.length > 1 && word === word.toUpperCase() && /[A-Z]/.test(word)) return word;
+      if (index !== 0 && SMALL_WORDS.indexOf(lower.replace(/[^a-z]/g, '')) !== -1) return lower;
+      return lower.replace(/[a-zà-ÿ]/, function (c) { return c.toUpperCase(); });
+    });
+  }
+
+  function sentenceCase(text) {
+    return text.toLowerCase().replace(/(^\s*|[.!?]\s+|\n\s*)([a-zà-ÿ])/g,
+      function (_, lead, c) { return lead + c.toUpperCase(); });
+  }
+
+  function transformCase(kind) {
+    const t = live();
+    if (!t) return;
+    const s = sel();
+    if (!s.text) { N.toast.show('Select some text first.', { kind: 'info', ms: 2000, key: 'fmt' }); return; }
+    const out = kind === 'upper' ? s.text.toUpperCase()
+      : kind === 'lower' ? s.text.toLowerCase()
+      : kind === 'title' ? titleCase(s.text)
+      : sentenceCase(s.text);
+    replace(s.start, s.end, out, [s.start, s.start + out.length]);
+  }
+
+  /* ---------------------------------------------------------- table aligner */
+
+  function isTableRow(line) { return /^\s*\|.*\|\s*$/.test(line); }
+  function splitRow(line) {
+    return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
+  }
+
+  /**
+   * Pad the pipes of the table the caret is in so the columns line up in the
+   * raw markdown. Alignment colons in the separator row are preserved and
+   * honoured, so ---: keeps its column right-aligned.
+   */
+  function formatTable() {
+    const t = live();
+    if (!t) return;
+    const v = t.value;
+    const s = sel();
+    const here = lineRange(s.start, s.start);
+    if (!isTableRow(here.text)) {
+      N.toast.show('Put the caret inside a markdown table first.', { kind: 'info', ms: 3000, key: 'fmt' });
+      return;
+    }
+    const all = v.split('\n');
+    let atLine = v.slice(0, here.start).split('\n').length - 1;
+    let top = atLine, bottom = atLine;
+    while (top > 0 && isTableRow(all[top - 1])) top--;
+    while (bottom < all.length - 1 && isTableRow(all[bottom + 1])) bottom++;
+
+    const rows = all.slice(top, bottom + 1).map(splitRow);
+    const sepIndex = rows.findIndex(function (r) {
+      return r.length && r.every(function (c) { return /^:?-{1,}:?$/.test(c); });
+    });
+    const align = sepIndex >= 0 ? rows[sepIndex].map(function (c) {
+      const l = c.charAt(0) === ':';
+      const r = c.charAt(c.length - 1) === ':';
+      return r && l ? 'centre' : r ? 'right' : l ? 'left' : '';
+    }) : [];
+
+    const cols = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
+    const widths = [];
+    for (let c = 0; c < cols; c++) {
+      /*
+       * The separator has to fit in the same width as the data, and an
+       * alignment colon takes one of those characters. A centred column needs
+       * :---: - five - and a one-sided one needs ---: - four. Getting this
+       * wrong is subtle: every data cell lines up and the dashed row alone
+       * sticks out, which looks like the aligner is broken.
+       */
+      const a = align[c] || '';
+      let w = a === 'centre' ? 5 : a ? 4 : 3;
+      rows.forEach(function (r, i) {
+        if (i === sepIndex) return;
+        w = Math.max(w, (r[c] || '').length);
+      });
+      widths.push(w);
+    }
+
+    const pad = function (text, width, how) {
+      const gap = width - text.length;
+      if (gap <= 0) return text;
+      if (how === 'right') return ' '.repeat(gap) + text;
+      if (how === 'centre') {
+        const left = Math.floor(gap / 2);
+        return ' '.repeat(left) + text + ' '.repeat(gap - left);
+      }
+      return text + ' '.repeat(gap);
+    };
+
+    const out = rows.map(function (r, i) {
+      const cells = [];
+      for (let c = 0; c < cols; c++) {
+        if (i === sepIndex) {
+          const a = align[c] || '';
+          const dashes = widths[c] - (a === 'centre' ? 2 : a ? 1 : 0);
+          const bar = '-'.repeat(Math.max(1, dashes));
+          cells.push(a === 'centre' ? ':' + bar + ':' : a === 'right' ? bar + ':' : a === 'left' ? ':' + bar : bar);
+        } else {
+          cells.push(pad(r[c] || '', widths[c], align[c]));
+        }
+      }
+      return '| ' + cells.join(' | ') + ' |';
+    }).join('\n');
+
+    const from = all.slice(0, top).join('\n').length + (top ? 1 : 0);
+    const to = from + all.slice(top, bottom + 1).join('\n').length;
+    replace(from, to, out, [from, from + out.length]);
+    N.toast.success('Table aligned.', { ms: 1800, key: 'fmt' });
+  }
+
+  /* -------------------------------------------------------------- the stats */
+
+  function stats() {
+    const s = sel();
+    if (!s) return null;
+    const text = s.text || (ta() ? ta().value : '');
+    const words = U.countWords(text);
+    return {
+      selection: !!s.text,
+      words: words,
+      chars: text.length,
+      lines: text ? text.split('\n').length : 0,
+      minutes: Math.max(1, Math.round(words / 220)),
+    };
+  }
+
+  /* ----------------------------------------------------------- send it away */
+
+  async function sendToTask() {
+    const s = sel();
+    if (!s || !s.text.trim()) return;
+    const line = s.text.trim().replace(/\s+/g, ' ').slice(0, 200);
+    const r = lineRange(s.start, s.end);
+    // Turned into a real markdown task in place: the tasks view reads notes,
+    // so this is the same thing as "add a task" without leaving the note.
+    const p = BLOCK_RE.exec(r.text);
+    const indent = (p && p[1]) || '';
+    const text = indent + '- [ ] ' + line;
+    replace(r.start, r.end, text, [r.start + text.length, r.start + text.length]);
+    N.toast.success('Added as a task.', { ms: 2400, key: 'fmt',
+      action: { label: 'Open tasks', onClick: function () { N.app.setView('tasks'); } } });
+  }
+
+  async function sendToSticky() {
+    const s = sel();
+    if (!s || !s.text.trim()) return;
+    try {
+      await N.store.saveRecord('stickies', {
+        text: s.text.trim(), color: 'yellow', stack: 'default',
+        createdAt: Date.now(),
+      });
+      N.toast.success('Pinned to your stickies.', { ms: 2600, key: 'fmt',
+        action: { label: 'Show', onClick: function () { N.app.setView('sticky'); } } });
+    } catch (err) {
+      N.toast.error('Could not make a sticky note.', { ms: 3000 });
+    }
+  }
+
+  /* ------------------------------------------------------------ smart paste */
+
+  /**
+   * Three things people expect from a paste in a markdown editor and almost
+   * never get. Anything else is left entirely alone - this listener runs in the
+   * capture phase and only claims the event in the cases it recognises, so the
+   * editor's own image-and-file paste handling is untouched.
+   */
+  function onPasteCapture(e) {
+    const t = live();
+    if (!t || e.target !== t) return;
+    if (!e.clipboardData) return;
+    if (e.clipboardData.files && e.clipboardData.files.length) return;   // images
+    const raw = e.clipboardData.getData('text/plain');
+    if (!raw) return;
+    const s = sel();
+    const trimmed = raw.trim();
+
+    // 1. a URL pasted over selected words becomes a link around them
+    if (s.text && /^(https?:\/\/|mailto:)[^\s]+$/i.test(trimmed) && !/\n/.test(trimmed)) {
+      e.preventDefault();
+      const text = '[' + s.text + '](' + trimmed + ')';
+      replace(s.start, s.end, text, [s.start + text.length, s.start + text.length]);
+      N.toast.show('Linked.', { kind: 'info', ms: 1600, key: 'fmt' });
+      return;
+    }
+
+    // 2. pasting into a list carries the list marker onto every line
+    if (/\n/.test(trimmed)) {
+      const hereLine = lineRange(s.start, s.start);
+      const m = /^(\s*)([-*+]\s+(?:\[[ xX/-]\]\s+)?|\d{1,9}[.)]\s+)$/.exec(hereLine.text.slice(0, s.start - hereLine.start));
+      if (m) {
+        e.preventDefault();
+        const marker = /\d/.test(m[2]) ? null : m[2];
+        let n = /\d/.test(m[2]) ? parseInt(m[2], 10) : 0;
+        const lines = trimmed.split(/\r?\n/).filter(function (l) { return l.trim(); });
+        const text = lines.map(function (l, i) {
+          const cleaned = l.replace(/^\s*(?:[-*+]|\d{1,9}[.)])\s+/, '').trim();
+          if (i === 0) return cleaned;
+          return m[1] + (marker || ((n + i) + '. ')) + cleaned;
+        }).join('\n');
+        replace(s.start, s.end, text);
+        return;
+      }
+    }
+
+    // 3. Windows line endings and non-breaking spaces, silently repaired
+    if (/\r| |​/.test(raw)) {
+      e.preventDefault();
+      const cleaned = raw.replace(/\r\n?/g, '\n').replace(/ /g, ' ').replace(/​/g, '');
+      replace(s.start, s.end, cleaned);
+    }
+  }
+
+  function pastePlain() {
+    readClip().then(function (text) {
+      if (!text) { N.toast.show('Nothing in the clipboard.', { kind: 'info', ms: 2000 }); return; }
+      const t = live();
+      if (!t) return;
+      const s = sel();
+      const cleaned = String(text)
+        .replace(/\r\n?/g, '\n')
+        .replace(/ /g, ' ')
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/\*\*([\s\S]*?)\*\*/g, '$1')
+        .replace(/(^|[^\\*])\*([^*\n]+)\*/g, '$1$2')
+        .replace(/`([^`\n]+)`/g, '$1')
+        .replace(/^\s*>\s?/gm, '')
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+      replace(s.start, s.end, cleaned);
+    });
+  }
+
+  /* --------------------------------------------------------- find & replace */
+
+  let fr = null;
+
+  function closeFind() {
+    if (!fr) return;
+    const node = fr.node;
+    fr = null;
+    node.classList.remove('is-in');
+    setTimeout(function () { if (node.parentNode) node.remove(); }, 180);
+    const t = ta();
+    if (t) t.focus();
+  }
+
+  function matchesFor(needle, opts) {
+    const t = ta();
+    if (!t || !needle) return [];
+    const flags = 'g' + (opts.matchCase ? '' : 'i');
+    let source = U.escapeRegExp ? U.escapeRegExp(needle) : needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (opts.wholeWord) source = '\\b' + source + '\\b';
+    let re;
+    try { re = new RegExp(source, flags); } catch (err) { return []; }
+    const out = [];
+    let m;
+    while ((m = re.exec(t.value)) !== null) {
+      out.push({ start: m.index, end: m.index + m[0].length });
+      if (m[0].length === 0) re.lastIndex++;
+      if (out.length > 5000) break;
+    }
+    return out;
+  }
+
+  function openFind() {
+    const t = live();
+    if (!t) { N.toast.show('Open a note first.', { kind: 'info', ms: 2200 }); return; }
+    if (fr) { fr.find.focus(); fr.find.select(); return; }
+
+    const pane = document.getElementById('split-editor') || t.parentNode;
+    const node = el('div.find-bar', { role: 'search', 'aria-label': 'Find and replace' });
+
+    const find = el('input.find-input', { type: 'text', placeholder: 'Find in this note', 'aria-label': 'Find' });
+    const repl = el('input.find-input', { type: 'text', placeholder: 'Replace with', 'aria-label': 'Replace with' });
+    const count = el('span.find-count', null, '');
+    const opts = { matchCase: false, wholeWord: false };
+    let list = [];
+    let at = -1;
+
+    const iconBtn = function (icon, label, fn) {
+      const b = el('button.find-btn', { type: 'button', title: label, 'aria-label': label });
+      b.appendChild(N.icons.node(icon, { size: 15 }));
+      b.addEventListener('click', function (e) { e.preventDefault(); fn(); });
+      return b;
+    };
+    const toggle = function (key, label, text) {
+      const b = el('button.find-toggle', { type: 'button', title: label, 'aria-label': label, 'aria-pressed': 'false' }, text);
+      b.addEventListener('click', function () {
+        opts[key] = !opts[key];
+        b.classList.toggle('is-on', opts[key]);
+        b.setAttribute('aria-pressed', opts[key] ? 'true' : 'false');
+        refresh(true);
+      });
+      return b;
+    };
+
+    const show = function (i) {
+      if (!list.length) return;
+      at = ((i % list.length) + list.length) % list.length;
+      const m = list[at];
+      t.focus();
+      t.setSelectionRange(m.start, m.end);
+      // Bring it into view: a textarea will not scroll to a programmatic
+      // selection on its own.
+      const before = t.value.slice(0, m.start).split('\n').length - 1;
+      const lineH = parseFloat(getComputedStyle(t).lineHeight) || 22;
+      const target = before * lineH - t.clientHeight / 2;
+      t.scrollTop = Math.max(0, target);
+      count.textContent = (at + 1) + ' of ' + list.length;
+    };
+
+    const refresh = function (keepAt) {
+      list = matchesFor(find.value, opts);
+      count.textContent = !find.value ? '' : list.length ? (list.length === 1 ? '1 match' : list.length + ' matches') : 'no matches';
+      node.classList.toggle('is-empty', !!find.value && !list.length);
+      if (!keepAt) at = -1;
+      if (list.length && !keepAt) show(0);
+    };
+
+    const replaceOne = function () {
+      if (!list.length) return;
+      if (at < 0) { show(0); return; }
+      const m = list[at];
+      replace(m.start, m.end, repl.value);
+      const keep = at;
+      setTimeout(function () { refresh(true); at = keep - 1; show(keep); }, 0);
+    };
+
+    const replaceAll = function () {
+      if (!list.length) return;
+      const n = list.length;
+      /*
+       * One pass, back to front, so every earlier offset stays valid - and one
+       * snapshot before it, so the whole thing is a single undo step in the
+       * note's own history as well as in the browser's.
+       */
+      const note = N.store.getNote(N.store.state.activeNoteId);
+      if (note && N.history && N.history.snapshot) {
+        try { N.history.snapshot(note, t.value, 'manual'); } catch (err) { /* not fatal */ }
+      }
+      let value = t.value;
+      for (let i = list.length - 1; i >= 0; i--) {
+        value = value.slice(0, list[i].start) + repl.value + value.slice(list[i].end);
+      }
+      replace(0, t.value.length, value, [0, 0]);
+      refresh();
+      N.toast.success('Replaced ' + U.pluralize(n, 'match') + '.', { ms: 2600, key: 'fmt' });
+    };
+
+    find.addEventListener('input', U.debounce(function () { refresh(); }, 130));
+    find.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? show(at - 1) : show(at + 1); }
+      if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+    });
+    repl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); e.metaKey || e.ctrlKey ? replaceAll() : replaceOne(); }
+      if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+    });
+
+    const row1 = el('div.find-row');
+    row1.appendChild(N.icons.node('search', { size: 15 }));
+    row1.appendChild(find);
+    row1.appendChild(count);
+    row1.appendChild(toggle('matchCase', 'Match case', 'Aa'));
+    row1.appendChild(toggle('wholeWord', 'Whole words only', 'ab|'));
+    row1.appendChild(iconBtn('chevron-up', 'Previous match (Shift+Enter)', function () { show(at - 1); }));
+    row1.appendChild(iconBtn('chevron-down', 'Next match (Enter)', function () { show(at + 1); }));
+    row1.appendChild(iconBtn('close', 'Close (Esc)', closeFind));
+
+    const row2 = el('div.find-row');
+    row2.appendChild(N.icons.node('edit', { size: 15 }));
+    row2.appendChild(repl);
+    const one = el('button.btn.btn-sm', { type: 'button' }, 'Replace');
+    one.addEventListener('click', replaceOne);
+    const all = el('button.btn.btn-sm.btn-primary', { type: 'button' }, 'Replace all');
+    all.addEventListener('click', replaceAll);
+    row2.appendChild(one);
+    row2.appendChild(all);
+
+    node.appendChild(row1);
+    node.appendChild(row2);
+    pane.appendChild(node);
+
+    /*
+     * Escape has to work from anywhere, not only from the two inputs. Press
+     * Replace all and focus is on a button, at which point a keydown bound to
+     * the fields never sees the key and the bar appears stuck open.
+     */
+    const onEsc = function (e) {
+      if (e.key !== 'Escape') return;
+      if (!fr) { document.removeEventListener('keydown', onEsc, true); return; }
+      e.preventDefault();
+      e.stopPropagation();
+      document.removeEventListener('keydown', onEsc, true);
+      closeFind();
+    };
+    document.addEventListener('keydown', onEsc, true);
+
+    fr = { node: node, find: find, repl: repl };
+
+    const s = sel();
+    if (s && s.text && s.text.length < 120 && !/\n/.test(s.text)) find.value = s.text;
+    requestAnimationFrame(function () {
+      node.classList.add('is-in');
+      find.focus(); find.select();
+      if (find.value) refresh();
+    });
+  }
+
+  /* ------------------------------------------------------------- commands */
+
+  function hasNote() { return !!(N.store && N.store.state.activeNoteId); }
+  function editing() { return hasNote() && !!live(); }
+
+  function registerCommands() {
+    if (!N.commands || !N.commands.registerMany) return;
+    const items = [
+      { id: 'format.bold', title: 'Bold', group: 'Format', icon: 'bold', accel: 'Mod+B',
+        when: editing, run: function () { toggleWrap('**'); } },
+      { id: 'format.italic', title: 'Italic', group: 'Format', icon: 'italic', accel: 'Mod+I',
+        when: editing, run: function () { toggleWrap('*'); } },
+      { id: 'format.strike', title: 'Strikethrough', group: 'Format', icon: 'strikethrough',
+        accel: 'Mod+Shift+X', when: editing, run: function () { toggleWrap('~~'); } },
+      { id: 'format.code', title: 'Inline code', group: 'Format', icon: 'code',
+        accel: 'Mod+E', when: editing, run: function () { toggleWrap('`'); } },
+      { id: 'format.highlight', title: 'Highlight', group: 'Format', icon: 'highlight',
+        accel: 'Mod+Shift+H', when: editing, run: function () { highlight('yellow'); } },
+      { id: 'format.link', title: 'Add a link', group: 'Format', icon: 'link',
+        accel: 'Mod+K', when: editing, run: makeLink },
+      { id: 'format.clear', title: 'Clear formatting', group: 'Format', icon: 'eraser',
+        accel: 'Mod+Shift+C', when: editing, run: clearFormatting },
+
+      { id: 'format.h1', title: 'Heading 1', group: 'Format', icon: 'heading-1',
+        accel: 'Mod+Alt+1', when: editing, run: function () { setBlock('# '); } },
+      { id: 'format.h2', title: 'Heading 2', group: 'Format', icon: 'heading-2',
+        accel: 'Mod+Alt+2', when: editing, run: function () { setBlock('## '); } },
+      { id: 'format.h3', title: 'Heading 3', group: 'Format', icon: 'heading-3',
+        accel: 'Mod+Alt+3', when: editing, run: function () { setBlock('### '); } },
+      { id: 'format.bullets', title: 'Bulleted list', group: 'Format', icon: 'list',
+        accel: 'Mod+Shift+8', when: editing, run: function () { setBlock('- '); } },
+      { id: 'format.numbers', title: 'Numbered list', group: 'Format', icon: 'list-ordered',
+        accel: 'Mod+Shift+7', when: editing, run: function () { setBlock('number'); } },
+      { id: 'format.tasks', title: 'Task list', group: 'Format', icon: 'list-check',
+        accel: 'Mod+Shift+9', when: editing, run: function () { setBlock('- [ ] '); } },
+      { id: 'format.quote', title: 'Quote', group: 'Format', icon: 'quote',
+        accel: 'Mod+Shift+.', when: editing, run: function () { setBlock('> '); } },
+
+      { id: 'format.find', title: 'Find and replace in this note', group: 'Edit', icon: 'search',
+        accel: 'Mod+H', when: hasNote, run: openFind },
+      { id: 'format.moveUp', title: 'Move line up', group: 'Edit', icon: 'chevron-up',
+        accel: 'Alt+ArrowUp', when: editing, run: function () { moveLines(-1); } },
+      { id: 'format.moveDown', title: 'Move line down', group: 'Edit', icon: 'chevron-down',
+        accel: 'Alt+ArrowDown', when: editing, run: function () { moveLines(1); } },
+      { id: 'format.duplicate', title: 'Duplicate line or selection', group: 'Edit', icon: 'copy',
+        accel: 'Mod+Shift+D', when: editing, run: duplicateLines },
+      { id: 'format.deleteLine', title: 'Delete line', group: 'Edit', icon: 'trash',
+        accel: 'Mod+Shift+K', when: editing, run: deleteLines },
+      { id: 'format.join', title: 'Join lines', group: 'Edit', icon: 'corner-down-left',
+        accel: 'Mod+J', when: editing, run: joinLines },
+      { id: 'format.sort', title: 'Sort selected lines A to Z', group: 'Edit', icon: 'sort',
+        when: editing, run: function () { sortLines(false); } },
+      { id: 'format.sortDesc', title: 'Sort selected lines Z to A', group: 'Edit', icon: 'sort',
+        when: editing, run: function () { sortLines(true); } },
+      { id: 'format.dedupe', title: 'Remove duplicate lines', group: 'Edit', icon: 'filter',
+        when: editing, run: dedupeLines },
+      { id: 'format.trim', title: 'Remove trailing spaces', group: 'Edit', icon: 'eraser',
+        when: editing, run: trimLines },
+      { id: 'format.table', title: 'Tidy up this table', group: 'Edit', icon: 'table',
+        accel: 'Mod+Alt+T', when: editing, run: formatTable },
+      { id: 'format.pastePlain', title: 'Paste without formatting', group: 'Edit', icon: 'paste',
+        accel: 'Mod+Shift+V', when: editing, run: pastePlain },
+
+      { id: 'format.upper', title: 'UPPERCASE', group: 'Format', icon: 'type', when: editing,
+        run: function () { transformCase('upper'); } },
+      { id: 'format.lower', title: 'lowercase', group: 'Format', icon: 'type', when: editing,
+        run: function () { transformCase('lower'); } },
+      { id: 'format.title', title: 'Title Case', group: 'Format', icon: 'type', when: editing,
+        run: function () { transformCase('title'); } },
+      { id: 'format.sentence', title: 'Sentence case', group: 'Format', icon: 'type', when: editing,
+        run: function () { transformCase('sentence'); } },
+    ];
+    HIGHLIGHTS.forEach(function (h) {
+      items.push({ id: 'format.highlight.' + h.id, title: 'Highlight - ' + h.label,
+        group: 'Format', icon: 'highlight', when: editing,
+        run: function () { highlight(h.id); } });
+    });
+    N.commands.registerMany(items);
+  }
+
+  function init() {
+    document.addEventListener('paste', onPasteCapture, true);
+    registerCommands();
+    N.bus.on('note:active', function () { if (fr) closeFind(); });
+  }
+
+  N.format = {
+    init: init, HIGHLIGHTS: HIGHLIGHTS,
+    toggleWrap: toggleWrap, setBlock: setBlock, highlight: highlight,
+    clearFormatting: clearFormatting, makeLink: makeLink,
+    moveLines: moveLines, duplicateLines: duplicateLines, deleteLines: deleteLines,
+    joinLines: joinLines, sortLines: sortLines, dedupeLines: dedupeLines, trimLines: trimLines,
+    transformCase: transformCase, titleCase: titleCase, sentenceCase: sentenceCase,
+    formatTable: formatTable, stats: stats, replace: replace, selection: sel,
+    sendToTask: sendToTask, sendToSticky: sendToSticky,
+    openFind: openFind, closeFind: closeFind, matchesFor: matchesFor,
+    pastePlain: pastePlain, isOpenFind: function () { return !!fr; },
+  };
+})(window.NODALIS = window.NODALIS || {});
+
+/* ===== js/features/reading.js ===== */
+/* =========================================================================
+ * Nodalis - features/reading.js   (v9.1)
+ *
+ * Three small things that change how a long note feels to work in:
+ *
+ *   PROGRESS      a hairline at the top of the editor showing how far through
+ *                 the note you are. Only for notes long enough to scroll, so
+ *                 it never appears as decoration on a four-line note.
+ *   STICKY HEAD   the heading you are currently under, pinned above the text
+ *                 while you scroll past it. In a 3,000-word note the single
+ *                 most common question is "which section am I in".
+ *   TAG COLOURS   a colour per tag, chosen once, shown everywhere that tag
+ *                 appears. Stored in settings, so it travels to your folder
+ *                 and your repository like every other preference.
+ * ========================================================================= */
+(function (N) {
+  'use strict';
+
+  const U = N && N.util;
+  if (!U || typeof U.el !== 'function') return;
+  const el = U.el;
+
+  const TAG_COLOURS = ['grey', 'red', 'amber', 'green', 'teal', 'blue', 'violet', 'pink'];
+
+  /* ---------------------------------------------------------- the progress */
+
+  let bar = null;
+  let head = null;
+
+  function editorPane() { return document.getElementById('split-editor'); }
+  function textarea() { return (N.editor && N.editor.getTextarea && N.editor.getTextarea()) || null; }
+  function previewPane() { return document.getElementById('split-preview'); }
+
+  function ensureChrome() {
+    const pane = editorPane();
+    if (!pane) return false;
+    if (!bar || !bar.parentNode) {
+      bar = el('div.read-progress', { 'aria-hidden': 'true' });
+      bar.appendChild(el('span.read-progress-fill'));
+      pane.appendChild(bar);
+    }
+    if (!head || !head.parentNode) {
+      head = el('div.sticky-head', { 'aria-hidden': 'true' });
+      pane.appendChild(head);
+    }
+    return true;
+  }
+
+  /* The scroller that is actually carrying the reading position right now. */
+  function activeScroller() {
+    const mode = N.editor && N.editor.getMode ? N.editor.getMode() : 'split';
+    if (mode === 'preview') return previewPane();
+    return textarea();
+  }
+
+  function update() {
+    if (!ensureChrome()) return;
+    const sc = activeScroller();
+    if (!sc) return;
+    const max = sc.scrollHeight - sc.clientHeight;
+
+    /*
+     * 240px of slack before either appears. Under that the note fits on a
+     * screen and a half, there is nothing to lose your place in, and a
+     * progress bar on it reads as an app showing off.
+     */
+    if (max < 240) {
+      bar.classList.remove('is-on');
+      head.classList.remove('is-on');
+      return;
+    }
+    const ratio = Math.max(0, Math.min(1, sc.scrollTop / max));
+    bar.classList.add('is-on');
+    bar.firstChild.style.transform = 'scaleX(' + ratio.toFixed(4) + ')';
+    updateHeading(sc);
+  }
+
+  function updateHeading(sc) {
+    const ta = textarea();
+    if (!ta || !head) return;
+    const mode = N.editor && N.editor.getMode ? N.editor.getMode() : 'split';
+    if (mode === 'preview') { head.classList.remove('is-on'); return; }
+
+    const lineH = parseFloat(getComputedStyle(ta).lineHeight) || 22;
+    const padTop = parseFloat(getComputedStyle(ta).paddingTop) || 0;
+    const firstVisible = Math.max(0, Math.floor((sc.scrollTop - padTop) / lineH));
+    if (firstVisible <= 0) { head.classList.remove('is-on'); return; }
+
+    const lines = ta.value.split('\n');
+    let found = null;
+    let fenced = false;
+    for (let i = 0; i < Math.min(firstVisible + 1, lines.length); i++) {
+      if (/^\s*```/.test(lines[i])) { fenced = !fenced; continue; }
+      if (fenced) continue;
+      const m = /^(#{1,6})\s+(.+)$/.exec(lines[i]);
+      // The heading on the first visible line is not "above" you yet.
+      if (m && i < firstVisible) found = { level: m[1].length, text: m[2].trim() };
+    }
+    if (!found) { head.classList.remove('is-on'); return; }
+    const label = found.text.replace(/[*_`~]/g, '').slice(0, 90);
+    if (head.dataset.text !== label) {
+      head.dataset.text = label;
+      head.textContent = '';
+      head.appendChild(el('span.sticky-head-level', null, '#'.repeat(found.level)));
+      head.appendChild(el('span.sticky-head-text', null, label));
+    }
+    head.classList.add('is-on');
+  }
+
+  const throttled = U.throttle(update, 60);
+
+  /* ------------------------------------------------------------ tag colours */
+
+  function colours() {
+    return (N.store.state.settings.tagColours) || {};
+  }
+
+  function colourFor(tag) {
+    const key = String(tag || '').replace(/^#/, '').toLowerCase();
+    return colours()[key] || '';
+  }
+
+  async function setColour(tag, colour) {
+    const key = String(tag || '').replace(/^#/, '').toLowerCase();
+    const next = Object.assign({}, colours());
+    if (!colour || colour === 'none') delete next[key];
+    else next[key] = colour;
+    await N.store.saveSettings({ tagColours: next });
+    paintTags();
+    if (N.sidebar && N.sidebar.render) N.sidebar.render();
+  }
+
+  function pickColour(tag) {
+    const key = String(tag || '').replace(/^#/, '');
+    N.menu.show(
+      [{ header: '#' + key }].concat(TAG_COLOURS.map(function (c) {
+        return {
+          label: c.charAt(0).toUpperCase() + c.slice(1),
+          icon: 'droplet',
+          checked: colourFor(key) === c,
+          onClick: function () { setColour(key, c); },
+        };
+      })).concat([
+        { separator: true },
+        { label: 'No colour', icon: 'close', onClick: function () { setColour(key, null); } },
+      ]),
+      { title: 'Colour for #' + key, allowSheet: true }
+    );
+  }
+
+  /**
+   * Paint every tag chip on screen. Done by attribute rather than inline style
+   * so the palette stays in CSS and therefore stays theme-aware - a colour that
+   * reads well on paper is unreadable on the Nothing theme's black.
+   */
+  function paintTags(root) {
+    const map = colours();
+    const scope = root || document;
+    scope.querySelectorAll('[data-tag]').forEach(function (node) {
+      const key = String(node.dataset.tag || node.textContent || '').replace(/^#/, '').toLowerCase();
+      const c = map[key];
+      if (c) node.setAttribute('data-tag-colour', c);
+      else node.removeAttribute('data-tag-colour');
+    });
+  }
+
+  const paintSoon = U.debounce(function () { paintTags(); }, 60);
+
+  /* ------------------------------------------------------------------ init */
+
+  function init() {
+    ensureChrome();
+
+    const ta = textarea();
+    if (ta) {
+      ta.addEventListener('scroll', throttled, { passive: true });
+      ta.addEventListener('input', throttled);
+    }
+    const pv = previewPane();
+    if (pv) pv.addEventListener('scroll', throttled, { passive: true });
+
+    N.bus.on('note:active', function () { setTimeout(update, 60); paintSoon(); });
+    N.bus.on('preview:rendered', paintSoon);
+    N.bus.on('vault:changed', paintSoon);
+    N.bus.on('settings:changed', function () { paintSoon(); setTimeout(update, 30); });
+    window.addEventListener('resize', throttled);
+
+    // The preview is re-rendered constantly; catch new chips as they arrive.
+    const preview = N.editor && N.editor.getPreview && N.editor.getPreview();
+    if (preview && window.MutationObserver) {
+      new MutationObserver(paintSoon).observe(preview, { childList: true, subtree: true });
+    }
+
+    if (N.commands && N.commands.registerMany) {
+      N.commands.registerMany([
+        { id: 'tag.colour', title: 'Give a tag a colour', group: 'Organise', icon: 'droplet',
+          run: async function () {
+            const tags = N.store.allTags().map(function (t) { return t.tag; });
+            if (!tags.length) { N.toast.show('No tags yet.', { kind: 'info', ms: 2200 }); return; }
+            N.menu.show(tags.slice(0, 40).map(function (t) {
+              return { label: '#' + t, icon: 'tag', onClick: function () { pickColour(t); } };
+            }), { title: 'Which tag?', allowSheet: true });
+          } },
+      ]);
+    }
+    setTimeout(update, 200);
+    setTimeout(paintTags, 400);
+  }
+
+  N.reading = {
+    init: init, update: update, paintTags: paintTags,
+    colourFor: colourFor, setColour: setColour, pickColour: pickColour,
+    TAG_COLOURS: TAG_COLOURS,
+  };
+})(window.NODALIS = window.NODALIS || {});
+
 /* ===== js/app.js ===== */
 /* =========================================================================
  * Nodalis — app.js
@@ -40410,7 +42225,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       ['ocr', N.ocr], ['exporter', N.exporter], ['settings', N.settings], ['help', N.help],
       ['history', N.history], ['writing', N.writing], ['github', N.github], ['capture', N.capture],
       ['related', N.related], ['intel', N.intel], ['intelExtra', N.intelExtra],
-      ['remind', N.remind], ['selectionBar', N.selectionBar], ['calendar', N.calendar],
+      ['remind', N.remind], ['calendar', N.calendar],
+      /* v9.1: format before selectionBar - the bar is a view onto it. */
+      ['format', N.format], ['reading', N.reading], ['selectionBar', N.selectionBar],
       // titles before trash and templates: both ask it to preview a name.
       ['linkcare', N.linkcare], ['titles', N.titles], ['trash', N.trash],
       ['templates', N.templates], ['health', N.health],
