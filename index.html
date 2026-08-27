@@ -7855,6 +7855,156 @@ body:has(.guest-sheet) .pwa-prompt {
   transform: translateY(14px) scale(0.98);
 }
 
+/* =========================================================================
+ * v9.2 — a find bar you can read, a toolbar nothing falls off, a tray that
+ * stays on screen, and a highlighter that takes any colour.
+ * ========================================================================= */
+
+/* --------------------------------------------------- find and replace ---
+ * Rewritten around one rule: when the bar runs out of room the BUTTONS wrap
+ * and the field you are typing into keeps its width. Every row can wrap; the
+ * inputs carry a real flex-basis and a real min-width, so they can no longer
+ * be squeezed to 18 pixels by the things around them.
+ */
+.find-bar {
+  position: absolute;
+  top: 10px; right: 14px; left: auto;
+  z-index: 60;
+  width: min(560px, calc(100% - 28px));
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 9px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md, 10px);
+  box-shadow: var(--shadow-lg, 0 12px 34px -14px rgba(0,0,0,.5));
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-spring);
+}
+.find-bar.is-in { opacity: 1; transform: translateY(0); }
+.find-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 6px; }
+.find-row > .icon { color: var(--text-3); flex: none; }
+.find-input {
+  flex: 1 1 170px;
+  min-width: 130px;
+  height: 32px; padding: 0 9px;
+  border: 1px solid var(--border); border-radius: var(--r-sm, 6px);
+  background: var(--bg-0); color: var(--text-0);
+  font-size: var(--text-sm); font-family: inherit;
+}
+.find-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.find-count {
+  flex: 0 0 auto; min-width: 62px; text-align: right;
+  font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums;
+}
+.find-tools { justify-content: flex-start; gap: 8px; }
+.find-nav { display: flex; gap: 2px; margin-left: auto; }
+.find-x { margin-left: 2px; }
+.find-bar.is-empty .find-count { color: var(--accent); }
+.find-bar.is-empty .find-input:first-of-type { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+.find-row .btn-sm { flex: 0 0 auto; }
+@media (max-width: 640px) {
+  .find-bar { left: 12px; right: 12px; width: auto; top: 8px; }
+  .find-input { height: 38px; flex-basis: 100%; }
+  .find-btn { width: 36px; height: 36px; }
+  .find-toggle { height: 32px; }
+  .find-row .btn-sm { flex: 1 1 auto; }
+}
+
+/* ------------------------------------------- the adaptive formatting bar */
+.sel-bar { max-width: calc(100vw - 16px); }
+.sel-scroll {
+  display: flex; align-items: center; gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: min(620px, calc(100vw - 190px));
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.sel-scroll::-webkit-scrollbar { display: none; }
+.sel-group { display: flex; align-items: center; gap: 2px; flex: none; }
+.sel-group + .sel-group::before {
+  content: ''; width: 1px; height: 20px; margin: 0 4px 0 2px;
+  background: var(--border); display: inline-block; vertical-align: middle;
+}
+/* The tail can never scroll away: it is how you reach everything else. */
+.sel-tail {
+  display: flex; align-items: center; gap: 2px;
+  flex: none;
+  padding-left: 4px;
+  margin-left: 2px;
+  border-left: 1px solid var(--border);
+}
+.sel-bar.has-overflow .sel-btn.is-more { color: var(--accent); }
+
+/* ------------------------------------------------------------ the tray --- */
+.sel-tray {
+  position: fixed;
+  z-index: var(--z-tooltip, 951);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md, 10px);
+  box-shadow: var(--shadow-lg, 0 10px 30px -12px rgba(0,0,0,.45));
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  opacity: 0; transform: translateY(-4px) scale(0.97);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-spring);
+}
+.sel-tray.is-in { opacity: 1; transform: translateY(0) scale(1); }
+.sel-tray-colours { display: flex; flex-direction: column; gap: 6px; min-width: 214px; }
+.sel-swatch-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.sel-tray-foot { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
+.sel-tray-menu { display: flex; flex-direction: column; min-width: 224px; }
+.sel-row.is-danger { color: var(--danger, #e5484d); }
+.sel-row.is-danger .icon { color: currentColor; }
+.sel-swatch.is-custom { background: color-mix(in srgb, var(--hl-custom) 70%, transparent); }
+
+/* ------------------------------------------- the highlight colour picker */
+.hl-pick-row { display: flex; gap: 10px; align-items: center; }
+.hl-pick-colour {
+  flex: none; width: 52px; height: 40px; padding: 2px;
+  border: 1px solid var(--border); border-radius: var(--r-sm, 6px);
+  background: var(--bg-0); cursor: pointer;
+}
+.hl-pick-hex { flex: 1 1 auto; min-width: 0; font-family: var(--font-code); }
+.hl-pick-hex.is-bad { border-color: var(--danger, #e5484d); }
+.hl-pick-preview {
+  margin-top: 14px; padding: 16px;
+  border: 1px solid var(--border); border-radius: var(--r-sm, 6px);
+  background: var(--bg-editor, var(--bg-0));
+  text-align: center;
+}
+.hl-pick-sample {
+  background: color-mix(in srgb, var(--hl-custom, var(--hl-yellow)) 42%, transparent);
+  color: inherit; padding: 0.1em 0.3em; border-radius: 3px;
+}
+[data-mode='dark'] .hl-pick-sample { background: color-mix(in srgb, var(--hl-custom, var(--hl-yellow)) 30%, transparent); }
+.hl-pick-saved { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.hl-pick-swatch {
+  width: 28px; height: 28px; border-radius: var(--r-sm, 6px);
+  border: 1px solid var(--border); cursor: pointer;
+  background: color-mix(in srgb, var(--hl-custom) 70%, transparent);
+  transition: transform 120ms var(--ease-spring);
+}
+.hl-pick-swatch:hover { transform: scale(1.12); }
+
+/* A custom highlight in the note itself. The hex arrives as a validated
+   custom property, never as a whole declaration - see markdown.js. */
+.prose mark[data-hl='custom'],
+.guest-body mark[data-hl='custom'] {
+  background: color-mix(in srgb, var(--hl-custom, var(--hl-yellow)) 42%, transparent);
+}
+[data-mode='dark'] .prose mark[data-hl='custom'],
+[data-mode='dark'] .guest-body mark[data-hl='custom'] {
+  background: color-mix(in srgb, var(--hl-custom, var(--hl-yellow)) 30%, transparent);
+}
+
+/* -------------------------------------------------- reset, in settings -- */
+.reset-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.reset-row .btn { flex: 0 1 auto; }
+
 </style>
 </head>
 
@@ -8332,9 +8482,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 (function (N) {
   'use strict';
 
-  N.version = '9.1.0';
-  N.versionName = 'v9.1';
-  N.built = '2026-08-27';
+  N.version = '9.2.0';
+  N.versionName = 'v9.2';
+  N.built = '2026-08-28';
 
   /** "v8.0.0" - what goes on screen. */
   N.versionLabel = function () { return 'v' + N.version; };
@@ -16661,9 +16811,27 @@ https://github.com/nodeca/pako/blob/main/LICENSE
      * highlight that happens to start "TODO: " is not mistaken for a colour.
      */
     src = src.replace(/==(?=\S)([\s\S]*?\S)==/g, function (whole, inner) {
-      const m = /^([a-z]{3,7}):[ \t]*([\s\S]+)$/.exec(inner);
-      if (m && ['yellow', 'green', 'blue', 'pink', 'purple'].indexOf(m[1]) !== -1) {
-        return '<mark data-hl="' + m[1] + '">' + m[2] + '</mark>';
+      const m = /^(#?[A-Za-z0-9]{3,8}):[ \t]*([\s\S]+)$/.exec(inner);
+      if (m) {
+        const token = m[1].toLowerCase();
+        if (['yellow', 'green', 'blue', 'pink', 'purple'].indexOf(token) !== -1) {
+          return '<mark data-hl="' + token + '">' + m[2] + '</mark>';
+        }
+        /*
+         * v9.2: ==#ff8800: text==, a colour of the writer's own.
+         *
+         * This string is about to end up inside a style attribute, so it is
+         * validated a second time here - format.js validated it on the way in,
+         * but a note is a file and a file can be edited by anything. The test
+         * is a strict hex and nothing else, and what it produces is a single
+         * CUSTOM PROPERTY, never a whole declaration: --hl-custom:#ff8800.
+         * Even if something slipped past the pattern it could not close the
+         * property and open a new one, and the stylesheet decides what that
+         * property is allowed to affect.
+         */
+        if (/^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/.test(token)) {
+          return '<mark data-hl="custom" style="--hl-custom:' + token + '">' + m[2] + '</mark>';
+        }
       }
       return '<mark>' + inner + '</mark>';
     });
@@ -17982,6 +18150,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       { label: 'Copy link', icon: 'link', onClick: function () { U.copyToClipboard('[[' + N.store.noteTitle(note) + ']]'); N.toast.success('Link copied', { ms: 1400 }); } },
       { label: 'Share…', icon: 'share', onClick: function () { if (N.share) N.share.open(note); } },
       { label: 'Export…', icon: 'download', onClick: function () { N.exporter.exportNoteDialog(note.id); } },
+      { label: 'Remove every highlight', icon: 'highlight',
+        onClick: function () { if (N.format) N.format.clearHighlights(); } },
+      { label: 'Reset all formatting…', icon: 'eraser',
+        onClick: function () { if (N.format) N.format.resetNoteFormatting(); } },
+      { separator: true },
       { label: 'Choose an icon…', icon: note.icon || 'star', onClick: function () { if (N.notemeta) N.notemeta.pickIcon(note); } },
       { label: 'Choose a colour…', icon: 'palette', onClick: function () { if (N.notemeta) N.notemeta.pickColour(note); } },
       { separator: true },
@@ -23932,9 +24105,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     installViewport();
 
     const saved = N.store.state.settings.stickyView;
-    if (saved && typeof saved.k === 'number') {
-      view.x = saved.x; view.y = saved.y;
-      view.k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, saved.k));
+    /* v9.2: isFinite, not typeof - NaN is a number, and NaN is what got saved. */
+    if (saved && isFinite(Number(saved.k)) && isFinite(Number(saved.x)) && isFinite(Number(saved.y))) {
+      view.x = Number(saved.x); view.y = Number(saved.y);
+      view.k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(saved.k)));
       applyView();
     } else {
       // First look at the wall: frame it rather than dropping the user at 0,0.
@@ -23943,7 +24117,35 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     paintSelection();
   }
 
+  /*
+   * v9.2: self-healing, for the records v9.1 already wrote.
+   *
+   * Telling people "it is fixed, but the sticky you already made stays broken"
+   * is not fixing it. Anything missing a position, a size or a kind is given
+   * one the first time the wall draws it, and the repair is saved so it only
+   * ever happens once.
+   */
+  function repairSticky(sticky) {
+    let changed = false;
+    if (!isFinite(Number(sticky.x)) || !isFinite(Number(sticky.y))) {
+      const spot = nextSpot(all().filter(function (s) { return s.id !== sticky.id; }));
+      sticky.x = spot.x; sticky.y = spot.y; changed = true;
+    }
+    if (!isFinite(Number(sticky.w)) || Number(sticky.w) <= 0) { sticky.w = 200; changed = true; }
+    if (!isFinite(Number(sticky.h)) || Number(sticky.h) <= 0) { sticky.h = 200; changed = true; }
+    if (!sticky.kind) { sticky.kind = 'text'; changed = true; }
+    if (!/^#[0-9a-fA-F]{3,8}$/.test(String(sticky.color || ''))) {
+      sticky.color = COLORS[0].hex; changed = true;
+    }
+    if (!isFinite(Number(sticky.rotation))) { sticky.rotation = 0; changed = true; }
+    if (changed) {
+      N.store.saveRecord('stickies', sticky).catch(function () { /* best effort */ });
+    }
+    return sticky;
+  }
+
   function buildSticky(sticky) {
+    repairSticky(sticky);
     const members = sticky.stack ? stackMembers(sticky.stack) : [];
     const node = el('div.sticky-note' + (members.length > 1 ? '.is-stack' : ''), {
       dataset: { sticky: sticky.id },
@@ -24139,8 +24341,36 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /* ------------------------------------------------------ pan and zoom */
 
+  /*
+   * v9.2: THE "NaN%" IN THE CORNER OF THE WALL.
+   *
+   * A sticky created without coordinates - which v9.1's "pin the selection as
+   * a sticky note" did, by writing straight into the store instead of going
+   * through createSticky - has x and y of undefined. fit() then computed the
+   * bounds of the wall from those, every arithmetic step produced NaN, and
+   * view.k became NaN. The transform silently did nothing and the zoom label
+   * read "NaN%".
+   *
+   * The cause is fixed at the source, but this is the wrong place to trust
+   * anyone: a single bad record must never be able to take the whole board
+   * down. The view is now checked before it is used, and repairView() puts it
+   * back to something sane if it ever is not.
+   */
+  function sane(n, fallback) {
+    const v = Number(n);
+    return isFinite(v) ? v : fallback;
+  }
+
+  function repairView() {
+    view.x = sane(view.x, 0);
+    view.y = sane(view.y, 0);
+    const k = sane(view.k, 1);
+    view.k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, k || 1));
+  }
+
   function applyView() {
     if (!board) return;
+    repairView();
     board.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.k + ')';
     const label = document.getElementById('sticky-zoom-level');
     if (label) label.textContent = Math.round(view.k * 100) + '%';
@@ -24168,13 +24398,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /** Frame everything on the wall, with a little breathing room. */
   function fit() {
-    const list = visible();
-    if (!list.length || !wall) return;
+    const list = visible().filter(function (s) { return isFinite(Number(s.x)) && isFinite(Number(s.y)); });
+    if (!list.length || !wall) { repairView(); applyView(); return; }
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     list.forEach(function (s) {
-      minX = Math.min(minX, s.x); minY = Math.min(minY, s.y);
-      maxX = Math.max(maxX, s.x + (s.w || 200)); maxY = Math.max(maxY, s.y + (s.h || 200));
+      const x = sane(s.x, 0), y = sane(s.y, 0);
+      minX = Math.min(minX, x); minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + sane(s.w, 200)); maxY = Math.max(maxY, y + sane(s.h, 200));
     });
+    if (![minX, minY, maxX, maxY].every(isFinite)) { repairView(); applyView(); return; }
     const pad = 48;
     const r = wall.getBoundingClientRect();
     const w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY);
@@ -24188,6 +24420,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   const persistView = U.debounce(function () {
+    repairView();     /* v9.2: never store a view that cannot be restored */
     try { N.store.setSetting('stickyView', { x: view.x, y: view.y, k: view.k }); } catch (err) { /* not critical */ }
   }, 700);
 
@@ -25729,6 +25962,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       'mark[data-hl=blue]{background:' + (dark ? 'rgba(70,180,255,.28)' : 'rgba(70,180,255,.40)') + '}',
       'mark[data-hl=pink]{background:' + (dark ? 'rgba(255,119,176,.28)' : 'rgba(255,119,176,.40)') + '}',
       'mark[data-hl=purple]{background:' + (dark ? 'rgba(169,125,255,.28)' : 'rgba(169,125,255,.40)') + '}',
+      /* v9.2: a colour of your own survives the export as well. */
+      'mark[data-hl=custom]{background:color-mix(in srgb,var(--hl-custom,#ffd23d) ' + (dark ? '30' : '42') + '%,transparent)}',
       'table{border-collapse:collapse;width:100%}th,td{border:1px solid ' + (dark ? '#2b2b3a' : '#e8e4da') + ';padding:8px 12px;text-align:left}',
       'th{background:' + (dark ? '#1c1c27' : '#faf6ed') + '}',
       'img{max-width:100%;border-radius:8px}',
@@ -27631,23 +27866,98 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     });
     wrap.appendChild(stats);
 
-    const danger = section('Danger zone', 'These cannot be undone.');
-    const resetSettings = el('button.btn.btn-danger', { type: 'button' }, 'Reset all settings');
-    resetSettings.addEventListener('click', async function () {
-      const ok = await N.modal.confirm({
-        title: 'Reset every setting?',
-        message: 'Theme, fonts, shortcuts and preferences go back to defaults. Your notes are not touched.',
-        confirmLabel: 'Reset settings', danger: true,
-      });
-      if (!ok) return;
-      N.store.state.settings = U.deepClone(N.store.DEFAULT_SETTINGS);
+    /* v9.2: resetting settings CAN be undone now; deleting everything cannot. */
+    const danger = section('Danger zone', 'Read these twice.');
+    /* ===================================================================== *
+     * v9.2: RESET, WITHOUT THROWING AWAY THINGS YOU CANNOT GET BACK.
+     *
+     * The old reset replaced the whole settings object with the defaults. The
+     * copy said "your notes are not touched", which was true, and did not
+     * mention that it also deleted your GitHub token, the repository address,
+     * the sync bookkeeping, and the passwords for every encrypted share link -
+     * none of which are preferences, and the token is not recoverable. It was
+     * in the danger zone, so nobody would call it a bug; it was still wrong.
+     *
+     * Now: connections and per-device bookkeeping are carried across, there is
+     * a smaller reset for the case people actually mean - "put the look back" -
+     * and both can be undone for as long as the toast is on screen.
+     * ===================================================================== */
+    const KEEP_ON_RESET = [
+      'githubToken', 'githubOwner', 'githubRepo', 'githubBranch',
+      'githubRev', 'githubSyncedAt', 'githubDirty', 'githubManifest', 'githubCommit',
+      'deviceName', 'sharePasswords', 'firstRunComplete', 'tourCompleted',
+      'settingsSavedAt', 'stickyView',
+    ];
+    const LOOK_KEYS = [
+      'themeStyle', 'themeMode', 'accent', 'accentOverrides', 'ambientBackground',
+      'uiFont', 'editorFont', 'fontSize', 'lineHeight', 'contentWidth',
+      'density', 'roundness', 'animations',
+    ];
+
+    const applyReset = async function (keys) {
+      const before = U.deepClone(N.store.state.settings);
+      const defaults = U.deepClone(N.store.DEFAULT_SETTINGS);
+      let next;
+      if (keys) {
+        next = U.deepClone(before);
+        keys.forEach(function (k) {
+          if (Object.prototype.hasOwnProperty.call(defaults, k)) next[k] = defaults[k];
+          else delete next[k];
+        });
+      } else {
+        next = defaults;
+        KEEP_ON_RESET.forEach(function (k) {
+          if (before[k] !== undefined) next[k] = before[k];
+        });
+      }
+      N.store.state.settings = next;
       await N.store.saveSettings();
       N.theme.apply();
       N.shortcuts.rebuild();
       render();
-      N.toast.success('Settings reset', { ms: 2000 });
+      N.toast.success(keys ? 'Appearance reset.' : 'Settings reset.', {
+        ms: 9000, key: 'settings-reset',
+        action: {
+          label: 'Undo',
+          onClick: async function () {
+            N.store.state.settings = before;
+            await N.store.saveSettings();
+            N.theme.apply();
+            N.shortcuts.rebuild();
+            render();
+            N.toast.show('Put back.', { kind: 'info', ms: 2200, key: 'settings-reset' });
+          },
+        },
+      });
+    };
+
+    const resetLook = el('button.btn', { type: 'button' }, 'Reset appearance');
+    resetLook.addEventListener('click', async function () {
+      const ok = await N.modal.confirm({
+        title: 'Put the look back to default?',
+        message: 'Theme, accent, fonts, spacing and animation go back to how they started. Everything else is left alone.',
+        confirmLabel: 'Reset appearance',
+      });
+      if (ok) await applyReset(LOOK_KEYS);
     });
-    danger.appendChild(row('Reset settings', 'Notes, canvases and stickies are kept.', resetSettings));
+
+    const resetSettings = el('button.btn.btn-danger', { type: 'button' }, 'Reset all settings');
+    resetSettings.addEventListener('click', async function () {
+      const ok = await N.modal.confirm({
+        title: 'Reset every setting?',
+        message: 'Theme, fonts, shortcuts and preferences go back to defaults. Your notes are not touched, and your GitHub connection is kept.',
+        detail: 'You can undo this from the message that appears afterwards.',
+        confirmLabel: 'Reset settings', danger: true,
+      });
+      if (!ok) return;
+      await applyReset(null);
+    });
+
+    const resetRow = el('div.reset-row');
+    resetRow.appendChild(resetLook);
+    resetRow.appendChild(resetSettings);
+    danger.appendChild(row('Reset settings',
+      'Notes, canvases, stickies and your GitHub connection are all kept.', resetRow));
 
     const wipe = el('button.btn.btn-danger-solid', { type: 'button' }, 'Delete everything');
     wipe.addEventListener('click', async function () {
@@ -33868,30 +34178,59 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /* ---------------------------------------------------------------- bar */
 
-  /*
-   * v9.1: the bar is now a formatting toolbar.
+  /* ===================================================================== *
+   * v9.2: AN ADAPTIVE TOOLBAR, AND A TRAY THAT STAYS ON SCREEN
    *
-   * It used to carry three vault actions - extract, remind, copy - which are
-   * good but are not what a hand reaches for when it has just selected a
-   * sentence. Everything that acts on a selection now lives here, grouped, in
-   * the order people use it: inline marks, then the highlighter, then block
-   * level, then the things that send the selection somewhere else.
+   * v9.1 put every button in one horizontally-scrolling strip capped at 560px.
+   * On a 1280px screen the strip was already wider than that, so the last two
+   * things in it - "more" and the word count - were scrolled out of sight.
+   * Playwright's verdict was blunt: "element is outside of the viewport". The
+   * overflow menu was unreachable on a desktop, which is not a small bug.
    *
-   * On a phone the bar scrolls horizontally rather than wrapping, because a
-   * toolbar that changes height as you drag a selection is worse than one you
-   * have to swipe.
-   */
+   * Three changes:
+   *
+   *   1. The tail - the highlight colours, "more" and the count - is PINNED
+   *      outside the scroller. Those three can never scroll away, because two
+   *      of them are how you reach everything else.
+   *
+   *   2. What does not fit MOVES INTO the tray rather than off the edge. The
+   *      bar is measured after it is built and the lowest-priority groups are
+   *      lifted out, one at a time, until the rest fits. On a phone that leaves
+   *      the four inline marks and the highlighter; on a laptop nothing moves.
+   *
+   *   3. The tray is clamped to the viewport and told how much room it has, so
+   *      it can never be drawn off the top of the screen - which is what the
+   *      screenshot showed, with the first three items cut off above the app.
+   * ===================================================================== */
+
+  /* Lower number = kept for longer when space runs out. */
+  const GROUPS = [
+    { id: 'marks', priority: 0 },
+    { id: 'heads', priority: 3 },
+    { id: 'lists', priority: 2 },
+    { id: 'quote', priority: 4 },
+    { id: 'links', priority: 1 },
+  ];
+
   function build(sel) {
     const node = el('div.sel-bar', { role: 'toolbar', 'aria-label': 'Formatting' });
     const scroll = el('div.sel-scroll');
+    const tail = el('div.sel-tail');
+    const F = N.format;
+    const overflow = [];
+
+    const accel = function (id) {
+      if (!N.shortcuts || !N.shortcuts.accelFor) return '';
+      const a = N.shortcuts.accelFor(id);
+      return a ? N.shortcuts.format(a) : '';
+    };
 
     const action = function (icon, label, fn, opts) {
       const o = opts || {};
       const b = el('button.sel-btn' + (o.className ? '.' + o.className : ''), {
         type: 'button', title: label + (o.accel ? '  ' + accel(o.accel) : ''), 'aria-label': label,
       });
-      if (o.text) b.appendChild(el('span.sel-text', null, o.text));
-      else b.appendChild(N.icons.node(icon, { size: 15 }));
+      b.appendChild(N.icons.node(icon, { size: 15 }));
       // mousedown default would blur the textarea and drop the selection
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('click', function (e) {
@@ -33900,69 +34239,105 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         if (!o.keepOpen) hide();
         else reposition();
       });
+      b._nd = { icon: icon, label: label, fn: fn };
       return b;
     };
 
-    const accel = function (id) {
-      if (!N.shortcuts || !N.shortcuts.accelFor) return '';
-      const a = N.shortcuts.accelFor(id);
-      return a ? N.shortcuts.format(a) : '';
+    /* --- the groups, in the order they appear --- */
+    const group = function (id) {
+      const g = el('span.sel-group', { dataset: { group: id } });
+      scroll.appendChild(g);
+      return g;
     };
-    const sep = function () { return el('span.sel-sep'); };
-    const F = N.format;
 
-    scroll.appendChild(action('bold', 'Bold', function () { F.toggleWrap('**'); }, { keepOpen: true, accel: 'format.bold' }));
-    scroll.appendChild(action('italic', 'Italic', function () { F.toggleWrap('*'); }, { keepOpen: true, accel: 'format.italic' }));
-    scroll.appendChild(action('strikethrough', 'Strikethrough', function () { F.toggleWrap('~~'); }, { keepOpen: true, accel: 'format.strike' }));
-    scroll.appendChild(action('code', 'Inline code', function () { F.toggleWrap('`'); }, { keepOpen: true, accel: 'format.code' }));
+    const marks = group('marks');
+    marks.appendChild(action('bold', 'Bold', function () { F.toggleWrap('**'); }, { keepOpen: true, accel: 'format.bold' }));
+    marks.appendChild(action('italic', 'Italic', function () { F.toggleWrap('*'); }, { keepOpen: true, accel: 'format.italic' }));
+    marks.appendChild(action('strikethrough', 'Strikethrough', function () { F.toggleWrap('~~'); }, { keepOpen: true, accel: 'format.strike' }));
+    marks.appendChild(action('code', 'Inline code', function () { F.toggleWrap('`'); }, { keepOpen: true, accel: 'format.code' }));
 
-    /* the highlighter, with its colours one tap away */
+    const heads = group('heads');
+    heads.appendChild(action('heading-1', 'Heading 1', function () { F.setBlock('# '); }, { keepOpen: true }));
+    heads.appendChild(action('heading-2', 'Heading 2', function () { F.setBlock('## '); }, { keepOpen: true }));
+    heads.appendChild(action('heading-3', 'Heading 3', function () { F.setBlock('### '); }, { keepOpen: true }));
+
+    const lists = group('lists');
+    lists.appendChild(action('list', 'Bulleted list', function () { F.setBlock('- '); }, { keepOpen: true }));
+    lists.appendChild(action('list-ordered', 'Numbered list', function () { F.setBlock('number'); }, { keepOpen: true }));
+    lists.appendChild(action('list-check', 'Task list', function () { F.setBlock('- [ ] '); }, { keepOpen: true }));
+
+    const quote = group('quote');
+    quote.appendChild(action('quote', 'Quote', function () { F.setBlock('> '); }, { keepOpen: true }));
+
+    const links = group('links');
+    links.appendChild(action('link', 'Add a link', function () { F.makeLink(); }));
+    links.appendChild(action('eraser', 'Clear formatting', function () { F.clearFormatting(); }, { keepOpen: true }));
+
+    /* --- the pinned tail --- */
     const hl = action('highlight', 'Highlight', function () { F.highlight('yellow'); }, { keepOpen: true, accel: 'format.highlight' });
     hl.classList.add('sel-btn-hl');
     const hlWrap = el('span.sel-hl');
     hlWrap.appendChild(hl);
-    const more = el('button.sel-caret', { type: 'button', title: 'Highlight colour', 'aria-label': 'Highlight colour' });
-    more.appendChild(N.icons.node('chevron-down', { size: 11 }));
-    more.addEventListener('mousedown', function (e) { e.preventDefault(); });
-    more.addEventListener('click', function (e) {
+    const caret = el('button.sel-caret', { type: 'button', title: 'Highlight colour', 'aria-label': 'Highlight colour' });
+    caret.appendChild(N.icons.node('chevron-down', { size: 11 }));
+    caret.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    caret.addEventListener('click', function (e) {
       e.preventDefault(); e.stopPropagation();
-      openColours(more);
+      if (sub && sub.dataset.kind === 'colours') { closeSub(); return; }
+      openColours(caret);
     });
-    hlWrap.appendChild(more);
-    scroll.appendChild(hlWrap);
+    hlWrap.appendChild(caret);
+    tail.appendChild(hlWrap);
 
-    scroll.appendChild(sep());
-    scroll.appendChild(action('heading-1', 'Heading 1', function () { F.setBlock('# '); }, { keepOpen: true }));
-    scroll.appendChild(action('heading-2', 'Heading 2', function () { F.setBlock('## '); }, { keepOpen: true }));
-    scroll.appendChild(action('heading-3', 'Heading 3', function () { F.setBlock('### '); }, { keepOpen: true }));
-    scroll.appendChild(action('list', 'Bulleted list', function () { F.setBlock('- '); }, { keepOpen: true }));
-    scroll.appendChild(action('list-ordered', 'Numbered list', function () { F.setBlock('number'); }, { keepOpen: true }));
-    scroll.appendChild(action('list-check', 'Task list', function () { F.setBlock('- [ ] '); }, { keepOpen: true }));
-    scroll.appendChild(action('quote', 'Quote', function () { F.setBlock('> '); }, { keepOpen: true }));
-
-    scroll.appendChild(sep());
-    scroll.appendChild(action('link', 'Add a link', function () { F.makeLink(); }));
-    scroll.appendChild(action('eraser', 'Clear formatting', function () { F.clearFormatting(); }, { keepOpen: true }));
-    scroll.appendChild(action('more', 'More', function () {}, { keepOpen: true, className: 'is-more' }));
-
-    // the "more" button opens a tray rather than running anything
-    const moreBtn = scroll.querySelector('.sel-btn.is-more');
+    const moreBtn = el('button.sel-btn.is-more', { type: 'button', title: 'More', 'aria-label': 'More formatting' });
+    moreBtn.appendChild(N.icons.node('more', { size: 15 }));
+    moreBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
     moreBtn.addEventListener('click', function (e) {
       e.preventDefault(); e.stopPropagation();
-      openMore(moreBtn, sel);
-    }, true);
+      if (sub && sub.dataset.kind === 'menu') { closeSub(); return; }
+      openMore(moreBtn, sel, overflow);
+    });
+    tail.appendChild(moreBtn);
 
-    node.appendChild(scroll);
-
-    /* the live count, which is the reason people select text in the first
-       place about a third of the time */
     const st = N.format.stats();
     if (st && st.words) {
-      node.appendChild(el('span.sel-stats', {
+      tail.appendChild(el('span.sel-stats', {
         title: st.words + ' words, ' + st.chars + ' characters, about ' + st.minutes + ' min to read',
       }, st.words + (st.words === 1 ? ' word' : ' words')));
     }
+
+    node.appendChild(scroll);
+    node.appendChild(tail);
+    node._nd = { scroll: scroll, overflow: overflow };
     return node;
+  }
+
+  /**
+   * Lift groups out of the strip, lowest priority first, until it fits. Called
+   * once the bar is in the document, because nothing can be measured before it
+   * is - and the width it has to fit into depends on the pinned tail.
+   */
+  function fitToWidth(node) {
+    const info = node._nd;
+    if (!info) return;
+    const scroll = info.scroll;
+    const order = GROUPS.slice().sort(function (a, b) { return b.priority - a.priority; });
+
+    let guard = 0;
+    while (scroll.scrollWidth > scroll.clientWidth + 1 && guard++ < GROUPS.length) {
+      const next = order.find(function (g) {
+        const box = scroll.querySelector('[data-group="' + g.id + '"]');
+        return box && box.childNodes.length;
+      });
+      if (!next) break;
+      const box = scroll.querySelector('[data-group="' + next.id + '"]');
+      Array.from(box.children).forEach(function (btn) {
+        if (btn._nd) info.overflow.push(btn._nd);
+      });
+      box.remove();
+      order.splice(order.indexOf(next), 1);
+    }
+    node.classList.toggle('has-overflow', info.overflow.length > 0);
   }
 
   function closeSub() {
@@ -33973,47 +34348,129 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     setTimeout(function () { if (node.parentNode) node.remove(); }, 160);
   }
 
-  function trayAt(anchor, className) {
+  /**
+   * Put a tray next to an anchor, on screen, whatever the anchor is doing.
+   *
+   * The v9.1 version flipped above when there was no room below and then did
+   * not check that "above" had any room either, so a tall menu near the top of
+   * the window was drawn at a negative y and its first items were cut off by
+   * the edge of the screen. Now the side with more room wins, the tray is told
+   * how tall it may be, and the result is clamped both ways.
+   */
+  function trayAt(anchor, kind) {
     closeSub();
-    const node = el('div.sel-tray' + (className ? '.' + className : ''));
+    const node = el('div.sel-tray.sel-tray-' + kind, { dataset: { kind: kind } });
+    node.style.visibility = 'hidden';
     document.body.appendChild(node);
     sub = node;
-    requestAnimationFrame(function () {
-      const box = anchor.getBoundingClientRect();
-      const w = node.offsetWidth;
-      let x = Math.max(8, Math.min(box.left + box.width / 2 - w / 2, window.innerWidth - w - 8));
-      let y = box.bottom + 8;
-      if (y + node.offsetHeight > window.innerHeight - 8) y = box.top - node.offsetHeight - 8;
-      node.style.left = Math.round(x) + 'px';
-      node.style.top = Math.round(y) + 'px';
-      node.classList.add('is-in');
-    });
+    node._nd = { anchor: anchor };
     return node;
   }
 
+  function placeTray(node) {
+    if (!node || !node._nd) return;
+    const anchor = node._nd.anchor;
+    const margin = 8;
+    const box = anchor.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const below = vh - box.bottom - margin * 2;
+    const above = box.top - margin * 2;
+    const useBelow = below >= above || below >= 260;
+    const room = Math.max(140, Math.min(useBelow ? below : above, Math.round(vh * 0.7)));
+
+    node.style.maxHeight = room + 'px';
+    const h = Math.min(node.offsetHeight, room);
+    const w = node.offsetWidth;
+
+    let x = box.left + box.width / 2 - w / 2;
+    x = Math.max(margin, Math.min(x, window.innerWidth - w - margin));
+    let y = useBelow ? box.bottom + margin : box.top - h - margin;
+    y = Math.max(margin, Math.min(y, vh - h - margin));
+
+    node.style.left = Math.round(x) + 'px';
+    node.style.top = Math.round(y) + 'px';
+    node.style.visibility = '';
+    requestAnimationFrame(function () { node.classList.add('is-in'); });
+  }
+
   function openColours(anchor) {
-    const tray = trayAt(anchor, 'sel-tray-colours');
-    N.format.HIGHLIGHTS.forEach(function (h) {
-      const b = el('button.sel-swatch', {
-        type: 'button', title: h.label, 'aria-label': 'Highlight ' + h.label,
-        'data-hl': h.id,
-      });
+    const tray = trayAt(anchor, 'colours');
+    const F = N.format;
+
+    const swatch = function (value, label, custom) {
+      const b = el('button.sel-swatch', { type: 'button', title: label, 'aria-label': label });
+      if (custom) { b.classList.add('is-custom'); b.style.setProperty('--hl-custom', value); }
+      else b.setAttribute('data-hl', value);
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
-        N.format.highlight(h.id);
+        F.highlight(value);
         closeSub();
         reposition();
       });
-      tray.appendChild(b);
+      return b;
+    };
+
+    const row = el('div.sel-swatch-row');
+    F.HIGHLIGHTS.forEach(function (h) { row.appendChild(swatch(h.id, h.label)); });
+    tray.appendChild(row);
+
+    const saved = F.swatches();
+    if (saved.length) {
+      const mine = el('div.sel-swatch-row');
+      saved.forEach(function (c) { mine.appendChild(swatch(c, c, true)); });
+      tray.appendChild(mine);
+    }
+
+    const foot = el('div.sel-tray-foot');
+    const pick = el('button.sel-row', { type: 'button' });
+    pick.appendChild(N.icons.node('palette', { size: 15 }));
+    pick.appendChild(el('span', null, 'A colour of my own…'));
+    pick.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    pick.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      closeSub();
+      hide();
+      F.pickCustomColour();
     });
+    foot.appendChild(pick);
+
+    const off = el('button.sel-row', { type: 'button' });
+    off.appendChild(N.icons.node('eraser', { size: 15 }));
+    off.appendChild(el('span', null, 'Remove this highlight'));
+    off.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    off.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      const current = currentHighlightColour();
+      if (current) F.highlight(current);          // toggling the same colour removes it
+      closeSub();
+      reposition();
+    });
+    foot.appendChild(off);
+    tray.appendChild(foot);
+    placeTray(tray);
   }
 
-  function openMore(anchor, sel) {
-    const tray = trayAt(anchor, 'sel-tray-menu');
+  /** Which colour, if any, the selection is already highlighted in. */
+  function currentHighlightColour() {
+    const s = N.format.selection();
+    if (!s) return null;
+    const inner = /^==(?:((?:#[0-9a-fA-F]{3,8})|(?:[a-z]{3,7})):[ \t]*)?[\s\S]*==$/.exec(s.text);
+    if (inner) return (inner[1] || 'yellow').toLowerCase();
+    const before = s.t.value.slice(Math.max(0, s.start - 14), s.start);
+    const m = /==((?:#[0-9a-fA-F]{3,8}|[a-z]{3,7}):[ \t]*)?$/.exec(before);
+    if (m && s.t.value.slice(s.end, s.end + 2) === '==') {
+      return (m[1] ? m[1].replace(/:[ \t]*$/, '') : 'yellow').toLowerCase();
+    }
+    return null;
+  }
+
+  function openMore(anchor, sel, overflow) {
+    const tray = trayAt(anchor, 'menu');
     const F = N.format;
-    const row = function (icon, label, fn) {
-      const b = el('button.sel-row', { type: 'button' });
+    const row = function (icon, label, fn, opts) {
+      const o = opts || {};
+      const b = el('button.sel-row' + (o.danger ? '.is-danger' : ''), { type: 'button' });
       b.appendChild(N.icons.node(icon, { size: 15 }));
       b.appendChild(el('span', null, label));
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
@@ -34024,16 +34481,26 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         hide();
       });
       tray.appendChild(b);
+      return b;
     };
+    const sep = function () { tray.appendChild(el('span.sel-row-sep')); };
+
+    /* Anything the toolbar could not fit comes first - it is the thing the
+       user was most likely reaching for. */
+    if (overflow && overflow.length) {
+      overflow.forEach(function (item) { row(item.icon, item.label, item.fn); });
+      sep();
+    }
+
     row('type', 'Title Case', function () { F.transformCase('title'); });
     row('type', 'UPPERCASE', function () { F.transformCase('upper'); });
     row('type', 'lowercase', function () { F.transformCase('lower'); });
     row('type', 'Sentence case', function () { F.transformCase('sentence'); });
-    tray.appendChild(el('span.sel-row-sep'));
+    sep();
     row('sort', 'Sort lines A to Z', function () { F.sortLines(false); });
     row('filter', 'Remove duplicate lines', function () { F.dedupeLines(); });
     row('table', 'Tidy up this table', function () { F.formatTable(); });
-    tray.appendChild(el('span.sel-row-sep'));
+    sep();
     row('list-check', 'Make this a task', function () { F.sendToTask(); });
     row('sticky', 'Pin as a sticky note', function () { F.sendToSticky(); });
     if (N.intelExtra && N.intelExtra.extract) {
@@ -34052,6 +34519,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         if (ok) N.toast.success('Copied.', { ms: 1800 });
       });
     });
+    sep();
+    row('highlight', 'Remove every highlight in this note', function () { F.clearHighlights(); });
+    row('eraser', 'Reset all formatting in this note', function () { F.resetNoteFormatting(); }, { danger: true });
+
+    placeTray(tray);
   }
 
   /* Re-measure without rebuilding, so a toggle does not make the bar blink. */
@@ -34062,6 +34534,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const st = N.format.stats();
     if (stats && st) stats.textContent = st.words + (st.words === 1 ? ' word' : ' words');
     place(s);
+    if (sub) placeTray(sub);
   }
 
   function place(sel) {
@@ -34076,10 +34549,21 @@ https://github.com/nodeca/pako/blob/main/LICENSE
      * but that room belongs to the note's own header, and a toolbar sitting on
      * top of the title looks like a bug even though the arithmetic was right.
      */
-    const paneTop = sel.ta.getBoundingClientRect().top;
+    const pane = sel.ta.getBoundingClientRect();
     let y = pt.y - h - 10;
-    if (y < paneTop + 4) y = pt.y + 26;          // no room: flip below the line
-    y = Math.min(y, window.innerHeight - h - 8);
+    if (y < pane.top + 4) y = pt.y + 26;         // no room: flip below the line
+
+    /*
+     * v9.2: clamped at BOTH ends, not just the bottom.
+     *
+     * pt.y is measured from the top of the text minus the textarea's scroll
+     * offset, so a selection that has been scrolled out of view above gives a
+     * negative y - and the bar was drawn off the top of the window, present in
+     * the DOM and impossible to press. Playwright's phrasing for it was
+     * "element is outside of the viewport", which is exactly what a user would
+     * have experienced as the toolbar simply not appearing.
+     */
+    y = Math.max(8, Math.min(y, window.innerHeight - h - 8));
     bar.style.left = Math.round(x) + 'px';
     bar.style.top = Math.round(y) + 'px';
   }
@@ -34088,9 +34572,23 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const sel = currentSelection();
     if (!sel) { hide(); return; }
 
+    /*
+     * v9.2: not while find and replace is open.
+     *
+     * Stepping through matches selects each one, which fires selectionchange,
+     * which brought the formatting bar up directly on top of the find bar's
+     * replace field. Two floating panels fighting over the same corner, one of
+     * them covering the thing you were typing into. The find bar wins: it is
+     * the one you deliberately opened.
+     */
+    if (N.format && N.format.isOpenFind && N.format.isOpenFind()) { hide(); return; }
+
     hide(true);
     bar = build(sel);
     document.body.appendChild(bar);
+    // Measured only once it is in the document: what fits depends on the real
+    // width the pinned tail leaves behind.
+    fitToWidth(bar);
     place(sel);
 
     requestAnimationFrame(function () {
@@ -34135,8 +34633,27 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { if (sub) closeSub(); else hide(); }
     });
-    window.addEventListener('scroll', function () { if (bar) hide(); }, true);
+    /*
+     * v9.2: a scroll inside the tray is not a reason to close the tray.
+     *
+     * This listener is in the capture phase and had no idea where the scroll
+     * came from, so scrolling the overflow menu - which is exactly what a
+     * scrollable menu is for - destroyed the menu under the pointer. Anything
+     * originating inside the bar or the tray is now left alone; a scroll of the
+     * page or the editor still dismisses, because the selection has moved.
+     */
+    window.addEventListener('scroll', function (e) {
+      if (!bar && !sub) return;
+      const t = e.target;
+      if (t && t.nodeType === 1) {
+        if (bar && bar.contains(t)) return;
+        if (sub && sub.contains(t)) return;
+      }
+      hide();
+    }, true);
     window.addEventListener('resize', function () { if (bar) hide(); });
+    // Keep the tray attached to its button when the window changes shape.
+    window.addEventListener('orientationchange', function () { if (bar) hide(); });
   }
 
   N.selectionBar = { init: init, show: show, hide: hide };
@@ -40807,7 +41324,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   if (!U || typeof U.el !== 'function') return;
   const el = U.el;
 
-  /* Five highlighter colours. Written into the note as `==colour: text==`,
+  /* Five named highlighter colours. Written into the note as `==colour: text==`,
      which is deliberately readable: open the file in any other editor and you
      see "==yellow: still legible==" rather than a broken tag. */
   const HIGHLIGHTS = [
@@ -40817,6 +41334,57 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     { id: 'pink', label: 'Pink' },
     { id: 'purple', label: 'Purple' },
   ];
+
+  /*
+   * v9.2: and any colour at all.
+   *
+   * A custom highlight is written as `==#ff8800: text==`. The same rule as the
+   * named ones: what goes in the file has to stay legible in a plain text
+   * editor, and a hex code does. Anything that is not a strict hex is treated
+   * as ordinary text, so `==C#: still text==` is not mistaken for a colour.
+   *
+   * The strictness matters beyond tidiness. This string ends up inside a style
+   * attribute in the rendered HTML, so it is validated here AND again in the
+   * renderer, and only ever as a CSS custom property - never as a whole
+   * declaration, which is what would let a colour smuggle in a second rule.
+   */
+  const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+  const MAX_SWATCHES = 8;
+
+  function isHex(v) { return HEX_RE.test(String(v || '').trim()); }
+
+  function normaliseHex(v) {
+    const raw = String(v || '').trim();
+    const withHash = raw.charAt(0) === '#' ? raw : '#' + raw;
+    return isHex(withHash) ? withHash.toLowerCase() : null;
+  }
+
+  /** The custom colours this vault has used, most recent first. */
+  function swatches() {
+    const list = (N.store.state.settings.highlightSwatches) || [];
+    return list.filter(isHex).slice(0, MAX_SWATCHES);
+  }
+
+  async function rememberSwatch(hex) {
+    const clean = normaliseHex(hex);
+    if (!clean) return swatches();
+    const next = [clean].concat(swatches().filter(function (c) { return c !== clean; })).slice(0, MAX_SWATCHES);
+    await N.store.saveSettings({ highlightSwatches: next });
+    return next;
+  }
+
+  async function forgetSwatch(hex) {
+    const clean = normaliseHex(hex);
+    const next = swatches().filter(function (c) { return c !== clean; });
+    await N.store.saveSettings({ highlightSwatches: next });
+    return next;
+  }
+
+  function isColourToken(token) {
+    const t = String(token || '').toLowerCase();
+    if (HIGHLIGHTS.some(function (h) { return h.id === t; })) return true;
+    return isHex(t);
+  }
 
   /**
    * Reading the clipboard needs permission and is refused outright in some
@@ -40915,17 +41483,23 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     replace(s.start, s.end, text, [from, from + core.length]);
   }
 
+  /* The token that opens a highlight, for a given colour. */
+  const TOKEN_RE = /^==(?:((?:#[0-9a-fA-F]{3,8})|(?:[a-z]{3,7})):[ \t]*)?([\s\S]*)==$/;
+  const OPEN_RE = /==(?:(?:#[0-9a-fA-F]{3,8}|[a-z]{3,7}):[ \t]*)?$/;
+
   function highlight(colour) {
     const t = live();
     if (!t) return;
     const s = sel();
-    const prefix = colour && colour !== 'yellow' ? colour + ': ' : '';
+    const want = normaliseHex(colour) || String(colour || 'yellow').toLowerCase();
+    const prefix = want !== 'yellow' ? want + ': ' : '';
+
     // Already highlighted, in any colour? Strip it, or recolour it.
-    const wrapped = /^==(?:([a-z]+):\s*)?([\s\S]*)==$/.exec(s.text);
-    if (wrapped) {
+    const wrapped = TOKEN_RE.exec(s.text);
+    if (wrapped && (wrapped[1] === undefined || isColourToken(wrapped[1]))) {
       const inner = wrapped[2];
-      const had = wrapped[1] || 'yellow';
-      if (had === (colour || 'yellow')) {
+      const had = (wrapped[1] || 'yellow').toLowerCase();
+      if (had === want) {
         replace(s.start, s.end, inner, [s.start, s.start + inner.length]);
       } else {
         const text = '==' + prefix + inner + '==';
@@ -40933,11 +41507,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       }
       return;
     }
-    const outer = t.value.slice(Math.max(0, s.start - 12), s.start);
-    const m = /==(?:[a-z]+:\s*)?$/.exec(outer);
+
+    // Or the marks sit just outside the selection, which is what happens when
+    // you highlight a word and then reach for a different colour.
+    const outer = t.value.slice(Math.max(0, s.start - 14), s.start);
+    const m = OPEN_RE.exec(outer);
     if (m && t.value.slice(s.end, s.end + 2) === '==') {
       const from = s.start - m[0].length;
-      if ((colour || 'yellow') === 'yellow' && m[0] === '==') {
+      const had = (/==(#[0-9a-fA-F]{3,8}|[a-z]{3,7}):/.exec(m[0]) || [])[1] || 'yellow';
+      if (had.toLowerCase() === want) {
         replace(from, s.end + 2, s.text, [from, from + s.text.length]);
       } else {
         const text = '==' + prefix + s.text + '==';
@@ -40946,6 +41524,85 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       return;
     }
     toggleWrap('==' + prefix, '==');
+  }
+
+  /** Every highlight in the note, gone. One undo step, one snapshot. */
+  function clearHighlights() {
+    const t = live();
+    if (!t) return 0;
+    const before = t.value;
+    const after = before.replace(/==(?:(?:#[0-9a-fA-F]{3,8}|[a-z]{3,7}):[ \t]*)?([\s\S]*?)==/g, '$1');
+    if (after === before) {
+      N.toast.show('No highlights in this note.', { kind: 'info', ms: 2200, key: 'fmt' });
+      return 0;
+    }
+    const n = (before.match(/==/g) || []).length / 2;
+    snapshotNow(before);
+    const at = t.selectionStart;
+    replace(0, before.length, after, [Math.min(at, after.length), Math.min(at, after.length)]);
+    N.toast.success('Removed ' + U.pluralize(Math.round(n), 'highlight') + '.', {
+      ms: 4000, key: 'fmt',
+      action: { label: 'Undo', onClick: function () { undoText(); } },
+    });
+    return Math.round(n);
+  }
+
+  /**
+   * Strip every piece of markdown formatting from the whole note, leaving the
+   * words. Deliberately behind a confirmation - it is the one action here that
+   * touches text you cannot see on screen.
+   */
+  async function resetNoteFormatting() {
+    const t = live();
+    if (!t) return false;
+    const ok = await N.modal.confirm({
+      title: 'Reset the formatting in this note?',
+      message: 'Headings, bold, italic, highlights, code marks, quotes and list markers are removed. The words stay exactly as they are.',
+      detail: 'One press of Ctrl+Z puts it all back.',
+      confirmLabel: 'Reset formatting',
+    });
+    if (!ok) return false;
+    const before = t.value;
+    const after = stripFormatting(before);
+    if (after === before) {
+      N.toast.show('There was no formatting to remove.', { kind: 'info', ms: 2600, key: 'fmt' });
+      return false;
+    }
+    snapshotNow(before);
+    replace(0, before.length, after, [0, 0]);
+    N.toast.success('Formatting reset.', {
+      ms: 5000, key: 'fmt',
+      action: { label: 'Undo', onClick: function () { undoText(); } },
+    });
+    return true;
+  }
+
+  function stripFormatting(text) {
+    return String(text)
+      .replace(/^(\s*)(#{1,6}\s+|[-*+]\s+\[[ xX/-]\]\s+|[-*+]\s+|\d{1,9}[.)]\s+|>\s?)/gm, '$1')
+      .replace(/==(?:(?:#[0-9a-fA-F]{3,8}|[a-z]{3,7}):[ \t]*)?([\s\S]*?)==/g, '$1')
+      .replace(/\*\*\*([\s\S]*?)\*\*\*/g, '$1')
+      .replace(/\*\*([\s\S]*?)\*\*/g, '$1')
+      .replace(/(^|[^\\*])\*([^*\n]+)\*/g, '$1$2')
+      .replace(/~~([\s\S]*?)~~/g, '$1')
+      .replace(/`([^`\n]+)`/g, '$1')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  }
+
+  /** A history snapshot before a whole-note rewrite, so it is recoverable. */
+  function snapshotNow(before) {
+    const note = N.store.getNote(N.store.state.activeNoteId);
+    if (note && N.history && N.history.snapshot) {
+      try { N.history.snapshot(note, before, 'manual'); } catch (err) { /* not fatal */ }
+    }
+  }
+
+  /** The browser's own undo, aimed at the editor. */
+  function undoText() {
+    const t = live();
+    if (!t) return;
+    t.focus();
+    try { document.execCommand('undo'); } catch (err) { /* nothing else to try */ }
   }
 
   /* ------------------------------------------------------------ block level */
@@ -41006,15 +41663,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (!t) return;
     const s = sel();
     if (!s.text) return;
-    const cleaned = s.text
-      .replace(/^(\s*)(#{1,6}\s+|[-*+]\s+\[[ xX/-]\]\s+|[-*+]\s+|\d{1,9}[.)]\s+|>\s?)/gm, '$1')
-      .replace(/==(?:[a-z]+:\s*)?([\s\S]*?)==/g, '$1')
-      .replace(/\*\*\*([\s\S]*?)\*\*\*/g, '$1')
-      .replace(/\*\*([\s\S]*?)\*\*/g, '$1')
-      .replace(/(^|[^\\*])\*([^*\n]+)\*/g, '$1$2')
-      .replace(/~~([\s\S]*?)~~/g, '$1')
-      .replace(/`([^`\n]+)`/g, '$1')
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    /* v9.2: one set of strip rules, shared with the whole-note reset. */
+    const cleaned = stripFormatting(s.text)
       .replace(/!?\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g, function (_, a, b) { return b || a; });
     replace(s.start, s.end, cleaned, [s.start, s.start + cleaned.length]);
   }
@@ -41305,17 +41955,43 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       action: { label: 'Open tasks', onClick: function () { N.app.setView('tasks'); } } });
   }
 
+  /*
+   * v9.2: THROUGH N.sticky.create, NOT STRAIGHT INTO THE STORE.
+   *
+   * The v9.1 version wrote a bare record - text, colour, stack - and skipped
+   * everything the sticky wall needs to draw one: x, y, w, h, kind, rotation.
+   * The wall rendered it at `left: undefinedpx`, and fit() computed its bounds
+   * from those undefined coordinates, which is where the "NaN%" in the zoom
+   * control came from. `colour: 'yellow'` was wrong too - stickies carry a hex.
+   *
+   * N.sticky.create() already knows all of that, including where to put a new
+   * note so it does not land on top of an existing one. Use it.
+   */
   async function sendToSticky() {
     const s = sel();
     if (!s || !s.text.trim()) return;
+    if (!N.sticky || !N.sticky.create) {
+      N.toast.error('The sticky wall is not available.', { ms: 3000 });
+      return;
+    }
     try {
-      await N.store.saveRecord('stickies', {
-        text: s.text.trim(), color: 'yellow', stack: 'default',
-        createdAt: Date.now(),
+      const made = await N.sticky.create({ kind: 'text', text: s.text.trim() });
+      N.toast.success('Pinned to your stickies.', {
+        ms: 5000, key: 'fmt',
+        action: {
+          label: 'Undo',
+          onClick: async function () {
+            try {
+              await N.store.deleteRecord('stickies', made.id);
+              if (N.sticky.render) N.sticky.render();
+              N.toast.show('Sticky removed again.', { kind: 'info', ms: 2000, key: 'fmt' });
+            } catch (err) { /* already gone */ }
+          },
+        },
       });
-      N.toast.success('Pinned to your stickies.', { ms: 2600, key: 'fmt',
-        action: { label: 'Show', onClick: function () { N.app.setView('sticky'); } } });
+      return made;
     } catch (err) {
+      console.warn('[format] sticky', err);
       N.toast.error('Could not make a sticky note.', { ms: 3000 });
     }
   }
@@ -41430,7 +42106,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (!t) { N.toast.show('Open a note first.', { kind: 'info', ms: 2200 }); return; }
     if (fr) { fr.find.focus(); fr.find.select(); return; }
 
-    const pane = document.getElementById('split-editor') || t.parentNode;
+    /*
+     * v9.2: MOUNTED ON THE WHOLE EDITOR, NOT ON THE WRITING PANE.
+     *
+     * It used to live inside #split-editor, which in Split mode is half the
+     * width of the app. Everything in the bar then competed for ~330px and the
+     * inputs, being the only flexible things in the row, lost: measured at
+     * 1280px the find field was 47 pixels wide, and at 768px it was 18. You
+     * could not see what you had typed.
+     *
+     * The editor view is the honest container - the bar belongs to the note,
+     * not to one pane of it - and the rows below wrap instead of crushing.
+     */
+    const pane = document.getElementById('view-editor') ||
+      document.getElementById('split-editor') || t.parentNode;
     const node = el('div.find-bar', { role: 'search', 'aria-label': 'Find and replace' });
 
     const find = el('input.find-input', { type: 'text', placeholder: 'Find in this note', 'aria-label': 'Find' });
@@ -41440,8 +42129,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     let list = [];
     let at = -1;
 
-    const iconBtn = function (icon, label, fn) {
-      const b = el('button.find-btn', { type: 'button', title: label, 'aria-label': label });
+    const iconBtn = function (icon, label, fn, extra) {
+      const b = el('button.find-btn' + (extra ? '.' + extra : ''), { type: 'button', title: label, 'aria-label': label });
       b.appendChild(N.icons.node(icon, { size: 15 }));
       b.addEventListener('click', function (e) { e.preventDefault(); fn(); });
       return b;
@@ -41520,28 +42209,39 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
     });
 
+    /*
+     * Three rows, each able to wrap. The inputs carry `flex: 1 1 160px` and a
+     * real min-width, so when the bar runs out of room the BUTTONS drop to the
+     * next line and the field you are typing into keeps its size. That is the
+     * opposite of what happened before, and it is the right way round.
+     */
     const row1 = el('div.find-row');
     row1.appendChild(N.icons.node('search', { size: 15 }));
     row1.appendChild(find);
     row1.appendChild(count);
-    row1.appendChild(toggle('matchCase', 'Match case', 'Aa'));
-    row1.appendChild(toggle('wholeWord', 'Whole words only', 'ab|'));
-    row1.appendChild(iconBtn('chevron-up', 'Previous match (Shift+Enter)', function () { show(at - 1); }));
-    row1.appendChild(iconBtn('chevron-down', 'Next match (Enter)', function () { show(at + 1); }));
-    row1.appendChild(iconBtn('close', 'Close (Esc)', closeFind));
+    row1.appendChild(iconBtn('close', 'Close (Esc)', closeFind, 'find-x'));
 
-    const row2 = el('div.find-row');
-    row2.appendChild(N.icons.node('edit', { size: 15 }));
-    row2.appendChild(repl);
+    const row2 = el('div.find-row.find-tools');
+    row2.appendChild(toggle('matchCase', 'Match case', 'Aa'));
+    row2.appendChild(toggle('wholeWord', 'Whole words only', 'ab|'));
+    const nav = el('div.find-nav');
+    nav.appendChild(iconBtn('chevron-up', 'Previous match (Shift+Enter)', function () { show(at - 1); }));
+    nav.appendChild(iconBtn('chevron-down', 'Next match (Enter)', function () { show(at + 1); }));
+    row2.appendChild(nav);
+
+    const row3 = el('div.find-row');
+    row3.appendChild(N.icons.node('edit', { size: 15 }));
+    row3.appendChild(repl);
     const one = el('button.btn.btn-sm', { type: 'button' }, 'Replace');
     one.addEventListener('click', replaceOne);
     const all = el('button.btn.btn-sm.btn-primary', { type: 'button' }, 'Replace all');
     all.addEventListener('click', replaceAll);
-    row2.appendChild(one);
-    row2.appendChild(all);
+    row3.appendChild(one);
+    row3.appendChild(all);
 
     node.appendChild(row1);
     node.appendChild(row2);
+    node.appendChild(row3);
     pane.appendChild(node);
 
     /*
@@ -41590,8 +42290,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         accel: 'Mod+Shift+H', when: editing, run: function () { highlight('yellow'); } },
       { id: 'format.link', title: 'Add a link', group: 'Format', icon: 'link',
         accel: 'Mod+K', when: editing, run: makeLink },
-      { id: 'format.clear', title: 'Clear formatting', group: 'Format', icon: 'eraser',
+      { id: 'format.clear', title: 'Clear formatting in the selection', group: 'Format', icon: 'eraser',
         accel: 'Mod+Shift+C', when: editing, run: clearFormatting },
+      { id: 'format.clearHighlights', title: 'Remove every highlight in this note', group: 'Format',
+        icon: 'highlight', when: editing, run: clearHighlights },
+      { id: 'format.resetNote', title: 'Reset all formatting in this note', group: 'Format',
+        icon: 'eraser', when: editing, run: resetNoteFormatting },
+      { id: 'format.customHighlight', title: 'Highlight in a colour of your own', group: 'Format',
+        icon: 'palette', when: editing, run: function () { return pickCustomColour(); } },
 
       { id: 'format.h1', title: 'Heading 1', group: 'Format', icon: 'heading-1',
         accel: 'Mod+Alt+1', when: editing, run: function () { setBlock('# '); } },
@@ -41650,6 +42356,94 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     N.commands.registerMany(items);
   }
 
+  /**
+   * A colour of your own.
+   *
+   * A native <input type="color"> is the only picker every platform already
+   * knows how to draw well - a phone gives you its own, a desktop gives you the
+   * OS one. Beside it a hex field, because people paste brand colours far more
+   * often than they hunt for them on a wheel, and the two stay in step.
+   */
+  function pickCustomColour(initial) {
+    const startAt = normaliseHex(initial) || swatches()[0] || '#ffd23d';
+    let hexField = null;
+
+    /* open() hands back the api object, with the answer on api.promise. */
+    return N.modal.open({
+      title: 'Highlight colour',
+      size: 'sm',
+      preferSheet: true,
+      dismissValue: null,
+      render: function (api) {
+        const wrap = el('div');
+        const row = el('div.hl-pick-row');
+        const swatch = el('input.hl-pick-colour', {
+          type: 'color', value: startAt.slice(0, 7), 'aria-label': 'Pick a colour',
+        });
+        const hex = el('input.field.hl-pick-hex', {
+          type: 'text', value: startAt, spellcheck: 'false', autocomplete: 'off',
+          'aria-label': 'Hex colour', maxlength: '9', placeholder: '#ffd23d',
+          'data-autofocus': '',
+        });
+        hexField = hex;
+        const preview = el('div.hl-pick-preview');
+        const sample = el('mark.hl-pick-sample', null, 'Highlighted like this');
+        preview.appendChild(sample);
+
+        const paint = function (value) {
+          const clean = normaliseHex(value);
+          hex.classList.toggle('is-bad', !clean && String(value || '').trim().length > 1);
+          if (!clean) return null;
+          swatch.value = clean.slice(0, 7);
+          sample.style.setProperty('--hl-custom', clean);
+          return clean;
+        };
+
+        swatch.addEventListener('input', function () { hex.value = swatch.value; paint(swatch.value); });
+        hex.addEventListener('input', function () { paint(hex.value); });
+        hex.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); api.close(normaliseHex(hex.value)); }
+        });
+
+        row.appendChild(swatch);
+        row.appendChild(hex);
+        wrap.appendChild(row);
+        wrap.appendChild(preview);
+
+        const saved = swatches();
+        if (saved.length) {
+          wrap.appendChild(el('div.field-label', { style: { marginTop: '14px' } }, 'Colours you have used'));
+          const list = el('div.hl-pick-saved');
+          saved.forEach(function (c) {
+            const b = el('button.hl-pick-swatch', { type: 'button', title: c, 'aria-label': 'Use ' + c });
+            b.style.setProperty('--hl-custom', c);
+            b.addEventListener('click', function () { hex.value = c; paint(c); });
+            list.appendChild(b);
+          });
+          wrap.appendChild(list);
+        }
+        paint(startAt);
+        return wrap;
+      },
+      footer: function (api) {
+        return [
+          el('button.btn', { type: 'button', onclick: function () { api.close(null); } }, 'Cancel'),
+          el('button.btn.btn-primary', {
+            type: 'button',
+            onclick: function () { api.close(normaliseHex(hexField && hexField.value)); },
+          }, 'Highlight'),
+        ];
+      },
+    }).promise.then(function (chosen) {
+      const clean = normaliseHex(chosen);
+      if (!clean) return null;
+      return rememberSwatch(clean).then(function () {
+        highlight(clean);
+        return clean;
+      });
+    });
+  }
+
   function init() {
     document.addEventListener('paste', onPasteCapture, true);
     registerCommands();
@@ -41658,6 +42452,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   N.format = {
     init: init, HIGHLIGHTS: HIGHLIGHTS,
+    /* v9.2 */
+    isHex: isHex, normaliseHex: normaliseHex, swatches: swatches,
+    rememberSwatch: rememberSwatch, forgetSwatch: forgetSwatch,
+    pickCustomColour: pickCustomColour, clearHighlights: clearHighlights,
+    resetNoteFormatting: resetNoteFormatting, stripFormatting: stripFormatting,
+    undoText: undoText,
     toggleWrap: toggleWrap, setBlock: setBlock, highlight: highlight,
     clearFormatting: clearFormatting, makeLink: makeLink,
     moveLines: moveLines, duplicateLines: duplicateLines, deleteLines: deleteLines,
