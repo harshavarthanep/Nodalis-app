@@ -8473,7 +8473,7 @@ html[dir='rtl'] .lang-select { text-align: right; }
     <button id="btn-back" class="icon-btn is-dim" title="You are at the start" aria-label="Back" data-tip-kbd="Alt+ArrowLeft">
       <span data-icon="arrow-left" data-icon-size="18"></span>
     </button>
-    <button id="btn-sidebar" class="icon-btn" title="Toggle sidebar" aria-label="Toggle sidebar" data-tip-kbd="Mod+B">
+    <button id="btn-sidebar" class="icon-btn" title="Toggle sidebar" aria-label="Toggle sidebar" data-tip-kbd="Mod+Alt+B">
       <span data-icon="sidebar" data-icon-size="19"></span>
     </button>
 
@@ -8516,7 +8516,7 @@ html[dir='rtl'] .lang-select { text-align: right; }
       <button id="btn-right-panel" class="icon-btn only-desktop" title="Toggle right panel">
         <span data-icon="sidebar-right" data-icon-size="18"></span>
       </button>
-      <button id="btn-help" class="icon-btn mobile-hide" title="Help, shortcuts and tour" data-i18n-title="bar.help" data-tip-kbd="F1">
+      <button id="btn-help" class="icon-btn mobile-hide" title="Help, shortcuts and tour" data-i18n-title="bar.help" data-tip-kbd="Mod+Alt+/">
         <span data-icon="help" data-icon-size="18"></span>
       </button>
       <button id="btn-settings" class="icon-btn mobile-hide" title="Settings" data-i18n-title="bar.settings" data-tip-kbd="Mod+,">
@@ -8540,7 +8540,7 @@ html[dir='rtl'] .lang-select { text-align: right; }
     <!-- ==================================================== sidebar ===== -->
     <aside id="sidebar" class="sidebar" aria-label="Vault navigation">
       <div class="sidebar-head">
-        <button id="btn-new-note" class="btn btn-primary btn-block" data-tip-kbd="Mod+N">
+        <button id="btn-new-note" class="btn btn-primary btn-block" data-tip-kbd="Mod+Alt+N">
           <span data-icon="plus" data-icon-size="16"></span>
           <span data-i18n="side.newNote">New note</span>
         </button>
@@ -21221,18 +21221,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const inEditor = function () { return !!currentId && document.activeElement === ta; };
 
     N.commands.registerMany([
-      { id: 'editor.bold', title: 'Bold', group: 'Format', icon: 'bold', accel: 'Mod+Alt+B', when: hasNote, allowInInput: true,
-        run: function () { wrapSelection('**', '**', 'bold text'); } },
-      { id: 'editor.italic', title: 'Italic', group: 'Format', icon: 'italic', accel: 'Mod+I', when: hasNote, allowInInput: true,
-        run: function () { wrapSelection('*', '*', 'italic text'); } },
-      { id: 'editor.strike', title: 'Strikethrough', group: 'Format', icon: 'strikethrough', accel: 'Mod+Shift+X', when: hasNote, allowInInput: true,
-        run: function () { wrapSelection('~~', '~~', 'struck text'); } },
-      { id: 'editor.highlight', title: 'Highlight', group: 'Format', icon: 'highlight', accel: 'Mod+Shift+H', when: hasNote, allowInInput: true,
-        run: function () { wrapSelection('==', '==', 'highlighted'); } },
-      { id: 'editor.code', title: 'Inline code', group: 'Format', icon: 'code', accel: 'Mod+E', when: hasNote, allowInInput: true,
-        run: function () { wrapSelection('`', '`', 'code'); } },
-      { id: 'editor.link', title: 'Insert link', group: 'Format', icon: 'link', accel: 'Mod+Alt+K', when: inEditor, allowInInput: true,
-        run: async function () {
+      { id: 'editor.bold', title: 'Bold', group: 'Format', icon: 'bold', when: hasNote, allowInInput: true,
+        hidden: true, run: function () { wrapSelection('**', '**', 'bold text'); } },
+      { id: 'editor.italic', title: 'Italic', group: 'Format', icon: 'italic', when: hasNote, allowInInput: true,
+        hidden: true, run: function () { wrapSelection('*', '*', 'italic text'); } },
+      { id: 'editor.strike', title: 'Strikethrough', group: 'Format', icon: 'strikethrough', when: hasNote, allowInInput: true,
+        hidden: true, run: function () { wrapSelection('~~', '~~', 'struck text'); } },
+      { id: 'editor.highlight', title: 'Highlight', group: 'Format', icon: 'highlight', when: hasNote, allowInInput: true,
+        hidden: true, run: function () { wrapSelection('==', '==', 'highlighted'); } },
+      { id: 'editor.code', title: 'Inline code', group: 'Format', icon: 'code', when: hasNote, allowInInput: true,
+        hidden: true, run: function () { wrapSelection('`', '`', 'code'); } },
+      { id: 'editor.link', title: 'Insert link', group: 'Format', icon: 'link', when: inEditor, allowInInput: true,
+        hidden: true, run: async function () {
           const s = selection();
           const selected = ta.value.slice(s.start, s.end);
           const url = await N.modal.prompt({ title: 'Link URL', placeholder: 'https://…', value: '' });
@@ -21250,14 +21250,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           const prefix = level ? '#'.repeat(level) + ' ' : '';
           replaceRange(line.start, line.end, prefix + m[2]);
         } },
-      { id: 'editor.bulletList', title: 'Bulleted list', group: 'Format', icon: 'list', accel: 'Mod+Shift+8', when: hasNote, allowInInput: true,
-        run: function () { togglePrefix('- ', { regex: /^\s*[-*+]\s+/ }); } },
-      { id: 'editor.numberList', title: 'Numbered list', group: 'Format', icon: 'list-ordered', accel: 'Mod+Shift+7', when: hasNote, allowInInput: true,
-        run: function () { togglePrefix('1. ', { regex: /^\s*\d+[.)]\s+/ }); } },
-      { id: 'editor.taskList', title: 'Task list', group: 'Format', icon: 'list-check', accel: 'Mod+Shift+9', when: hasNote, allowInInput: true,
-        run: function () { togglePrefix('- [ ] ', { regex: /^\s*[-*+]\s+\[[ xX/-]\]\s+/ }); } },
-      { id: 'editor.quote', title: 'Blockquote', group: 'Format', icon: 'quote', accel: "Mod+Shift+.", when: hasNote, allowInInput: true,
-        run: function () { togglePrefix('> ', { regex: /^\s*>\s?/ }); } },
+      { id: 'editor.bulletList', title: 'Bulleted list', group: 'Format', icon: 'list', when: hasNote, allowInInput: true,
+        hidden: true, run: function () { togglePrefix('- ', { regex: /^\s*[-*+]\s+/ }); } },
+      { id: 'editor.numberList', title: 'Numbered list', group: 'Format', icon: 'list-ordered', when: hasNote, allowInInput: true,
+        hidden: true, run: function () { togglePrefix('1. ', { regex: /^\s*\d+[.)]\s+/ }); } },
+      { id: 'editor.taskList', title: 'Task list', group: 'Format', icon: 'list-check', when: hasNote, allowInInput: true,
+        hidden: true, run: function () { togglePrefix('- [ ] ', { regex: /^\s*[-*+]\s+\[[ xX/-]\]\s+/ }); } },
+      { id: 'editor.quote', title: 'Blockquote', group: 'Format', icon: 'quote', when: hasNote, allowInInput: true,
+        hidden: true, run: function () { togglePrefix('> ', { regex: /^\s*>\s?/ }); } },
       { id: 'editor.codeBlock', title: 'Code block', group: 'Format', icon: 'code-block', accel: 'Mod+Alt+C', when: hasNote, allowInInput: true,
         run: function () { insertAtCursor('```\n\n```', 4); } },
       { id: 'editor.table', title: 'Insert table', group: 'Format', icon: 'table', when: hasNote,
@@ -21278,7 +21278,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         } },
       { id: 'editor.slash', title: 'Open block menu', group: 'Editor', icon: 'plus', accel: 'Mod+/', when: inEditor, allowInInput: true,
         run: function () { openSlashMenu(''); } },
-      { id: 'editor.toggleMode', title: 'Cycle write / split / read', group: 'Editor', icon: 'eye', accel: 'Mod+Shift+V', when: hasNote,
+      { id: 'editor.toggleMode', title: 'Cycle write / split / read', group: 'Editor', icon: 'eye', accel: 'Mod+Alt+V', when: hasNote,
         run: cycleMode },
       { id: 'editor.modeEdit', title: 'Write mode', group: 'Editor', icon: 'edit', when: hasNote, run: function () { setMode('edit'); } },
       { id: 'editor.modeSplit', title: 'Split mode', group: 'Editor', icon: 'columns', when: hasNote, run: function () { setMode('split'); } },
@@ -28476,7 +28476,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         } },
       { id: 'note.share', title: 'Share this note', group: 'Export', icon: 'share',
         when: function () { return !!N.store.state.activeNoteId; },
-        run: function () { shareNote(N.store.getNote(N.store.state.activeNoteId)); } },
+        hidden: true, run: function () { shareNote(N.store.getNote(N.store.state.activeNoteId)); } },
       { id: 'app.share', title: 'Share Nodalis', group: 'Export', icon: 'share', run: shareApp },
       { id: 'note.print', title: 'Print this note', group: 'Export', icon: 'file', accel: 'Mod+P',
         when: function () { return !!N.store.state.activeNoteId; },
@@ -29399,7 +29399,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       U.clear(tableWrap);
       const table = el('table.keymap-table');
       const tbody = el('tbody');
-      const groups = N.commands.groups();
+      /*
+       * v9.5: same reason as the shortcut sheet. groups() applies when(), so
+       * with no note open this table could not show - or rebind - Bold. An
+       * editor has to list everything it can bind.
+       */
+      const groups = new Map();
+      N.commands.all().forEach(function (c) {
+        if (c.hidden) return;
+        if (!groups.has(c.group)) groups.set(c.group, []);
+        groups.get(c.group).push(c);
+      });
+      groups.forEach(function (list) {
+        list.sort(function (a, b) { return a.title.localeCompare(b.title); });
+      });
       let shown = 0;
 
       Array.from(groups.keys()).sort().forEach(function (group) {
@@ -30678,7 +30691,26 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       size: 'lg',
       render: function () {
         const wrap = el('div');
-        const groups = N.commands.groups();
+        /*
+         * v9.5: BUILT FROM all(), NOT groups().
+         *
+         * groups() runs every command's when() first, so the sheet only listed
+         * what happened to be available at the moment it opened - open it with
+         * no note and the whole Format section was missing. A reference sheet
+         * has to be the same sheet every time, so it is built from all()
+         * instead, minus the commands marked hidden (the retired duplicates,
+         * which is what used to make every format action appear twice).
+         */
+        const groups = new Map();
+        N.commands.all().forEach(function (c) {
+          if (c.hidden) return;
+          if (!N.shortcuts.accelFor(c.id)) return;
+          if (!groups.has(c.group)) groups.set(c.group, []);
+          groups.get(c.group).push(c);
+        });
+        groups.forEach(function (list) {
+          list.sort(function (a, b) { return a.title.localeCompare(b.title); });
+        });
         Array.from(groups.keys()).sort().forEach(function (group) {
           const withKeys = groups.get(group).filter(function (c) { return N.shortcuts.accelFor(c.id); });
           if (!withKeys.length) return;
@@ -30706,7 +30738,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (btn) btn.addEventListener('click', function () { open(); });
 
     N.commands.registerMany([
-      { id: 'help.open', title: 'Open the manual', group: 'Help', icon: 'help', accel: 'F1', run: function () { open(); } },
+      { id: 'help.open', title: 'Open the manual', group: 'Help', icon: 'help', accel: 'Mod+Alt+/', run: function () { open(); } },
       { id: 'help.tour', title: 'Replay the guided tour', group: 'Help', icon: 'play', run: openTour },
       { id: 'help.shortcuts', title: 'Show all keyboard shortcuts', group: 'Help', icon: 'keyboard', accel: 'Mod+Shift+/',
         run: openShortcutCard },
@@ -31036,8 +31068,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         title: 'New note from a template',
         group: 'Create',
         icon: 'file-plus',
-        accel: 'Mod+Alt+N',
-        run: function () { newFromTemplate(); },
+        hidden: true, run: function () { newFromTemplate(); },
       },
       {
         id: 'note.archive',
@@ -33082,8 +33113,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         title: 'Focus the current paragraph',
         group: 'Writing',
         icon: 'target',
-        accel: 'Mod+Alt+F',
-        run: async function () {
+        accel: 'Mod+Alt+Shift+F', run: async function () {
           const next = !enabled('focusMode');
           await N.store.setSetting('focusMode', next);
           refresh();
@@ -33109,7 +33139,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         title: 'Open a random note',
         group: 'Note',
         icon: 'shuffle',
-        run: function () {
+        hidden: true, run: function () {
           const notes = N.store.allNotes();
           if (!notes.length) { N.toast.info('There are no notes yet.', { ms: 2000 }); return; }
           const pick = notes[Math.floor(Math.random() * notes.length)];
@@ -38359,6 +38389,103 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     };
   }
 
+
+  /* ------------------------------------------------- reserved key combos --
+   *
+   * v9.5. A shortcut can be unique and still not work, because the operating
+   * system or the browser consumes the keystroke before the page is given a
+   * keydown to look at. There is nothing the app can do about those at
+   * runtime - preventDefault() is never reached - so the only useful thing is
+   * to say so plainly and point at the screen where it can be changed.
+   *
+   * The list is deliberately short. It holds only combos that are handled
+   * above the page in a mainstream browser or by macOS itself, and NOT the
+   * long tail that a page can in fact cancel (Mod+S, Mod+P, Mod+D, Mod+O,
+   * Mod+G, the zoom pair) - those work today and warning about them would be
+   * noise.
+   *
+   * A shortcut listed here still works in an installed PWA window, where
+   * there is no browser UI to steal it. That is why these are reported rather
+   * than reassigned: which behaviour is right depends on how you run Nodalis.
+   */
+  const RESERVED_COMBOS = {
+    'mod+n':       'your browser opens a new window',
+    'mod+t':       'your browser opens a new tab',
+    'mod+w':       'your browser closes the tab',
+    'mod+shift+n': 'Chrome and Edge open a private window',
+    'mod+shift+t': 'your browser reopens the last closed tab',
+    'mod+shift+w': 'your browser closes the window',
+    'mod+shift+c': 'Chrome and Edge open the element picker',
+    'mod+alt+i':   'Chrome and Edge open the developer tools',
+    'mod+alt+j':   'Chrome and Edge open the developer console',
+    'mod+q':       'macOS quits the app',
+    'mod+h':       'macOS hides the app',
+    'mod+m':       'macOS minimises the window',
+    'mod+space':   'macOS opens Spotlight',
+    'mod+tab':     'the system switches windows',
+  };
+
+  /*
+   * Keys a 65% keyboard does not have. There is no F-row, no number pad and no
+   * navigation cluster, so a binding on any of them cannot be pressed at all
+   * on that board without a second Fn layer - and Fn is invisible to the web.
+   */
+  const OFF_65_PERCENT = /^(f\d{1,2}|home|end|pageup|pagedown|insert|numlock|scrolllock|pause)$/;
+
+  function reservedShortcuts() {
+    const risky = [];
+    N.commands.all().forEach(function (c) {
+      if (c.hidden) return;
+      const accel = N.shortcuts.accelFor(c.id);
+      if (!accel) return;
+      const key = N.shortcuts.normalize(accel);
+      const last = key.split('+').pop();
+      if (RESERVED_COMBOS[key]) {
+        risky.push({ cmd: c, accel: key, pretty: N.shortcuts.format(key), why: RESERVED_COMBOS[key] });
+      } else if (OFF_65_PERCENT.test(last)) {
+        risky.push({ cmd: c, accel: key, pretty: N.shortcuts.format(key),
+          why: 'a 65% keyboard has no ' + last.toUpperCase() + ' key' });
+      }
+    });
+    return {
+      id: 'reserved-keys',
+      ok: risky.length === 0,
+      label: 'Shortcuts your keyboard can reach',
+      good: 'Every shortcut is on a key a 65% keyboard has, and none is one the browser takes.',
+      bad: U.pluralize(risky.length, 'shortcut') + ' may never reach Nodalis: ' +
+        risky.map(function (r) { return r.pretty; }).join(', ') + '.',
+      viewLabel: 'Show me',
+      view: function () { showReserved(risky); },
+      data: risky,
+    };
+  }
+
+  function showReserved(risky) {
+    if (!risky.length) { N.toast.success('Every shortcut is reachable.', { ms: 3000 }); return; }
+    const items = [{ header: 'The key never reaches the page' }];
+    risky.forEach(function (r) {
+      items.push({
+        label: r.cmd.title + '  ' + r.pretty,
+        hint: r.why,
+        icon: 'warning',
+        onClick: function () { N.commands.run('settings.shortcuts'); },
+      });
+    });
+    items.push({ separator: true });
+    items.push({
+      label: 'Pick new keys in Settings',
+      icon: 'keyboard',
+      onClick: function () { N.commands.run('settings.shortcuts'); },
+    });
+    /*
+     * No auto-fixer here on purpose, and for the same reason resolveConflicts
+     * unbinds rather than reassigns: guessing a replacement key is how you get
+     * a second conflict. These also still work in an installed PWA, so the
+     * right answer genuinely depends on the person.
+     */
+    N.menu.show(items, { title: 'Shortcuts the system takes', allowSheet: true });
+  }
+
   function brokenLinks() {
     const unresolved = N.store.buildLinkGraph().unresolved;
     let total = 0;
@@ -38462,6 +38589,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     };
     add(duplicateTitles);
     add(shortcutConflicts);
+    add(reservedShortcuts);
     add(brokenLinks);
     add(emptyNotes);
     add(orphanReminders);
@@ -44119,9 +44247,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       { id: 'format.highlight', title: 'Highlight', group: 'Format', icon: 'highlight',
         accel: 'Mod+Shift+H', when: editing, run: function () { highlight('yellow'); } },
       { id: 'format.link', title: 'Add a link', group: 'Format', icon: 'link',
-        accel: 'Mod+K', when: editing, run: makeLink },
+        accel: 'Mod+Alt+K', when: editing, run: makeLink },
       { id: 'format.clear', title: 'Clear formatting in the selection', group: 'Format', icon: 'eraser',
-        accel: 'Mod+Shift+C', when: editing, run: clearFormatting },
+        accel: 'Mod+Alt+Shift+X', when: editing, run: clearFormatting },
       { id: 'format.clearHighlights', title: 'Remove every highlight in this note', group: 'Format',
         icon: 'highlight', when: editing, run: clearHighlights },
       { id: 'format.resetNote', title: 'Reset all formatting in this note', group: 'Format',
@@ -44145,15 +44273,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         accel: 'Mod+Shift+.', when: editing, run: function () { setBlock('> '); } },
 
       { id: 'format.find', title: 'Find and replace in this note', group: 'Edit', icon: 'search',
-        accel: 'Mod+H', when: hasNote, run: openFind },
+        accel: 'Mod+Alt+F', when: hasNote, run: openFind },
       { id: 'format.moveUp', title: 'Move line up', group: 'Edit', icon: 'chevron-up',
         accel: 'Alt+ArrowUp', when: editing, run: function () { moveLines(-1); } },
       { id: 'format.moveDown', title: 'Move line down', group: 'Edit', icon: 'chevron-down',
         accel: 'Alt+ArrowDown', when: editing, run: function () { moveLines(1); } },
       { id: 'format.duplicate', title: 'Duplicate line or selection', group: 'Edit', icon: 'copy',
-        accel: 'Mod+Shift+D', when: editing, run: duplicateLines },
+        accel: 'Mod+Alt+D', when: editing, run: duplicateLines },
       { id: 'format.deleteLine', title: 'Delete line', group: 'Edit', icon: 'trash',
-        accel: 'Mod+Shift+K', when: editing, run: deleteLines },
+        accel: 'Mod+Shift+Backspace', when: editing, run: deleteLines },
       { id: 'format.join', title: 'Join lines', group: 'Edit', icon: 'corner-down-left',
         accel: 'Mod+J', when: editing, run: joinLines },
       { id: 'format.sort', title: 'Sort selected lines A to Z', group: 'Edit', icon: 'sort',
@@ -44165,7 +44293,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       { id: 'format.trim', title: 'Remove trailing spaces', group: 'Edit', icon: 'eraser',
         when: editing, run: trimLines },
       { id: 'format.table', title: 'Tidy up this table', group: 'Edit', icon: 'table',
-        accel: 'Mod+Alt+T', when: editing, run: formatTable },
+        accel: 'Mod+Alt+A', when: editing, run: formatTable },
       { id: 'format.pastePlain', title: 'Paste without formatting', group: 'Edit', icon: 'paste',
         accel: 'Mod+Shift+V', when: editing, run: pastePlain },
 
@@ -45913,8 +46041,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       { id: 'palette.commands', title: 'Run a command', group: 'App', icon: 'command', accel: 'Mod+Shift+P', allowInInput: true,
         run: function () { N.palette.open('commands'); } },
 
-      { id: 'note.new', title: 'New note', group: 'Create', icon: 'file-plus', accel: 'Mod+N',
-        run: function () { return createNoteIn(N.store.state.settings.defaultNewNoteFolder || ''); } },
+      { id: 'note.new', title: 'New note', group: 'Create', icon: 'file-plus', accel: 'Mod+Alt+N', run: function () { return createNoteIn(N.store.state.settings.defaultNewNoteFolder || ''); } },
       { id: 'folder.new', title: 'New folder', group: 'Create', icon: 'folder-plus',
         run: async function () {
           const name = await N.modal.prompt({ title: 'New folder', placeholder: 'Folder name' });
@@ -45990,7 +46117,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           win.document.close();
         } },
 
-      { id: 'view.sidebar', title: 'Toggle the sidebar', group: 'View', icon: 'sidebar', accel: 'Mod+B', run: toggleSidebar },
+      { id: 'view.sidebar', title: 'Toggle the sidebar', group: 'View', icon: 'sidebar', accel: 'Mod+Alt+B', run: toggleSidebar },
       { id: 'view.rightPanel', title: 'Toggle the right panel', group: 'View', icon: 'sidebar-right', accel: 'Mod+Alt+\\',
         run: toggleRightPanel },
       { id: 'view.editor', title: 'Go to notes', group: 'View', icon: 'note', accel: 'Mod+1', run: function () { setView('editor'); } },
