@@ -7737,28 +7737,20 @@ html[data-guest][data-mode='dark'] .guest-body mark {
     color-mix(in srgb, var(--accent) 55%, transparent), var(--accent));
   transition: transform 90ms linear;
 }
-.sticky-head {
-  position: absolute; top: 2px; left: 0; right: 0;
-  z-index: 39; pointer-events: none;
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px var(--sp-6);
-  font-size: 11px; letter-spacing: var(--tracking-caps, 0.06em);
-  text-transform: uppercase;
-  color: var(--text-3);
-  background: color-mix(in srgb, var(--bg-editor) 88%, transparent);
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid var(--border);
-  opacity: 0; transform: translateY(-6px);
-  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-spring);
-}
-.sticky-head.is-on { opacity: 1; transform: translateY(0); }
-.sticky-head-level { color: var(--accent); font-weight: 700; flex: none; }
-.sticky-head-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-[data-animations='none'] .read-progress-fill,
-[data-animations='none'] .sticky-head { transition: none; }
-.glass-only .sticky-head { backdrop-filter: none; }
-[data-style='nothing'] .sticky-head { backdrop-filter: none; background: var(--bg-editor); }
-@media (max-width: 700px) { .sticky-head { padding-left: var(--sp-5); padding-right: var(--sp-5); } }
+/*
+ * v9.3: THE OTHER HALF OF THE COLLISION, AND THE WORSE HALF.
+ *
+ * These rules were written for the reading crumb and named .sticky-head - so
+ * they were also landing on the header of every sticky note on the sticky
+ * wall, since v9.1. `position: absolute` and `opacity: 0` on a sticky note's
+ * own header is why a sticky came out looking like a coloured block with a
+ * stray bar across it. The crumb has been renamed; these have to go with it,
+ * or the wall stays broken.
+ *
+ * Only the progress-bar rule survives here. Everything the crumb needs now
+ * lives under .note-crumb further down.
+ */
+[data-animations='none'] .read-progress-fill { transition: none; }
 
 /* ------------------------------------------------------ tag colours ----- */
 [data-tag-colour] { --tagc: var(--text-2); }
@@ -8005,6 +7997,281 @@ body:has(.guest-sheet) .pwa-prompt {
 .reset-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .reset-row .btn { flex: 0 1 auto; }
 
+/* =========================================================================
+ * v9.3 — the docked toolbar, reading aloud, languages, and the mobile fixes.
+ * ========================================================================= */
+
+/* ------------------------------------------------- the reading crumb ----
+ * RENAMED. It used to be called .sticky-head, which is ALSO the header of a
+ * sticky note on the sticky wall - a name that already existed in this
+ * stylesheet. Three symptoms, one collision:
+ *
+ *   @media (hover: none) { .sticky-head { opacity: 1 !important; } }
+ *
+ * On any touch device that !important pinned the crumb permanently visible,
+ * which is why a note with no heading showed the PREVIOUS note's heading, and
+ * why it only ever happened on a phone. The sticky-note rule also carries
+ * negative margins, which squashed the bar to 11px and pushed it 6px wider
+ * than its pane - the horizontal scrollbar that appeared with almost nothing
+ * to scroll. All three go away with the name.
+ */
+.note-crumb {
+  position: absolute; top: 0; left: 0; right: 0;
+  z-index: 39; pointer-events: none;
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px var(--sp-6);
+  font-size: 11px; letter-spacing: var(--tracking-caps, 0.06em);
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: color-mix(in srgb, var(--bg-editor) 90%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+  opacity: 0; transform: translateY(-6px);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-spring);
+}
+.note-crumb.is-on { opacity: 1; transform: translateY(0); }
+.note-crumb-level { color: var(--accent); font-weight: 700; flex: none; }
+.note-crumb-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-animations='none'] .note-crumb { transition: none; }
+[data-style='nothing'] .note-crumb { backdrop-filter: none; background: var(--bg-editor); }
+@media (max-width: 700px) { .note-crumb { padding-left: var(--sp-5); padding-right: var(--sp-5); } }
+
+/* Nothing inside the writing pane may make it wider than itself. */
+.split-editor, .split-preview { overflow-x: hidden; }
+.split-editor > .note-crumb, .split-editor > .read-progress { max-width: 100%; }
+
+/* --------------------------------------- the toolbar in the title row ---
+ * While there is a selection the title row becomes the toolbar. The children
+ * are hidden rather than removed so the row keeps its height and nothing
+ * jumps; the dock is absolutely positioned over them.
+ */
+.editor-head[data-selecting] > .note-title-input,
+.editor-head[data-selecting] > .title-warn,
+.editor-head[data-selecting] > .editor-actions {
+  visibility: hidden;
+  pointer-events: none;
+}
+.sel-dock {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 var(--sp-4);
+  background: var(--bg-0);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-spring);
+}
+.sel-dock.is-in { opacity: 1; transform: translateY(0); }
+[data-animations='none'] .sel-dock { transition: none; }
+.sel-dock .sel-scroll {
+  display: flex; align-items: center; gap: 2px;
+  flex: 1 1 auto; min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.sel-dock .sel-scroll::-webkit-scrollbar { display: none; }
+.sel-dock .sel-group { display: flex; align-items: center; gap: 2px; flex: none; }
+.sel-dock .sel-group + .sel-group::before {
+  content: ''; width: 1px; height: 18px; margin: 0 4px 0 2px;
+  background: var(--border); display: inline-block; vertical-align: middle;
+}
+.sel-dock .sel-tail {
+  display: flex; align-items: center; gap: 2px; flex: none;
+  padding-left: 4px; margin-left: 2px;
+  border-left: 1px solid var(--border);
+}
+.sel-dock .sel-btn {
+  width: 34px; height: 34px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; color: var(--text-1);
+  border-radius: var(--r-sm, 6px); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out),
+              transform 90ms var(--ease-out);
+}
+.sel-dock .sel-btn:hover { background: var(--bg-2); color: var(--text-0); }
+.sel-dock .sel-btn:active { transform: scale(0.94); }
+.sel-dock .sel-done { color: var(--accent); }
+.sel-dock .sel-stats {
+  flex: none; padding: 0 6px;
+  font-size: 11px; color: var(--text-3); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sel-dock.has-overflow .sel-btn.is-more { color: var(--accent); }
+.sel-dock .sel-caret {
+  width: 15px; height: 34px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; color: var(--text-2);
+  border-radius: var(--r-sm, 6px); cursor: pointer;
+}
+.sel-dock .sel-caret:hover { background: var(--bg-2); color: var(--text-0); }
+.sel-dock .sel-hl { position: relative; display: inline-flex; align-items: center; }
+
+/* The highlighter button wears the colour it will apply. */
+.sel-btn-hl svg { color: var(--sel-hl, var(--hl-yellow)); }
+.sel-btn-hl[data-hl='green'] svg  { color: var(--hl-green); }
+.sel-btn-hl[data-hl='blue'] svg   { color: var(--hl-blue); }
+.sel-btn-hl[data-hl='pink'] svg   { color: var(--hl-pink); }
+.sel-btn-hl[data-hl='purple'] svg { color: var(--hl-purple); }
+.sel-btn-hl[data-hl='yellow'] svg { color: var(--hl-yellow); }
+.sel-swatch.is-on { box-shadow: 0 0 0 2px var(--bg-panel), 0 0 0 3.5px var(--text-0); }
+
+@media (max-width: 620px) {
+  .sel-dock { padding: 0 var(--sp-3); gap: 2px; }
+  .sel-dock .sel-btn { width: 38px; height: 38px; }
+  .sel-dock .sel-stats { display: none; }
+  .sel-dock .sel-caret { width: 18px; height: 38px; }
+}
+@media (max-width: 380px) {
+  .sel-dock .sel-tail { padding-left: 2px; margin-left: 0; }
+}
+
+/* ------------------------------------------- mobile header breathing ---- */
+@media (max-width: 820px), (pointer: coarse) {
+  /* The title sat 8px under a 50px top bar with a 46px row - tight enough to
+     read as one crowded block. A little air, and a rule to separate them. */
+  .editor-head { padding-top: var(--sp-3); padding-bottom: var(--sp-3); min-height: 52px; }
+  .note-title-input { font-size: var(--text-md); padding: var(--sp-2) var(--sp-2); }
+  .topbar { box-shadow: 0 1px 0 var(--border); }
+}
+
+/* --------------------------------- one More button, not two ------------
+ * The mobile bar has More, and so did the top bar - the same menu, twice, a
+ * thumb's width apart. Wherever the bar is showing, the top bar's copy stands
+ * down; on a tablet or desktop with no bar it is the only route and stays.
+ */
+@media (max-width: 900px) {
+  body:has(.mobile-nav) #btn-more { display: none !important; }
+}
+
+/* ------------------------------------- sheet rows: icon on the first line
+ * .sheet-item put the icon at flex-start with a 2px nudge, which lines it up
+ * with the top of the label rather than the middle of the label's first line.
+ * On a two-line row - "Copy a link to it in your repository" - the icon read
+ * as floating above the text. A fixed 24px box matched to the first line's
+ * height puts it exactly where the eye expects, on one line or three.
+ */
+.sheet-item { align-items: flex-start; }
+.sheet-item .icon {
+  align-self: flex-start;
+  margin-top: 0;
+  height: 24px;
+  box-sizing: content-box;
+  display: block;
+}
+.sheet-item-main { padding-top: 1px; }
+.sheet-item-label { line-height: 22px; }
+.sheet-item:not(:has(.sheet-item-desc)) { align-items: center; }
+.sheet-item:not(:has(.sheet-item-desc)) .sheet-item-main { padding-top: 0; }
+
+/* ------------------------------------------------------ reading aloud --- */
+.speak-bar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--sp-6) + var(--safe-bottom, 0px));
+  transform: translate(-50%, 14px);
+  z-index: var(--z-toast, 180);
+  display: flex; align-items: center; gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill, 999px);
+  box-shadow: var(--shadow-lg, 0 14px 40px -16px rgba(0,0,0,.5));
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-spring);
+}
+.speak-bar.is-in { opacity: 1; transform: translate(-50%, 0); }
+[data-animations='none'] .speak-bar { transition: none; }
+.speak-btn {
+  width: 34px; height: 34px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; color: var(--text-1);
+  border-radius: 50%; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), transform 90ms var(--ease-out);
+}
+.speak-btn:hover { background: var(--bg-2); color: var(--text-0); }
+.speak-btn:active { transform: scale(0.92); }
+.speak-play { background: var(--accent-soft); color: var(--accent); }
+.speak-meter { flex: 1 1 70px; min-width: 46px; height: 3px; border-radius: 2px; background: var(--bg-3); overflow: hidden; }
+.speak-meter-fill {
+  display: block; height: 100%; width: 100%;
+  transform-origin: 0 50%; transform: scaleX(0);
+  background: var(--accent);
+  transition: transform 220ms var(--ease-out);
+}
+.speak-count { flex: none; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.speak-speeds { display: flex; gap: 2px; flex: none; }
+.speak-speed {
+  min-width: 34px; height: 26px; padding: 0 6px;
+  border: 1px solid transparent; border-radius: var(--r-pill, 999px);
+  background: transparent; color: var(--text-3);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.speak-speed:hover { color: var(--text-1); background: var(--bg-2); }
+.speak-speed.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.speak-voice {
+  flex: 0 1 120px; min-width: 0; height: 28px;
+  border: 1px solid var(--border); border-radius: var(--r-sm, 6px);
+  background: var(--bg-0); color: var(--text-1);
+  font-size: 11px; font-family: inherit;
+}
+.speak-bar.is-paused .speak-meter-fill { opacity: 0.5; }
+@keyframes nd-speak-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.speak-bar:not(.is-paused) .speak-play svg { animation: nd-speak-pulse 1.8s var(--ease-in-out) infinite; }
+[data-animations='none'] .speak-bar .speak-play svg { animation: none; }
+@media (prefers-reduced-motion: reduce) { .speak-bar .speak-play svg { animation: none; } }
+@media (max-width: 560px) {
+  .speak-bar { left: 12px; right: 12px; transform: translateY(14px); max-width: none; }
+  .speak-bar.is-in { transform: translateY(0); }
+  .speak-voice { display: none; }
+  .speak-bar { bottom: calc(64px + var(--safe-bottom, 0px)); }
+}
+
+/* ------------------------------------------------------------ languages -- */
+.lang-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.lang-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--r-md, 10px);
+  background: var(--bg-0); color: var(--text-1);
+  cursor: pointer; text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out),
+              transform 120ms var(--ease-spring);
+}
+.lang-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.lang-card.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--text-0); }
+.lang-card .icon { color: var(--text-3); flex: none; }
+.lang-card.is-active .icon { color: var(--accent); }
+.lang-native { font-weight: 600; }
+.lang-name { font-size: var(--text-xs); color: var(--text-3); }
+.lang-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+/* Right-to-left. The browser mirrors most of it from dir="rtl"; these are the
+   handful of places this app pins a side explicitly. */
+html[dir='rtl'] .find-bar { right: auto; left: 14px; }
+html[dir='rtl'] .note-crumb { text-align: right; }
+html[dir='rtl'] .sel-dock .sel-tail { border-left: 0; border-right: 1px solid var(--border); padding-left: 0; padding-right: 4px; }
+html[dir='rtl'] .speak-meter-fill { transform-origin: 100% 50%; }
+html[dir='rtl'] .read-progress-fill { transform-origin: 100% 50%; }
+html[dir='rtl'] .sheet-item, html[dir='rtl'] .sel-row, html[dir='rtl'] .lang-card { text-align: right; }
+
+/* --------------------------------------------------- offline and sync --- */
+.sync-pending {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-3);
+}
+@keyframes nd-sync-spin { to { transform: rotate(360deg); } }
+.sync-pending.is-working svg { animation: nd-sync-spin 1.1s linear infinite; }
+[data-animations='none'] .sync-pending.is-working svg { animation: none; }
+
 </style>
 </head>
 
@@ -8051,7 +8318,7 @@ body:has(.guest-sheet) .pwa-prompt {
       <button id="btn-capture" class="icon-btn mobile-hide" title="Quick capture" data-tip-kbd="Mod+Shift+C">
         <span data-icon="zap" data-icon-size="18"></span>
       </button>
-      <button id="btn-theme" class="icon-btn" title="Switch light / dark" data-tip-kbd="Mod+Shift+L">
+      <button id="btn-theme" class="icon-btn" title="Switch light / dark" data-i18n-title="bar.theme" data-tip-kbd="Mod+Shift+L">
         <span data-icon="sun" data-icon-size="18"></span>
       </button>
       <button id="btn-install" class="icon-btn hidden" title="Install Nodalis as an app">
@@ -8060,10 +8327,10 @@ body:has(.guest-sheet) .pwa-prompt {
       <button id="btn-right-panel" class="icon-btn only-desktop" title="Toggle right panel">
         <span data-icon="sidebar-right" data-icon-size="18"></span>
       </button>
-      <button id="btn-help" class="icon-btn mobile-hide" title="Help, shortcuts and tour" data-tip-kbd="F1">
+      <button id="btn-help" class="icon-btn mobile-hide" title="Help, shortcuts and tour" data-i18n-title="bar.help" data-tip-kbd="F1">
         <span data-icon="help" data-icon-size="18"></span>
       </button>
-      <button id="btn-settings" class="icon-btn mobile-hide" title="Settings" data-tip-kbd="Mod+,">
+      <button id="btn-settings" class="icon-btn mobile-hide" title="Settings" data-i18n-title="bar.settings" data-tip-kbd="Mod+,">
         <span data-icon="settings" data-icon-size="18"></span>
       </button>
       <!--
@@ -8086,7 +8353,7 @@ body:has(.guest-sheet) .pwa-prompt {
       <div class="sidebar-head">
         <button id="btn-new-note" class="btn btn-primary btn-block" data-tip-kbd="Mod+N">
           <span data-icon="plus" data-icon-size="16"></span>
-          <span>New note</span>
+          <span data-i18n="side.newNote">New note</span>
         </button>
         <div class="sidebar-actions">
           <button id="btn-new-folder" class="icon-btn" title="New folder"><span data-icon="folder-plus" data-icon-size="17"></span></button>
@@ -8097,10 +8364,10 @@ body:has(.guest-sheet) .pwa-prompt {
       </div>
 
       <div class="sidebar-tabs" role="tablist" aria-label="Sidebar sections">
-        <button class="sidebar-tab is-active" data-tab="files" role="tab">Files</button>
-        <button class="sidebar-tab" data-tab="tags" role="tab">Tags</button>
-        <button class="sidebar-tab" data-tab="recent" role="tab">Recent</button>
-        <button class="sidebar-tab" data-tab="canvases" role="tab">Boards</button>
+        <button class="sidebar-tab is-active" data-tab="files" role="tab" data-i18n="side.files">Files</button>
+        <button class="sidebar-tab" data-tab="tags" role="tab" data-i18n="side.tags">Tags</button>
+        <button class="sidebar-tab" data-tab="recent" role="tab" data-i18n="side.recent">Recent</button>
+        <button class="sidebar-tab" data-tab="canvases" role="tab" data-i18n="side.boards">Boards</button>
       </div>
 
       <div class="sidebar-body">
@@ -8138,9 +8405,9 @@ body:has(.guest-sheet) .pwa-prompt {
             <button id="btn-pin" class="icon-btn" title="Pin note"><span data-icon="pin" data-icon-size="17"></span></button>
             <button id="btn-note-menu" class="icon-btn is-prominent" title="Note actions — share, icon, lock, delete" aria-label="Note actions"><span data-icon="more" data-icon-size="17"></span></button>
             <div class="segmented only-desktop" id="editor-mode" role="group" aria-label="Editor mode">
-              <button data-mode="edit" title="Write only">Write</button>
-              <button data-mode="split" class="is-active" title="Write and preview">Split</button>
-              <button data-mode="preview" title="Read only">Read</button>
+              <button data-mode="edit" title="Write only" data-i18n="note.write">Write</button>
+              <button data-mode="split" class="is-active" title="Write and preview" data-i18n="note.split">Split</button>
+              <button data-mode="preview" title="Read only" data-i18n="note.read">Read</button>
             </div>
             <button id="btn-editor-mode-mobile" class="icon-btn only-mobile" title="Toggle preview"><span data-icon="eye" data-icon-size="17"></span></button>
           </div>
@@ -8378,9 +8645,9 @@ body:has(.guest-sheet) .pwa-prompt {
       <!-- ---------- settings ---------- -->
       <section id="view-settings" class="view" data-view="settings">
         <div class="view-header">
-          <h2 class="view-title">Settings</h2>
+          <h2 class="view-title" data-i18n="view.settings">Settings</h2>
           <div class="view-header-actions">
-            <button class="btn btn-sm" id="settings-export-config">Export settings</button>
+            <button class="btn btn-sm" id="settings-export-config" data-i18n="set.exportConfig">Export settings</button>
           </div>
         </div>
         <div class="view-body view-pad" id="settings-body"></div>
@@ -8407,19 +8674,19 @@ body:has(.guest-sheet) .pwa-prompt {
   <!-- ================================================== mobile nav ===== -->
   <nav class="mobile-nav" id="mobile-nav" aria-label="Main">
     <button class="mobile-nav-btn is-active" data-view="editor">
-      <span data-icon="note" data-icon-size="21"></span><span>Notes</span>
+      <span data-icon="note" data-icon-size="21"></span><span data-i18n="nav.notes">Notes</span>
     </button>
     <button class="mobile-nav-btn" data-action="search">
-      <span data-icon="search" data-icon-size="21"></span><span>Search</span>
+      <span data-icon="search" data-icon-size="21"></span><span data-i18n="nav.search">Search</span>
     </button>
     <button class="mobile-nav-btn" data-action="capture">
-      <span data-icon="zap" data-icon-size="21"></span><span>Capture</span>
+      <span data-icon="zap" data-icon-size="21"></span><span data-i18n="nav.capture">Capture</span>
     </button>
     <button class="mobile-nav-btn" data-view="tasks">
-      <span data-icon="list-check" data-icon-size="21"></span><span>Tasks</span>
+      <span data-icon="list-check" data-icon-size="21"></span><span data-i18n="nav.tasks">Tasks</span>
     </button>
     <button class="mobile-nav-btn" data-action="more">
-      <span data-icon="more" data-icon-size="21"></span><span>More</span>
+      <span data-icon="more" data-icon-size="21"></span><span data-i18n="nav.more">More</span>
     </button>
   </nav>
 
@@ -8482,9 +8749,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 (function (N) {
   'use strict';
 
-  N.version = '9.2.0';
-  N.versionName = 'v9.2';
-  N.built = '2026-08-28';
+  N.version = '9.3.0';
+  N.versionName = 'v9.3';
+  N.built = '2026-08-29';
 
   /** "v8.0.0" - what goes on screen. */
   N.versionLabel = function () { return 'v' + N.version; };
@@ -8507,6 +8774,511 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   };
 })(window.NODALIS = window.NODALIS || {});
 
+
+/* ===== js/core/i18n.js ===== */
+/* =========================================================================
+ * Nodalis - core/i18n.js   (v9.3)
+ *
+ * The language of the INTERFACE, and only the interface.
+ *
+ * The distinction matters more here than in most apps, because the whole point
+ * of Nodalis is that your notes are plain text files that belong to you. So:
+ *
+ *   YOUR NOTES ARE NEVER TOUCHED. Not translated, not transliterated, not
+ *   normalised. Type Tamil into an English interface, paste Japanese into a
+ *   Spanish one, mix scripts in one sentence - the bytes that reach the .md
+ *   file are exactly the bytes you typed. Nothing in this module can reach the
+ *   editor, the preview, a note title, or anything read from disk. It only
+ *   rewrites labels the app itself wrote.
+ *
+ *   THE INTERFACE FOLLOWS YOUR CHOICE. Chrome, menus, buttons, view titles,
+ *   command names, settings labels.
+ *
+ * HOW IT WORKS, and why it is done this way.
+ *
+ * Every translatable string in the shell carries data-i18n="key". A pass over
+ * the document swaps the text of those elements; a second pass handles title=
+ * and aria-label= and placeholder= through data-i18n-title and friends. Command
+ * titles are translated by command id, because the command palette is the
+ * largest single surface of English in the app and it is generated, not markup.
+ *
+ * A missing translation falls back to the English string that is already in the
+ * DOM. That is deliberate: a half-translated interface in a language you read
+ * is more useful than a fully-translated one in a language you do not, and it
+ * means adding a language can never break the app.
+ *
+ * RIGHT-TO-LEFT is a first-class case, not an afterthought - dir="rtl" goes on
+ * <html> so the browser mirrors layout, and the stylesheet has the handful of
+ * logical-property corrections that the app's own CSS needs.
+ * ========================================================================= */
+(function (N) {
+  'use strict';
+
+  const LANGS = [
+    { id: 'en', name: 'English', native: 'English', dir: 'ltr' },
+    { id: 'ta', name: 'Tamil', native: 'தமிழ்', dir: 'ltr' },
+    { id: 'hi', name: 'Hindi', native: 'हिन्दी', dir: 'ltr' },
+    { id: 'es', name: 'Spanish', native: 'Español', dir: 'ltr' },
+    { id: 'fr', name: 'French', native: 'Français', dir: 'ltr' },
+    { id: 'de', name: 'German', native: 'Deutsch', dir: 'ltr' },
+    { id: 'pt', name: 'Portuguese', native: 'Português', dir: 'ltr' },
+    { id: 'ar', name: 'Arabic', native: 'العربية', dir: 'rtl' },
+    { id: 'zh', name: 'Chinese', native: '中文', dir: 'ltr' },
+    { id: 'ja', name: 'Japanese', native: '日本語', dir: 'ltr' },
+  ];
+
+  /*
+   * The dictionary. Keys are stable identifiers, never English text - so
+   * correcting the English wording later does not orphan ten translations.
+   *
+   * What is covered: everything the app draws for itself that a person reads
+   * while working - the top bar, the sidebar, the mobile bar, view titles,
+   * the note header, the settings sections, and the common verbs. Command
+   * titles are keyed as cmd.<command id>.
+   */
+  const DICT = {
+    ta: {
+      'nav.notes': 'குறிப்புகள்', 'nav.search': 'தேடல்', 'nav.capture': 'பதிவு',
+      'nav.tasks': 'பணிகள்', 'nav.more': 'மேலும்',
+      'side.files': 'கோப்புகள்', 'side.tags': 'குறிச்சொற்கள்', 'side.recent': 'சமீபத்திய',
+      'side.boards': 'பலகைகள்', 'side.newNote': 'புதிய குறிப்பு',
+      'bar.search': 'தேடு அல்லது செல்…', 'bar.theme': 'ஒளி / இருள் மாற்று',
+      'bar.help': 'உதவி', 'bar.settings': 'அமைப்புகள்', 'bar.more': 'மேலும்',
+      'bar.capture': 'விரைவு பதிவு', 'bar.sidebar': 'பக்கப்பட்டியை மாற்று',
+      'view.tasks': 'பணிகள்', 'view.search': 'தேடல்', 'view.settings': 'அமைப்புகள்',
+      'view.graph': 'அறிவு வரைபடம்', 'view.canvas': 'கித்தான்', 'view.sticky': 'ஒட்டுக் குறிப்புகள்',
+      'view.scratch': 'கிறுக்கல் தாள்', 'view.calendar': 'நாட்காட்டி', 'view.matrix': 'முன்னுரிமை அணி',
+      'view.trash': 'குப்பை', 'view.database': 'தரவுத்தளம்',
+      'note.pin': 'குறிப்பைப் பொருத்து', 'note.actions': 'குறிப்பு செயல்கள்',
+      'note.write': 'எழுது', 'note.split': 'பிரி', 'note.read': 'படி', 'note.preview': 'முன்னோட்டம்',
+      'note.saved': 'சேமிக்கப்பட்டது', 'note.focus': 'கவனம்',
+      'act.save': 'சேமி', 'act.cancel': 'ரத்து', 'act.close': 'மூடு', 'act.undo': 'செயல்தவிர்',
+      'act.redo': 'மீண்டும் செய்', 'act.delete': 'நீக்கு', 'act.copy': 'நகலெடு',
+      'act.share': 'பங்கிடு', 'act.export': 'ஏற்றுமதி', 'act.done': 'முடிந்தது',
+      'set.storage': 'சேமிப்பு', 'set.appearance': 'தோற்றம்', 'set.typography': 'எழுத்துரு',
+      'set.editor': 'திருத்தி', 'set.features': 'அம்சங்கள்', 'set.shortcuts': 'சுருக்குவழிகள்',
+      'set.daily': 'தினசரி குறிப்புகள்', 'set.github': 'GitHub ஒத்திசைவு',
+      'set.data': 'காப்புப்பிரதி மற்றும் தரவு', 'set.about': 'பற்றி',
+      'set.exportConfig': 'அமைப்புகளை ஏற்றுமதி செய்',
+      'set.sidebarTabs': 'பக்கப்பட்டி தாவல்கள்', 'set.vaultTools': 'சேமிப்பு கருவிகள்',
+      'set.dangerZone': 'ஆபத்து மண்டலம்',
+      'set.language': 'மொழி', 'set.languageHelp': 'பயன்பாட்டு இடைமுகத்தின் மொழி. உங்கள் குறிப்புகள் மாற்றப்படாது.',
+      'speak.speak': 'வாசி', 'speak.pause': 'இடைநிறுத்து', 'speak.resume': 'தொடர்',
+      'speak.stop': 'நிறுத்து', 'speak.speed': 'வேகம்', 'speak.voice': 'குரல்',
+      'speak.readNote': 'இந்தக் குறிப்பை வாசி', 'speak.readSelection': 'தேர்வை வாசி',
+      'fmt.bold': 'தடிமன்', 'fmt.italic': 'சாய்வு', 'fmt.strike': 'கோடிட்டு',
+      'fmt.code': 'குறியீடு', 'fmt.highlight': 'முன்னிலைப்படுத்து', 'fmt.link': 'இணைப்பு',
+      'fmt.clear': 'வடிவமைப்பை அழி', 'fmt.more': 'மேலும்',
+    },
+    hi: {
+      'nav.notes': 'नोट्स', 'nav.search': 'खोज', 'nav.capture': 'कैप्चर',
+      'nav.tasks': 'कार्य', 'nav.more': 'और',
+      'side.files': 'फ़ाइलें', 'side.tags': 'टैग', 'side.recent': 'हाल के',
+      'side.boards': 'बोर्ड', 'side.newNote': 'नया नोट',
+      'bar.search': 'खोजें या जाएँ…', 'bar.theme': 'लाइट / डार्क बदलें',
+      'bar.help': 'सहायता', 'bar.settings': 'सेटिंग्स', 'bar.more': 'और',
+      'bar.capture': 'तुरंत कैप्चर', 'bar.sidebar': 'साइडबार टॉगल करें',
+      'view.tasks': 'कार्य', 'view.search': 'खोज', 'view.settings': 'सेटिंग्स',
+      'view.graph': 'ज्ञान ग्राफ़', 'view.canvas': 'कैनवास', 'view.sticky': 'स्टिकी दीवार',
+      'view.scratch': 'स्क्रैचपैड', 'view.calendar': 'कैलेंडर', 'view.matrix': 'प्राथमिकता मैट्रिक्स',
+      'view.trash': 'कूड़ेदान', 'view.database': 'डेटाबेस',
+      'note.pin': 'नोट पिन करें', 'note.actions': 'नोट क्रियाएँ',
+      'note.write': 'लिखें', 'note.split': 'विभाजित', 'note.read': 'पढ़ें', 'note.preview': 'पूर्वावलोकन',
+      'note.saved': 'सहेजा गया', 'note.focus': 'फ़ोकस',
+      'act.save': 'सहेजें', 'act.cancel': 'रद्द', 'act.close': 'बंद', 'act.undo': 'पूर्ववत',
+      'act.redo': 'दोबारा', 'act.delete': 'हटाएँ', 'act.copy': 'कॉपी',
+      'act.share': 'साझा', 'act.export': 'निर्यात', 'act.done': 'पूर्ण',
+      'set.storage': 'भंडारण', 'set.appearance': 'रूप', 'set.typography': 'टाइपोग्राफ़ी',
+      'set.editor': 'संपादक', 'set.features': 'विशेषताएँ', 'set.shortcuts': 'शॉर्टकट',
+      'set.daily': 'दैनिक नोट्स', 'set.github': 'GitHub सिंक',
+      'set.data': 'बैकअप और डेटा', 'set.about': 'परिचय',
+      'set.exportConfig': 'सेटिंग्स निर्यात करें',
+      'set.sidebarTabs': 'साइडबार टैब', 'set.vaultTools': 'वॉल्ट टूल्स',
+      'set.dangerZone': 'खतरे का क्षेत्र',
+      'set.language': 'भाषा', 'set.languageHelp': 'ऐप इंटरफ़ेस की भाषा। आपके नोट्स नहीं बदले जाते।',
+      'speak.speak': 'बोलें', 'speak.pause': 'रोकें', 'speak.resume': 'जारी रखें',
+      'speak.stop': 'बंद करें', 'speak.speed': 'गति', 'speak.voice': 'आवाज़',
+      'speak.readNote': 'यह नोट पढ़ें', 'speak.readSelection': 'चयन पढ़ें',
+      'fmt.bold': 'बोल्ड', 'fmt.italic': 'इटैलिक', 'fmt.strike': 'स्ट्राइक',
+      'fmt.code': 'कोड', 'fmt.highlight': 'हाइलाइट', 'fmt.link': 'लिंक',
+      'fmt.clear': 'फ़ॉर्मैटिंग हटाएँ', 'fmt.more': 'और',
+    },
+    es: {
+      'nav.notes': 'Notas', 'nav.search': 'Buscar', 'nav.capture': 'Capturar',
+      'nav.tasks': 'Tareas', 'nav.more': 'Más',
+      'side.files': 'Archivos', 'side.tags': 'Etiquetas', 'side.recent': 'Recientes',
+      'side.boards': 'Tableros', 'side.newNote': 'Nueva nota',
+      'bar.search': 'Buscar o ir a…', 'bar.theme': 'Cambiar claro / oscuro',
+      'bar.help': 'Ayuda', 'bar.settings': 'Ajustes', 'bar.more': 'Más',
+      'bar.capture': 'Captura rápida', 'bar.sidebar': 'Mostrar u ocultar la barra',
+      'view.tasks': 'Tareas', 'view.search': 'Buscar', 'view.settings': 'Ajustes',
+      'view.graph': 'Grafo de conocimiento', 'view.canvas': 'Lienzo', 'view.sticky': 'Muro de notas',
+      'view.scratch': 'Borrador', 'view.calendar': 'Calendario', 'view.matrix': 'Matriz de prioridades',
+      'view.trash': 'Papelera', 'view.database': 'Base de datos',
+      'note.pin': 'Fijar la nota', 'note.actions': 'Acciones de la nota',
+      'note.write': 'Escribir', 'note.split': 'Dividir', 'note.read': 'Leer', 'note.preview': 'Vista previa',
+      'note.saved': 'Guardado', 'note.focus': 'Concentración',
+      'act.save': 'Guardar', 'act.cancel': 'Cancelar', 'act.close': 'Cerrar', 'act.undo': 'Deshacer',
+      'act.redo': 'Rehacer', 'act.delete': 'Eliminar', 'act.copy': 'Copiar',
+      'act.share': 'Compartir', 'act.export': 'Exportar', 'act.done': 'Hecho',
+      'set.storage': 'Almacenamiento', 'set.appearance': 'Apariencia', 'set.typography': 'Tipografía',
+      'set.editor': 'Editor', 'set.features': 'Funciones', 'set.shortcuts': 'Atajos',
+      'set.daily': 'Notas diarias', 'set.github': 'Sincronización con GitHub',
+      'set.data': 'Copias y datos', 'set.about': 'Acerca de',
+      'set.exportConfig': 'Exportar ajustes',
+      'set.sidebarTabs': 'Pestañas de la barra lateral', 'set.vaultTools': 'Herramientas de la bóveda',
+      'set.dangerZone': 'Zona de riesgo',
+      'set.language': 'Idioma', 'set.languageHelp': 'El idioma de la interfaz. Tus notas no se modifican.',
+      'speak.speak': 'Leer en voz alta', 'speak.pause': 'Pausar', 'speak.resume': 'Continuar',
+      'speak.stop': 'Detener', 'speak.speed': 'Velocidad', 'speak.voice': 'Voz',
+      'speak.readNote': 'Leer esta nota', 'speak.readSelection': 'Leer la selección',
+      'fmt.bold': 'Negrita', 'fmt.italic': 'Cursiva', 'fmt.strike': 'Tachado',
+      'fmt.code': 'Código', 'fmt.highlight': 'Resaltar', 'fmt.link': 'Enlace',
+      'fmt.clear': 'Quitar formato', 'fmt.more': 'Más',
+    },
+    fr: {
+      'nav.notes': 'Notes', 'nav.search': 'Rechercher', 'nav.capture': 'Capturer',
+      'nav.tasks': 'Tâches', 'nav.more': 'Plus',
+      'side.files': 'Fichiers', 'side.tags': 'Étiquettes', 'side.recent': 'Récents',
+      'side.boards': 'Tableaux', 'side.newNote': 'Nouvelle note',
+      'bar.search': 'Rechercher ou aller à…', 'bar.theme': 'Clair / sombre',
+      'bar.help': 'Aide', 'bar.settings': 'Réglages', 'bar.more': 'Plus',
+      'bar.capture': 'Capture rapide', 'bar.sidebar': 'Afficher la barre latérale',
+      'view.tasks': 'Tâches', 'view.search': 'Rechercher', 'view.settings': 'Réglages',
+      'view.graph': 'Graphe de connaissances', 'view.canvas': 'Canevas', 'view.sticky': 'Mur de pense-bêtes',
+      'view.scratch': 'Brouillon', 'view.calendar': 'Calendrier', 'view.matrix': 'Matrice de priorités',
+      'view.trash': 'Corbeille', 'view.database': 'Base de données',
+      'note.pin': 'Épingler la note', 'note.actions': 'Actions de la note',
+      'note.write': 'Écrire', 'note.split': 'Diviser', 'note.read': 'Lire', 'note.preview': 'Aperçu',
+      'note.saved': 'Enregistré', 'note.focus': 'Concentration',
+      'act.save': 'Enregistrer', 'act.cancel': 'Annuler', 'act.close': 'Fermer', 'act.undo': 'Annuler',
+      'act.redo': 'Rétablir', 'act.delete': 'Supprimer', 'act.copy': 'Copier',
+      'act.share': 'Partager', 'act.export': 'Exporter', 'act.done': 'Terminé',
+      'set.storage': 'Stockage', 'set.appearance': 'Apparence', 'set.typography': 'Typographie',
+      'set.editor': 'Éditeur', 'set.features': 'Fonctions', 'set.shortcuts': 'Raccourcis',
+      'set.daily': 'Notes du jour', 'set.github': 'Synchronisation GitHub',
+      'set.data': 'Sauvegarde et données', 'set.about': 'À propos',
+      'set.exportConfig': 'Exporter les réglages',
+      'set.sidebarTabs': 'Onglets de la barre latérale', 'set.vaultTools': 'Outils du coffre',
+      'set.dangerZone': 'Zone sensible',
+      'set.language': 'Langue', 'set.languageHelp': "La langue de l'interface. Vos notes ne sont pas modifiées.",
+      'speak.speak': 'Lire à voix haute', 'speak.pause': 'Pause', 'speak.resume': 'Reprendre',
+      'speak.stop': 'Arrêter', 'speak.speed': 'Vitesse', 'speak.voice': 'Voix',
+      'speak.readNote': 'Lire cette note', 'speak.readSelection': 'Lire la sélection',
+      'fmt.bold': 'Gras', 'fmt.italic': 'Italique', 'fmt.strike': 'Barré',
+      'fmt.code': 'Code', 'fmt.highlight': 'Surligner', 'fmt.link': 'Lien',
+      'fmt.clear': 'Effacer la mise en forme', 'fmt.more': 'Plus',
+    },
+    de: {
+      'nav.notes': 'Notizen', 'nav.search': 'Suchen', 'nav.capture': 'Erfassen',
+      'nav.tasks': 'Aufgaben', 'nav.more': 'Mehr',
+      'side.files': 'Dateien', 'side.tags': 'Schlagwörter', 'side.recent': 'Zuletzt',
+      'side.boards': 'Boards', 'side.newNote': 'Neue Notiz',
+      'bar.search': 'Suchen oder springen…', 'bar.theme': 'Hell / dunkel',
+      'bar.help': 'Hilfe', 'bar.settings': 'Einstellungen', 'bar.more': 'Mehr',
+      'bar.capture': 'Schnell erfassen', 'bar.sidebar': 'Seitenleiste umschalten',
+      'view.tasks': 'Aufgaben', 'view.search': 'Suchen', 'view.settings': 'Einstellungen',
+      'view.graph': 'Wissensgraph', 'view.canvas': 'Leinwand', 'view.sticky': 'Notizwand',
+      'view.scratch': 'Notizblock', 'view.calendar': 'Kalender', 'view.matrix': 'Prioritätsmatrix',
+      'view.trash': 'Papierkorb', 'view.database': 'Datenbank',
+      'note.pin': 'Notiz anpinnen', 'note.actions': 'Notizaktionen',
+      'note.write': 'Schreiben', 'note.split': 'Geteilt', 'note.read': 'Lesen', 'note.preview': 'Vorschau',
+      'note.saved': 'Gespeichert', 'note.focus': 'Fokus',
+      'act.save': 'Speichern', 'act.cancel': 'Abbrechen', 'act.close': 'Schließen', 'act.undo': 'Rückgängig',
+      'act.redo': 'Wiederholen', 'act.delete': 'Löschen', 'act.copy': 'Kopieren',
+      'act.share': 'Teilen', 'act.export': 'Exportieren', 'act.done': 'Fertig',
+      'set.storage': 'Speicher', 'set.appearance': 'Aussehen', 'set.typography': 'Typografie',
+      'set.editor': 'Editor', 'set.features': 'Funktionen', 'set.shortcuts': 'Tastenkürzel',
+      'set.daily': 'Tagesnotizen', 'set.github': 'GitHub-Sync',
+      'set.data': 'Backup und Daten', 'set.about': 'Über',
+      'set.exportConfig': 'Einstellungen exportieren',
+      'set.sidebarTabs': 'Seitenleisten-Tabs', 'set.vaultTools': 'Vault-Werkzeuge',
+      'set.dangerZone': 'Gefahrenzone',
+      'set.language': 'Sprache', 'set.languageHelp': 'Die Sprache der Oberfläche. Ihre Notizen bleiben unverändert.',
+      'speak.speak': 'Vorlesen', 'speak.pause': 'Pause', 'speak.resume': 'Fortsetzen',
+      'speak.stop': 'Stopp', 'speak.speed': 'Geschwindigkeit', 'speak.voice': 'Stimme',
+      'speak.readNote': 'Diese Notiz vorlesen', 'speak.readSelection': 'Auswahl vorlesen',
+      'fmt.bold': 'Fett', 'fmt.italic': 'Kursiv', 'fmt.strike': 'Durchgestrichen',
+      'fmt.code': 'Code', 'fmt.highlight': 'Hervorheben', 'fmt.link': 'Link',
+      'fmt.clear': 'Formatierung entfernen', 'fmt.more': 'Mehr',
+    },
+    pt: {
+      'nav.notes': 'Notas', 'nav.search': 'Buscar', 'nav.capture': 'Capturar',
+      'nav.tasks': 'Tarefas', 'nav.more': 'Mais',
+      'side.files': 'Arquivos', 'side.tags': 'Etiquetas', 'side.recent': 'Recentes',
+      'side.boards': 'Quadros', 'side.newNote': 'Nova nota',
+      'bar.search': 'Buscar ou ir para…', 'bar.theme': 'Claro / escuro',
+      'bar.help': 'Ajuda', 'bar.settings': 'Configurações', 'bar.more': 'Mais',
+      'bar.capture': 'Captura rápida', 'bar.sidebar': 'Alternar a barra lateral',
+      'view.tasks': 'Tarefas', 'view.search': 'Buscar', 'view.settings': 'Configurações',
+      'view.graph': 'Grafo de conhecimento', 'view.canvas': 'Tela', 'view.sticky': 'Mural de notas',
+      'view.scratch': 'Rascunho', 'view.calendar': 'Calendário', 'view.matrix': 'Matriz de prioridades',
+      'view.trash': 'Lixeira', 'view.database': 'Banco de dados',
+      'note.pin': 'Fixar a nota', 'note.actions': 'Ações da nota',
+      'note.write': 'Escrever', 'note.split': 'Dividir', 'note.read': 'Ler', 'note.preview': 'Pré-visualizar',
+      'note.saved': 'Salvo', 'note.focus': 'Foco',
+      'act.save': 'Salvar', 'act.cancel': 'Cancelar', 'act.close': 'Fechar', 'act.undo': 'Desfazer',
+      'act.redo': 'Refazer', 'act.delete': 'Excluir', 'act.copy': 'Copiar',
+      'act.share': 'Compartilhar', 'act.export': 'Exportar', 'act.done': 'Pronto',
+      'set.storage': 'Armazenamento', 'set.appearance': 'Aparência', 'set.typography': 'Tipografia',
+      'set.editor': 'Editor', 'set.features': 'Recursos', 'set.shortcuts': 'Atalhos',
+      'set.daily': 'Notas diárias', 'set.github': 'Sincronização com GitHub',
+      'set.data': 'Backup e dados', 'set.about': 'Sobre',
+      'set.exportConfig': 'Exportar configurações',
+      'set.sidebarTabs': 'Abas da barra lateral', 'set.vaultTools': 'Ferramentas do cofre',
+      'set.dangerZone': 'Zona de risco',
+      'set.language': 'Idioma', 'set.languageHelp': 'O idioma da interface. Suas notas não são alteradas.',
+      'speak.speak': 'Ler em voz alta', 'speak.pause': 'Pausar', 'speak.resume': 'Continuar',
+      'speak.stop': 'Parar', 'speak.speed': 'Velocidade', 'speak.voice': 'Voz',
+      'speak.readNote': 'Ler esta nota', 'speak.readSelection': 'Ler a seleção',
+      'fmt.bold': 'Negrito', 'fmt.italic': 'Itálico', 'fmt.strike': 'Riscado',
+      'fmt.code': 'Código', 'fmt.highlight': 'Destacar', 'fmt.link': 'Link',
+      'fmt.clear': 'Remover formatação', 'fmt.more': 'Mais',
+    },
+    ar: {
+      'nav.notes': 'الملاحظات', 'nav.search': 'بحث', 'nav.capture': 'تسجيل',
+      'nav.tasks': 'المهام', 'nav.more': 'المزيد',
+      'side.files': 'الملفات', 'side.tags': 'الوسوم', 'side.recent': 'الأخيرة',
+      'side.boards': 'اللوحات', 'side.newNote': 'ملاحظة جديدة',
+      'bar.search': 'ابحث أو انتقل…', 'bar.theme': 'فاتح / غامق',
+      'bar.help': 'مساعدة', 'bar.settings': 'الإعدادات', 'bar.more': 'المزيد',
+      'bar.capture': 'تسجيل سريع', 'bar.sidebar': 'إظهار الشريط الجانبي',
+      'view.tasks': 'المهام', 'view.search': 'بحث', 'view.settings': 'الإعدادات',
+      'view.graph': 'خريطة المعرفة', 'view.canvas': 'اللوحة', 'view.sticky': 'حائط الملاحظات',
+      'view.scratch': 'مسودة', 'view.calendar': 'التقويم', 'view.matrix': 'مصفوفة الأولويات',
+      'view.trash': 'المحذوفات', 'view.database': 'قاعدة البيانات',
+      'note.pin': 'تثبيت الملاحظة', 'note.actions': 'إجراءات الملاحظة',
+      'note.write': 'كتابة', 'note.split': 'مقسّم', 'note.read': 'قراءة', 'note.preview': 'معاينة',
+      'note.saved': 'محفوظ', 'note.focus': 'تركيز',
+      'act.save': 'حفظ', 'act.cancel': 'إلغاء', 'act.close': 'إغلاق', 'act.undo': 'تراجع',
+      'act.redo': 'إعادة', 'act.delete': 'حذف', 'act.copy': 'نسخ',
+      'act.share': 'مشاركة', 'act.export': 'تصدير', 'act.done': 'تم',
+      'set.storage': 'التخزين', 'set.appearance': 'المظهر', 'set.typography': 'الخطوط',
+      'set.editor': 'المحرر', 'set.features': 'الميزات', 'set.shortcuts': 'الاختصارات',
+      'set.daily': 'ملاحظات اليوم', 'set.github': 'مزامنة GitHub',
+      'set.data': 'النسخ والبيانات', 'set.about': 'حول',
+      'set.exportConfig': 'تصدير الإعدادات',
+      'set.sidebarTabs': 'تبويبات الشريط الجانبي', 'set.vaultTools': 'أدوات المخزن',
+      'set.dangerZone': 'منطقة الخطر',
+      'set.language': 'اللغة', 'set.languageHelp': 'لغة واجهة التطبيق. ملاحظاتك لا تتغير.',
+      'speak.speak': 'اقرأ بصوت عال', 'speak.pause': 'إيقاف مؤقت', 'speak.resume': 'متابعة',
+      'speak.stop': 'إيقاف', 'speak.speed': 'السرعة', 'speak.voice': 'الصوت',
+      'speak.readNote': 'اقرأ هذه الملاحظة', 'speak.readSelection': 'اقرأ التحديد',
+      'fmt.bold': 'عريض', 'fmt.italic': 'مائل', 'fmt.strike': 'يتوسطه خط',
+      'fmt.code': 'كود', 'fmt.highlight': 'تظليل', 'fmt.link': 'رابط',
+      'fmt.clear': 'إزالة التنسيق', 'fmt.more': 'المزيد',
+    },
+    zh: {
+      'nav.notes': '笔记', 'nav.search': '搜索', 'nav.capture': '速记',
+      'nav.tasks': '任务', 'nav.more': '更多',
+      'side.files': '文件', 'side.tags': '标签', 'side.recent': '最近',
+      'side.boards': '面板', 'side.newNote': '新建笔记',
+      'bar.search': '搜索或跳转…', 'bar.theme': '切换浅色 / 深色',
+      'bar.help': '帮助', 'bar.settings': '设置', 'bar.more': '更多',
+      'bar.capture': '快速记录', 'bar.sidebar': '显示或隐藏侧栏',
+      'view.tasks': '任务', 'view.search': '搜索', 'view.settings': '设置',
+      'view.graph': '知识图谱', 'view.canvas': '画布', 'view.sticky': '便签墙',
+      'view.scratch': '草稿本', 'view.calendar': '日历', 'view.matrix': '优先级矩阵',
+      'view.trash': '回收站', 'view.database': '数据库',
+      'note.pin': '置顶笔记', 'note.actions': '笔记操作',
+      'note.write': '写作', 'note.split': '分栏', 'note.read': '阅读', 'note.preview': '预览',
+      'note.saved': '已保存', 'note.focus': '专注',
+      'act.save': '保存', 'act.cancel': '取消', 'act.close': '关闭', 'act.undo': '撤销',
+      'act.redo': '重做', 'act.delete': '删除', 'act.copy': '复制',
+      'act.share': '分享', 'act.export': '导出', 'act.done': '完成',
+      'set.storage': '存储', 'set.appearance': '外观', 'set.typography': '排版',
+      'set.editor': '编辑器', 'set.features': '功能', 'set.shortcuts': '快捷键',
+      'set.daily': '每日笔记', 'set.github': 'GitHub 同步',
+      'set.data': '备份与数据', 'set.about': '关于',
+      'set.exportConfig': '导出设置',
+      'set.sidebarTabs': '侧边栏标签', 'set.vaultTools': '仓库工具',
+      'set.dangerZone': '危险区域',
+      'set.language': '语言', 'set.languageHelp': '界面语言。你的笔记内容不会被改动。',
+      'speak.speak': '朗读', 'speak.pause': '暂停', 'speak.resume': '继续',
+      'speak.stop': '停止', 'speak.speed': '速度', 'speak.voice': '语音',
+      'speak.readNote': '朗读这篇笔记', 'speak.readSelection': '朗读所选内容',
+      'fmt.bold': '加粗', 'fmt.italic': '斜体', 'fmt.strike': '删除线',
+      'fmt.code': '代码', 'fmt.highlight': '高亮', 'fmt.link': '链接',
+      'fmt.clear': '清除格式', 'fmt.more': '更多',
+    },
+    ja: {
+      'nav.notes': 'ノート', 'nav.search': '検索', 'nav.capture': 'キャプチャ',
+      'nav.tasks': 'タスク', 'nav.more': 'その他',
+      'side.files': 'ファイル', 'side.tags': 'タグ', 'side.recent': '最近',
+      'side.boards': 'ボード', 'side.newNote': '新しいノート',
+      'bar.search': '検索または移動…', 'bar.theme': 'ライト / ダーク',
+      'bar.help': 'ヘルプ', 'bar.settings': '設定', 'bar.more': 'その他',
+      'bar.capture': 'クイックキャプチャ', 'bar.sidebar': 'サイドバーの切り替え',
+      'view.tasks': 'タスク', 'view.search': '検索', 'view.settings': '設定',
+      'view.graph': 'ナレッジグラフ', 'view.canvas': 'キャンバス', 'view.sticky': '付箋ウォール',
+      'view.scratch': 'スクラッチ', 'view.calendar': 'カレンダー', 'view.matrix': '優先度マトリクス',
+      'view.trash': 'ゴミ箱', 'view.database': 'データベース',
+      'note.pin': 'ノートをピン留め', 'note.actions': 'ノートの操作',
+      'note.write': '編集', 'note.split': '分割', 'note.read': '閲覧', 'note.preview': 'プレビュー',
+      'note.saved': '保存済み', 'note.focus': '集中',
+      'act.save': '保存', 'act.cancel': 'キャンセル', 'act.close': '閉じる', 'act.undo': '取り消す',
+      'act.redo': 'やり直す', 'act.delete': '削除', 'act.copy': 'コピー',
+      'act.share': '共有', 'act.export': '書き出し', 'act.done': '完了',
+      'set.storage': 'ストレージ', 'set.appearance': '外観', 'set.typography': 'タイポグラフィ',
+      'set.editor': 'エディタ', 'set.features': '機能', 'set.shortcuts': 'ショートカット',
+      'set.daily': 'デイリーノート', 'set.github': 'GitHub 同期',
+      'set.data': 'バックアップとデータ', 'set.about': 'このアプリについて',
+      'set.exportConfig': '設定を書き出す',
+      'set.sidebarTabs': 'サイドバーのタブ', 'set.vaultTools': '保管庫のツール',
+      'set.dangerZone': '危険な操作',
+      'set.language': '言語', 'set.languageHelp': 'アプリの表示言語です。ノートの内容は変更されません。',
+      'speak.speak': '読み上げ', 'speak.pause': '一時停止', 'speak.resume': '再開',
+      'speak.stop': '停止', 'speak.speed': '速度', 'speak.voice': '音声',
+      'speak.readNote': 'このノートを読み上げる', 'speak.readSelection': '選択範囲を読み上げる',
+      'fmt.bold': '太字', 'fmt.italic': '斜体', 'fmt.strike': '取り消し線',
+      'fmt.code': 'コード', 'fmt.highlight': 'ハイライト', 'fmt.link': 'リンク',
+      'fmt.clear': '書式をクリア', 'fmt.more': 'その他',
+    },
+  };
+
+  /* Command titles, keyed by command id. Only the ones people meet daily -
+     the rest fall back to English, which is the documented behaviour. */
+  const CMD = {
+    ta: { 'note.new': 'புதிய குறிப்பு', 'note.delete': 'குறிப்பை நீக்கு', 'note.pin': 'குறிப்பைப் பொருத்து',
+      'search.open': 'எல்லாவற்றையும் தேடு', 'settings.open': 'அமைப்புகளைத் திற',
+      'format.bold': 'தடிமன்', 'format.italic': 'சாய்வு', 'format.highlight': 'முன்னிலைப்படுத்து',
+      'format.find': 'இந்தக் குறிப்பில் தேடி மாற்று', 'speak.note': 'இந்தக் குறிப்பை வாசி',
+      'github.push': 'GitHub-க்கு காப்புப்பிரதி' },
+    hi: { 'note.new': 'नया नोट', 'note.delete': 'नोट हटाएँ', 'note.pin': 'नोट पिन करें',
+      'search.open': 'सब कुछ खोजें', 'settings.open': 'सेटिंग्स खोलें',
+      'format.bold': 'बोल्ड', 'format.italic': 'इटैलिक', 'format.highlight': 'हाइलाइट',
+      'format.find': 'इस नोट में खोजें और बदलें', 'speak.note': 'यह नोट पढ़ें',
+      'github.push': 'GitHub पर बैकअप' },
+    es: { 'note.new': 'Nueva nota', 'note.delete': 'Eliminar la nota', 'note.pin': 'Fijar la nota',
+      'search.open': 'Buscar en todo', 'settings.open': 'Abrir los ajustes',
+      'format.bold': 'Negrita', 'format.italic': 'Cursiva', 'format.highlight': 'Resaltar',
+      'format.find': 'Buscar y reemplazar en esta nota', 'speak.note': 'Leer esta nota',
+      'github.push': 'Copia de seguridad en GitHub' },
+    fr: { 'note.new': 'Nouvelle note', 'note.delete': 'Supprimer la note', 'note.pin': 'Épingler la note',
+      'search.open': 'Tout rechercher', 'settings.open': 'Ouvrir les réglages',
+      'format.bold': 'Gras', 'format.italic': 'Italique', 'format.highlight': 'Surligner',
+      'format.find': 'Rechercher et remplacer dans cette note', 'speak.note': 'Lire cette note',
+      'github.push': 'Sauvegarder sur GitHub' },
+    de: { 'note.new': 'Neue Notiz', 'note.delete': 'Notiz löschen', 'note.pin': 'Notiz anpinnen',
+      'search.open': 'Alles durchsuchen', 'settings.open': 'Einstellungen öffnen',
+      'format.bold': 'Fett', 'format.italic': 'Kursiv', 'format.highlight': 'Hervorheben',
+      'format.find': 'In dieser Notiz suchen und ersetzen', 'speak.note': 'Diese Notiz vorlesen',
+      'github.push': 'Auf GitHub sichern' },
+    pt: { 'note.new': 'Nova nota', 'note.delete': 'Excluir a nota', 'note.pin': 'Fixar a nota',
+      'search.open': 'Buscar em tudo', 'settings.open': 'Abrir configurações',
+      'format.bold': 'Negrito', 'format.italic': 'Itálico', 'format.highlight': 'Destacar',
+      'format.find': 'Buscar e substituir nesta nota', 'speak.note': 'Ler esta nota',
+      'github.push': 'Backup no GitHub' },
+    ar: { 'note.new': 'ملاحظة جديدة', 'note.delete': 'حذف الملاحظة', 'note.pin': 'تثبيت الملاحظة',
+      'search.open': 'ابحث في كل شيء', 'settings.open': 'افتح الإعدادات',
+      'format.bold': 'عريض', 'format.italic': 'مائل', 'format.highlight': 'تظليل',
+      'format.find': 'بحث واستبدال في هذه الملاحظة', 'speak.note': 'اقرأ هذه الملاحظة',
+      'github.push': 'نسخ احتياطي إلى GitHub' },
+    zh: { 'note.new': '新建笔记', 'note.delete': '删除笔记', 'note.pin': '置顶笔记',
+      'search.open': '全局搜索', 'settings.open': '打开设置',
+      'format.bold': '加粗', 'format.italic': '斜体', 'format.highlight': '高亮',
+      'format.find': '在本篇笔记中查找替换', 'speak.note': '朗读这篇笔记',
+      'github.push': '备份到 GitHub' },
+    ja: { 'note.new': '新しいノート', 'note.delete': 'ノートを削除', 'note.pin': 'ノートをピン留め',
+      'search.open': 'すべて検索', 'settings.open': '設定を開く',
+      'format.bold': '太字', 'format.italic': '斜体', 'format.highlight': 'ハイライト',
+      'format.find': 'このノート内で検索と置換', 'speak.note': 'このノートを読み上げる',
+      'github.push': 'GitHub にバックアップ' },
+  };
+
+  let lang = 'en';
+
+  function current() { return lang; }
+  function info(id) {
+    return LANGS.filter(function (l) { return l.id === (id || lang); })[0] || LANGS[0];
+  }
+  function languages() { return LANGS.slice(); }
+
+  /** Translate a key. Falls back to the English text the caller supplies. */
+  function t(key, fallback) {
+    const table = DICT[lang];
+    if (table && table[key] !== undefined) return table[key];
+    return fallback === undefined ? key : fallback;
+  }
+
+  /** A command's title in the current language, or its own English title. */
+  function cmd(id, fallback) {
+    const table = CMD[lang];
+    if (table && table[id] !== undefined) return table[id];
+    return fallback;
+  }
+
+  function has(id) { return id === 'en' || !!DICT[id]; }
+
+  /**
+   * Rewrite the labelled parts of the document.
+   *
+   * The English text is stashed in data-i18n-en the first time an element is
+   * seen, so switching back to English - or to a language with a gap in its
+   * table - restores the original wording rather than leaving a key on screen.
+   */
+  function apply(root) {
+    const scope = root || document;
+    scope.querySelectorAll('[data-i18n]').forEach(function (node) {
+      const key = node.getAttribute('data-i18n');
+      if (!node.hasAttribute('data-i18n-en')) node.setAttribute('data-i18n-en', node.textContent.trim());
+      node.textContent = t(key, node.getAttribute('data-i18n-en'));
+    });
+    [['data-i18n-title', 'title'], ['data-i18n-aria', 'aria-label'], ['data-i18n-ph', 'placeholder']]
+      .forEach(function (pair) {
+        scope.querySelectorAll('[' + pair[0] + ']').forEach(function (node) {
+          const key = node.getAttribute(pair[0]);
+          const stash = pair[0] + '-en';
+          if (!node.hasAttribute(stash)) node.setAttribute(stash, node.getAttribute(pair[1]) || '');
+          node.setAttribute(pair[1], t(key, node.getAttribute(stash)));
+        });
+      });
+  }
+
+  async function setLanguage(id, opts) {
+    const o = opts || {};
+    if (!has(id)) return false;
+    lang = id;
+    const meta = info(id);
+    const root = document.documentElement;
+    root.setAttribute('lang', id);
+    root.setAttribute('dir', meta.dir);
+    root.dataset.lang = id;
+    apply(document);
+    if (N.commands && N.commands.retitle) N.commands.retitle();
+    if (o.save !== false) {
+      try { await N.store.saveSettings({ language: id }); } catch (err) { /* not fatal */ }
+    }
+    N.bus.emit('i18n:changed', id);
+    return true;
+  }
+
+  /** Best guess from the browser, used only when nothing has been chosen. */
+  function detect() {
+    const list = (navigator.languages && navigator.languages.length)
+      ? navigator.languages : [navigator.language || 'en'];
+    for (const raw of list) {
+      const base = String(raw || '').toLowerCase().split('-')[0];
+      if (has(base)) return base;
+    }
+    return 'en';
+  }
+
+  function init() {
+    const saved = N.store && N.store.state && N.store.state.settings.language;
+    const pick = saved && has(saved) ? saved : 'en';
+    setLanguage(pick, { save: false });
+    N.bus.on('settings:changed', function (s) {
+      if (s && s.language && s.language !== lang && has(s.language)) setLanguage(s.language, { save: false });
+    });
+  }
+
+  N.i18n = {
+    init: init, t: t, cmd: cmd, apply: apply, setLanguage: setLanguage,
+    current: current, languages: languages, info: info, has: has, detect: detect,
+    DICT: DICT,
+  };
+})(window.NODALIS = window.NODALIS || {});
 
 /* ===== js/core/util.js ===== */
 /* =========================================================================
@@ -11241,6 +12013,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
      * With it, the later copy wins, which is what anyone would expect.
      */
     settingsSavedAt: 0,
+
+    /*
+     * v9.3. All three of these are ordinary portable preferences, which means
+     * they go into .nodalis/settings.json and into the GitHub backup and come
+     * back on a restore, exactly like the theme - "even the small thing like
+     * the highlighter colour" was the request, and the machinery for it has
+     * been in place since v8.1.
+     */
+    language: 'en',            // the INTERFACE language; notes are never touched
+    lastHighlight: 'yellow',   // the colour the highlighter button applies
+    speakRate: 1,              // reading-aloud speed
+    speakVoice: '',            // preferred voice, by URI
   };
 
   const state = {
@@ -15793,7 +16577,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       allowInInput: cmd.allowInInput,
       hidden: !!cmd.hidden,
       danger: !!cmd.danger,
+      titleEn: cmd.title || cmd.id,
     });
+    /* v9.3: modules register at boot, which may be after the language is set. */
+    if (N.i18n && N.i18n.cmd) {
+      const entry = registry.get(cmd.id);
+      entry.title = N.i18n.cmd(cmd.id, entry.titleEn);
+    }
   }
 
   function registerMany(list) {
@@ -15944,10 +16734,25 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return map;
   }
 
+  /*
+   * v9.3: the palette is the largest single surface of English in the app, and
+   * it is generated rather than markup - so it cannot carry data-i18n. Instead
+   * the English title is kept once and the displayed title is looked up by
+   * command id whenever the language changes. A command with no translation
+   * keeps its English title, which is the documented fallback everywhere.
+   */
+  function retitle() {
+    registry.forEach(function (cmd) {
+      if (cmd.titleEn === undefined) cmd.titleEn = cmd.title;
+      cmd.title = (N.i18n && N.i18n.cmd) ? N.i18n.cmd(cmd.id, cmd.titleEn) : cmd.titleEn;
+    });
+    if (N.bus) N.bus.emit('commands:changed');
+  }
+
   N.commands = {
     register: register, registerMany: registerMany, get: get, all: all, has: has,
     available: available, run: run, search: search, groups: groups, recentIds: recentIds,
-    usageScore: usageScore,
+    usageScore: usageScore, retitle: retitle,
   };
 })(window.NODALIS = window.NODALIS || {});
 
@@ -26813,6 +27618,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     });
 
     N.bus.on('view:changed', function (v) { if (v === 'settings') render(); });
+    /* Choosing a language while looking at Settings should show it there. */
+    N.bus.on('i18n:changed', function () {
+      if (N.store.state.activeView === 'settings') render();
+    });
     N.bus.on('settings:openSection', function (id) {
       activeSection = id;
       N.app.setView('settings');
@@ -26871,13 +27680,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     const nav = el('div.settings-nav');
     SECTIONS.forEach(function (sec) {
+      const secLabel = sectionLabel(sec);
       const btn = el('button.settings-nav-item' + (sec.id === activeSection ? '.is-active' : ''), {
         type: 'button',
-        dataset: { label: sec.label, target: sec.id },
+        dataset: { label: secLabel, target: sec.id },
         onclick: function () { goToSection(sec.id); },
       });
       btn.appendChild(N.icons.node(sec.icon, { size: 16 }));
-      btn.appendChild(el('span', null, sec.label));
+      btn.appendChild(el('span', null, secLabel));
       nav.appendChild(btn);
     });
     layout.appendChild(nav);
@@ -26959,9 +27769,37 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     blocks.forEach(function (b) { spy.observe(b); });
   }
 
+  /*
+   * v9.3: Settings is built in code, not in markup, so the data-i18n sweep
+   * never reached it. These two helpers look a heading up by the section it
+   * belongs to and hand back the English untouched when there is no
+   * translation - which is also what happens for English itself.
+   */
+  const SECTION_KEY = {
+    'Where your notes live': 'set.storage', 'Storage': 'set.storage',
+    'Appearance': 'set.appearance', 'Typography': 'set.typography',
+    'Editor': 'set.editor', 'Features': 'set.features',
+    'Sidebar tabs': 'set.sidebarTabs', 'Shortcuts': 'set.shortcuts',
+    'Daily notes': 'set.daily', 'GitHub sync': 'set.github',
+    'Backup and data': 'set.data', 'Backup & data': 'set.data',
+    'Vault tools': 'set.vaultTools', 'Danger zone': 'set.dangerZone',
+    'About Nodalis': 'set.about', 'About': 'set.about',
+  };
+
+  function say(english) {
+    const key = SECTION_KEY[english];
+    if (!key || !N.i18n || typeof N.i18n.t !== 'function') return english;
+    return N.i18n.t(key, english);
+  }
+
+  function sectionLabel(sec) {
+    if (!N.i18n || typeof N.i18n.t !== 'function') return sec.label;
+    return N.i18n.t('set.' + sec.id, sec.label);
+  }
+
   function section(title, description) {
     const wrap = el('div.settings-section');
-    wrap.appendChild(el('h3.settings-section-title', null, title));
+    wrap.appendChild(el('h3.settings-section-title', null, say(title)));
     if (description) wrap.appendChild(el('p.settings-section-desc', null, description));
     return wrap;
   }
@@ -27214,8 +28052,49 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /* ---------------------------------------------------------- appearance */
 
+  /* ===================================================================== *
+   * v9.3: THE LANGUAGE OF THE INTERFACE.
+   *
+   * Said plainly on the screen itself, because it is the question anyone would
+   * have: this changes the app's own labels and nothing else. Notes are text
+   * files and stay exactly as typed - any script, any mixture of scripts, in
+   * any interface language. Type Tamil into an English app if you like.
+   * ===================================================================== */
+  function renderLanguage(wrap) {
+    if (!N.i18n) return;
+    const langs = N.i18n.languages();
+    const here = N.i18n.current();
+
+    wrap.appendChild(row(
+      N.i18n.t('set.language', 'Language'),
+      N.i18n.t('set.languageHelp',
+        'The language of the app interface. Your notes are never translated or changed - they keep whatever you typed, in any script.'),
+      el('span.small.dim', null, N.i18n.info(here).native)
+    ));
+
+    const grid = el('div.lang-grid');
+    langs.forEach(function (l) {
+      const card = el('button.lang-card' + (l.id === here ? '.is-active' : ''), {
+        type: 'button', lang: l.id, 'aria-pressed': l.id === here ? 'true' : 'false',
+      });
+      card.appendChild(N.icons.node(l.id === here ? 'check' : 'globe', { size: 18 }));
+      const main = el('div.lang-main');
+      main.appendChild(el('span.lang-native', { dir: l.dir }, l.native));
+      main.appendChild(el('span.lang-name', null, l.name + (l.dir === 'rtl' ? ' · right to left' : '')));
+      card.appendChild(main);
+      card.addEventListener('click', async function () {
+        await N.i18n.setLanguage(l.id);
+        render({ anchor: '.lang-grid' });
+        N.toast.success(N.i18n.info(l.id).native, { ms: 2200, key: 'lang' });
+      });
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid);
+  }
+
   function renderAppearance() {
     const wrap = section('Appearance', 'Six complete looks, each with its own personality. Everything here applies instantly.');
+    renderLanguage(wrap);
 
     const picker = el('div.theme-picker');
     [
@@ -28445,6 +29324,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         ['Canvas', 'An infinite whiteboard. Cards, stickies, shapes, frames, images, freehand ink, and connectors that stay attached when you move things. You can drop a live note onto it.'],
         ['Database', 'Your notes as a table, kanban board, gallery or calendar — driven by whatever properties you have used. Drag cards between board columns to change a property.'],
         ['Tasks', 'Every `- [ ]` in every note, in one list, alongside standalone tasks. Ticking one here edits the original note.'],
+        ['Formatting on a selection', 'Select any text and the note\'s title row becomes a formatting toolbar - bold, italic, headings, lists, quote, link, and the highlighter with its colours. It sits in the title row on purpose: on a phone the operating system draws its own Cut/Copy menu over the text, and nothing a web page draws can appear above that.'],
+        ['Highlighter', 'Five colours, plus any colour you like through the picker. Written into the file as `==green: text==` or `==#ff8800: text==`, so the note stays readable in any editor. The button wears the colour it will apply, and remembers it.'],
+        ['Reading aloud', 'Select text and press the play button, or use More -> Read this note aloud. Speed, pause, resume and a voice picker are in the bar that appears. The audio cannot be saved to a file - no browser exposes the synthesised sound to a page - so if you need a recording, your device\'s own screen recorder is the way.'],
+        ['Language', 'Settings -> Appearance -> Language changes the app\'s own labels. Your notes are never translated or altered: any script, any mixture of scripts, whatever the interface language.'],
+        ['Find and replace', 'Mod+H inside a note. Match case, whole words, replace one or replace all - and replace-all is a single undo.'],
         ['Priority matrix', 'The Eisenhower grid. Tasks are placed automatically from priority and due date; drag one and that choice is remembered.'],
         ['Sticky wall', 'Coloured stickies holding text, a checklist, or a sketch. Drop one on another to stack them.'],
         ['Scratchpad', 'For thoughts that are not notes yet. Capture, forget, sort out later — or never.'],
@@ -28465,6 +29349,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         ['Everything is a command', 'Press the command palette shortcut and type. Every feature in the app is in there, with its shortcut shown next to it.'],
         ['Rebinding', 'Settings → Shortcuts lists every command. Click any shortcut to record a new one. Conflicts are detected rather than silently overriding.'],
         ['Chords', 'A binding can be a sequence, like `g then d`. Useful once the obvious combinations are taken.'],
+        ['Formatting', '`Mod+B` bold, `Mod+I` italic, `Mod+E` inline code, `Mod+Shift+X` strikethrough, `Mod+Shift+H` highlight, `Mod+K` link, `Mod+Shift+C` clear formatting.'],
+        ['Blocks', '`Mod+Alt+1` / `2` / `3` for headings, `Mod+Shift+8` bullets, `Mod+Shift+7` numbers, `Mod+Shift+9` tasks, `Mod+Shift+.` quote.'],
+        ['Editing', '`Mod+H` find and replace in the note, `Alt+Up` / `Alt+Down` move the line or selection, `Mod+Shift+D` duplicate it, `Mod+Shift+K` delete it, `Mod+J` join lines, `Mod+Alt+T` tidy the table under the caret, `Mod+Shift+V` paste with the markdown stripped.'],
+        ['Reading aloud', '`Mod+Shift+Space` reads the note - or the selection, if there is one. The bar that appears carries pause, resume, five speeds and a voice picker.'],
+        ['On a phone', 'Select any text and the title row of the note becomes the formatting toolbar. That is deliberate: Android and iOS draw their own Cut/Copy menu over the selected text, and nothing a web page draws can sit above it - so the toolbar lives somewhere the platform never covers.'],
         ['Shifted chords', 'Anything with Shift and a digit or punctuation — cycle heading level, the three list types, block quote, and the shortcut list itself — is matched on the physical key, so it works on layouts where the digit row needs Shift to produce digits at all.'],
         ['In the reader', 'A shared note has its own single-key shortcuts, no modifier needed: T theme, D light or dark, W column width, R check for a new version, Q QR code, P print, S save a copy as markdown, M the menu. They never fire while you are typing in a field.'],
       ],
@@ -34118,92 +35007,33 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   if (!U || typeof U.el !== 'function') return;
   const el = U.el;
 
-  let bar = null;
-  let hideTimer = null;
-  let sub = null;              // the open colour or "more" tray
-
-  function textarea() {
-    return (N.editor && N.editor.getTextarea && N.editor.getTextarea()) || null;
-  }
-
-  function currentSelection() {
-    const ta = textarea();
-    if (!ta || document.activeElement !== ta) return null;
-    if (typeof ta.selectionStart !== 'number') return null;
-    if (ta.selectionStart === ta.selectionEnd) return null;
-    const text = ta.value.slice(ta.selectionStart, ta.selectionEnd);
-    if (!text.trim() || text.length < 2) return null;
-    return { ta: ta, start: ta.selectionStart, end: ta.selectionEnd, text: text };
-  }
-
-  /* ------------------------------------------------------------ position */
-
-  /**
-   * A textarea gives no rectangle for its selection, so we measure it with a
-   * mirror div: an off-screen copy with identical typography, containing the
-   * text up to the selection start. The height of that copy is the caret's
-   * offset. It is the standard technique and it is accurate because every
-   * font metric is inherited from the real element.
-   */
-  function selectionPoint(sel) {
-    const ta = sel.ta;
-    const cs = getComputedStyle(ta);
-    const mirror = el('div');
-    const style = mirror.style;
-    ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','textTransform',
-     'paddingTop','paddingLeft','paddingRight','borderTopWidth','borderLeftWidth','whiteSpace','wordWrap']
-      .forEach(function (k) { style[k] = cs[k]; });
-    style.position = 'absolute';
-    style.visibility = 'hidden';
-    style.whiteSpace = 'pre-wrap';
-    style.wordWrap = 'break-word';
-    style.width = ta.clientWidth + 'px';
-    style.top = '0';
-    style.left = '-9999px';
-    mirror.textContent = ta.value.slice(0, sel.start);
-    const marker = el('span');
-    marker.textContent = sel.text.slice(0, 1) || '.';
-    mirror.appendChild(marker);
-    document.body.appendChild(mirror);
-    const top = marker.offsetTop;
-    const left = marker.offsetLeft;
-    mirror.remove();
-
-    const box = ta.getBoundingClientRect();
-    return {
-      x: box.left + Math.min(left, ta.clientWidth - 40) + 8,
-      y: box.top + top - ta.scrollTop
-    };
-  }
-
-  /* ---------------------------------------------------------------- bar */
-
   /* ===================================================================== *
-   * v9.2: AN ADAPTIVE TOOLBAR, AND A TRAY THAT STAYS ON SCREEN
+   * v9.3: THE TOOLBAR MOVES INTO THE TITLE ROW
    *
-   * v9.1 put every button in one horizontally-scrolling strip capped at 560px.
-   * On a 1280px screen the strip was already wider than that, so the last two
-   * things in it - "more" and the word count - were scrolled out of sight.
-   * Playwright's verdict was blunt: "element is outside of the viewport". The
-   * overflow menu was unreachable on a desktop, which is not a small bug.
+   * Until now this was a small panel that floated next to the selection. It
+   * measured the caret with a mirror div, flipped above or below, clamped
+   * itself to the viewport - a lot of machinery, and on a phone it lost anyway.
    *
-   * Three changes:
+   * Android and iOS both put their OWN selection menu - Cut, Copy, Select all -
+   * directly over the text you just selected. That is the operating system's
+   * window; a web page cannot move it, cannot hide it, and cannot draw above
+   * it. So the app's toolbar was underneath it exactly when it was needed, and
+   * the reported symptom - "the mobile default option is shown so the app's
+   * option is not usable" - was not a bug in the toolbar. It was a bug in the
+   * idea of floating it.
    *
-   *   1. The tail - the highlight colours, "more" and the count - is PINNED
-   *      outside the scroller. Those three can never scroll away, because two
-   *      of them are how you reach everything else.
+   * So it does not float any more. While there is a selection, the toolbar
+   * TAKES OVER THE NOTE'S TITLE ROW: the title, the pin and the note actions
+   * step aside, the formatting controls appear in their place, and a tick puts
+   * the row back. The row is somewhere the OS menu never covers, it is the same
+   * place every time, and it is the same on a phone, a tablet and a desktop -
+   * which is what was asked for, and is also simply better.
    *
-   *   2. What does not fit MOVES INTO the tray rather than off the edge. The
-   *      bar is measured after it is built and the lowest-priority groups are
-   *      lifted out, one at a time, until the rest fits. On a phone that leaves
-   *      the four inline marks and the highlighter; on a laptop nothing moves.
-   *
-   *   3. The tray is clamped to the viewport and told how much room it has, so
-   *      it can never be drawn off the top of the screen - which is what the
-   *      screenshot showed, with the first three items cut off above the app.
+   * Everything else carries over: the adaptive overflow from v9.2 (what does
+   * not fit moves into the tray rather than off the edge), the clamped trays,
+   * the live word count.
    * ===================================================================== */
 
-  /* Lower number = kept for longer when space runs out. */
   const GROUPS = [
     { id: 'marks', priority: 0 },
     { id: 'heads', priority: 3 },
@@ -34212,38 +35042,102 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     { id: 'links', priority: 1 },
   ];
 
+  let dock = null;          // the toolbar element inside .editor-head
+  let sub = null;           // an open tray
+  let hideTimer = null;
+  let overflow = [];
+  let lastSel = null;
+
+  const T = function (key, fallback) { return N.i18n ? N.i18n.t(key, fallback) : fallback; };
+
+  function head() { return document.querySelector('.editor-head'); }
+  function textarea() {
+    return (N.editor && N.editor.getTextarea && N.editor.getTextarea()) || null;
+  }
+
+  function currentSelection() {
+    const ta = textarea();
+    if (!ta) return null;
+    if (typeof ta.selectionStart !== 'number') return null;
+    if (ta.selectionStart === ta.selectionEnd) return null;
+    const text = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+    if (!text.trim()) return null;
+    return { ta: ta, start: ta.selectionStart, end: ta.selectionEnd, text: text };
+  }
+
+  /* ------------------------------------------------------------ building */
+
+  function accel(id) {
+    if (!N.shortcuts || !N.shortcuts.accelFor) return '';
+    const a = N.shortcuts.accelFor(id);
+    return a ? N.shortcuts.format(a) : '';
+  }
+
+  function action(icon, label, fn, opts) {
+    const o = opts || {};
+    const b = el('button.sel-btn' + (o.className ? '.' + o.className : ''), {
+      type: 'button', title: label + (o.accel ? '  ' + accel(o.accel) : ''), 'aria-label': label,
+    });
+    b.appendChild(N.icons.node(icon, { size: 16 }));
+    /*
+     * The selection must survive the press. mousedown's default is what blurs
+     * the textarea, and on touch the same is true of the synthetic mousedown -
+     * so both are stopped, and the work happens on click.
+     */
+    b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    b.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      try { fn(); } catch (err) { console.error('[selection]', err); }
+      if (o.keepOpen === false) hide();
+      else refresh();
+    });
+    b._nd = { icon: icon, label: label, fn: fn };
+    return b;
+  }
+
+  /** The highlighter button, tinted with the colour it will apply. */
+  function highlightColour() {
+    const F = N.format;
+    if (!F) return 'yellow';
+    const inUse = currentHighlightColour();
+    if (inUse) return inUse;
+    const last = N.store.state.settings.lastHighlight;
+    if (last && (F.isHex(last) || F.HIGHLIGHTS.some(function (h) { return h.id === last; }))) return last;
+    return 'yellow';
+  }
+
+  function tintHighlight(btn) {
+    const c = highlightColour();
+    const F = N.format;
+    if (F && F.isHex(c)) {
+      btn.style.setProperty('--sel-hl', c);
+      btn.dataset.hl = 'custom';
+    } else {
+      btn.style.removeProperty('--sel-hl');
+      btn.dataset.hl = c;
+    }
+  }
+
+  function currentHighlightColour() {
+    const s = N.format && N.format.selection ? N.format.selection() : null;
+    if (!s) return null;
+    const inner = /^==(?:((?:#[0-9a-fA-F]{3,8})|(?:[a-z]{3,7})):[ \t]*)?[\s\S]*==$/.exec(s.text);
+    if (inner) return (inner[1] || 'yellow').toLowerCase();
+    const before = s.t.value.slice(Math.max(0, s.start - 14), s.start);
+    const m = /==((?:#[0-9a-fA-F]{3,8}|[a-z]{3,7}):[ \t]*)?$/.exec(before);
+    if (m && s.t.value.slice(s.end, s.end + 2) === '==') {
+      return (m[1] ? m[1].replace(/:[ \t]*$/, '') : 'yellow').toLowerCase();
+    }
+    return null;
+  }
+
   function build(sel) {
-    const node = el('div.sel-bar', { role: 'toolbar', 'aria-label': 'Formatting' });
+    const node = el('div.sel-dock', { role: 'toolbar', 'aria-label': T('fmt.more', 'Formatting') });
     const scroll = el('div.sel-scroll');
     const tail = el('div.sel-tail');
     const F = N.format;
-    const overflow = [];
+    overflow = [];
 
-    const accel = function (id) {
-      if (!N.shortcuts || !N.shortcuts.accelFor) return '';
-      const a = N.shortcuts.accelFor(id);
-      return a ? N.shortcuts.format(a) : '';
-    };
-
-    const action = function (icon, label, fn, opts) {
-      const o = opts || {};
-      const b = el('button.sel-btn' + (o.className ? '.' + o.className : ''), {
-        type: 'button', title: label + (o.accel ? '  ' + accel(o.accel) : ''), 'aria-label': label,
-      });
-      b.appendChild(N.icons.node(icon, { size: 15 }));
-      // mousedown default would blur the textarea and drop the selection
-      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
-      b.addEventListener('click', function (e) {
-        e.preventDefault(); e.stopPropagation();
-        try { fn(); } catch (err) { console.error('[selection-bar]', err); }
-        if (!o.keepOpen) hide();
-        else reposition();
-      });
-      b._nd = { icon: icon, label: label, fn: fn };
-      return b;
-    };
-
-    /* --- the groups, in the order they appear --- */
     const group = function (id) {
       const g = el('span.sel-group', { dataset: { group: id } });
       scroll.appendChild(g);
@@ -34251,31 +35145,33 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     };
 
     const marks = group('marks');
-    marks.appendChild(action('bold', 'Bold', function () { F.toggleWrap('**'); }, { keepOpen: true, accel: 'format.bold' }));
-    marks.appendChild(action('italic', 'Italic', function () { F.toggleWrap('*'); }, { keepOpen: true, accel: 'format.italic' }));
-    marks.appendChild(action('strikethrough', 'Strikethrough', function () { F.toggleWrap('~~'); }, { keepOpen: true, accel: 'format.strike' }));
-    marks.appendChild(action('code', 'Inline code', function () { F.toggleWrap('`'); }, { keepOpen: true, accel: 'format.code' }));
+    marks.appendChild(action('bold', T('fmt.bold', 'Bold'), function () { F.toggleWrap('**'); }, { accel: 'format.bold' }));
+    marks.appendChild(action('italic', T('fmt.italic', 'Italic'), function () { F.toggleWrap('*'); }, { accel: 'format.italic' }));
+    marks.appendChild(action('strikethrough', T('fmt.strike', 'Strikethrough'), function () { F.toggleWrap('~~'); }, { accel: 'format.strike' }));
+    marks.appendChild(action('code', T('fmt.code', 'Inline code'), function () { F.toggleWrap('`'); }, { accel: 'format.code' }));
 
     const heads = group('heads');
-    heads.appendChild(action('heading-1', 'Heading 1', function () { F.setBlock('# '); }, { keepOpen: true }));
-    heads.appendChild(action('heading-2', 'Heading 2', function () { F.setBlock('## '); }, { keepOpen: true }));
-    heads.appendChild(action('heading-3', 'Heading 3', function () { F.setBlock('### '); }, { keepOpen: true }));
+    heads.appendChild(action('heading-1', 'Heading 1', function () { F.setBlock('# '); }));
+    heads.appendChild(action('heading-2', 'Heading 2', function () { F.setBlock('## '); }));
+    heads.appendChild(action('heading-3', 'Heading 3', function () { F.setBlock('### '); }));
 
     const lists = group('lists');
-    lists.appendChild(action('list', 'Bulleted list', function () { F.setBlock('- '); }, { keepOpen: true }));
-    lists.appendChild(action('list-ordered', 'Numbered list', function () { F.setBlock('number'); }, { keepOpen: true }));
-    lists.appendChild(action('list-check', 'Task list', function () { F.setBlock('- [ ] '); }, { keepOpen: true }));
+    lists.appendChild(action('list', 'Bulleted list', function () { F.setBlock('- '); }));
+    lists.appendChild(action('list-ordered', 'Numbered list', function () { F.setBlock('number'); }));
+    lists.appendChild(action('list-check', 'Task list', function () { F.setBlock('- [ ] '); }));
 
     const quote = group('quote');
-    quote.appendChild(action('quote', 'Quote', function () { F.setBlock('> '); }, { keepOpen: true }));
+    quote.appendChild(action('quote', 'Quote', function () { F.setBlock('> '); }));
 
     const links = group('links');
-    links.appendChild(action('link', 'Add a link', function () { F.makeLink(); }));
-    links.appendChild(action('eraser', 'Clear formatting', function () { F.clearFormatting(); }, { keepOpen: true }));
+    links.appendChild(action('link', T('fmt.link', 'Add a link'), function () { F.makeLink(); }, { keepOpen: false }));
+    links.appendChild(action('eraser', T('fmt.clear', 'Clear formatting'), function () { F.clearFormatting(); }));
 
-    /* --- the pinned tail --- */
-    const hl = action('highlight', 'Highlight', function () { F.highlight('yellow'); }, { keepOpen: true, accel: 'format.highlight' });
-    hl.classList.add('sel-btn-hl');
+    /* ---- the pinned tail: never scrolls away ---- */
+    const hl = action('highlight', T('fmt.highlight', 'Highlight'), function () {
+      F.highlight(highlightColour());
+    }, { className: 'sel-btn-hl', accel: 'format.highlight' });
+    tintHighlight(hl);
     const hlWrap = el('span.sel-hl');
     hlWrap.appendChild(hl);
     const caret = el('button.sel-caret', { type: 'button', title: 'Highlight colour', 'aria-label': 'Highlight colour' });
@@ -34289,56 +35185,63 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     hlWrap.appendChild(caret);
     tail.appendChild(hlWrap);
 
-    const moreBtn = el('button.sel-btn.is-more', { type: 'button', title: 'More', 'aria-label': 'More formatting' });
-    moreBtn.appendChild(N.icons.node('more', { size: 15 }));
+    if (N.speak && N.speak.supported()) {
+      tail.appendChild(action('play', T('speak.readSelection', 'Read the selection aloud'), function () {
+        const s = N.format.selection();
+        N.speak.start(s && s.text);
+      }, { keepOpen: false }));
+    }
+
+    const moreBtn = el('button.sel-btn.is-more', { type: 'button', title: T('fmt.more', 'More'), 'aria-label': T('fmt.more', 'More formatting') });
+    moreBtn.appendChild(N.icons.node('more', { size: 16 }));
     moreBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
     moreBtn.addEventListener('click', function (e) {
       e.preventDefault(); e.stopPropagation();
       if (sub && sub.dataset.kind === 'menu') { closeSub(); return; }
-      openMore(moreBtn, sel, overflow);
+      openMore(moreBtn);
     });
     tail.appendChild(moreBtn);
 
-    const st = N.format.stats();
-    if (st && st.words) {
-      tail.appendChild(el('span.sel-stats', {
-        title: st.words + ' words, ' + st.chars + ' characters, about ' + st.minutes + ' min to read',
-      }, st.words + (st.words === 1 ? ' word' : ' words')));
-    }
+    tail.appendChild(el('span.sel-stats'));
+
+    const done = el('button.sel-btn.sel-done', { type: 'button', title: T('act.done', 'Done'), 'aria-label': T('act.done', 'Done') });
+    done.appendChild(N.icons.node('check', { size: 16 }));
+    done.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    done.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      const ta = textarea();
+      if (ta) ta.setSelectionRange(ta.selectionEnd, ta.selectionEnd);
+      hide();
+    });
+    tail.appendChild(done);
 
     node.appendChild(scroll);
     node.appendChild(tail);
-    node._nd = { scroll: scroll, overflow: overflow };
+    node._nd = { scroll: scroll, tail: tail };
     return node;
   }
 
-  /**
-   * Lift groups out of the strip, lowest priority first, until it fits. Called
-   * once the bar is in the document, because nothing can be measured before it
-   * is - and the width it has to fit into depends on the pinned tail.
-   */
-  function fitToWidth(node) {
-    const info = node._nd;
-    if (!info) return;
-    const scroll = info.scroll;
+  /** Lift groups out of the strip, lowest priority first, until it fits. */
+  function fitToWidth() {
+    if (!dock || !dock._nd) return;
+    const scroll = dock._nd.scroll;
     const order = GROUPS.slice().sort(function (a, b) { return b.priority - a.priority; });
-
     let guard = 0;
     while (scroll.scrollWidth > scroll.clientWidth + 1 && guard++ < GROUPS.length) {
-      const next = order.find(function (g) {
+      const next = order.filter(function (g) {
         const box = scroll.querySelector('[data-group="' + g.id + '"]');
         return box && box.childNodes.length;
-      });
+      })[0];
       if (!next) break;
       const box = scroll.querySelector('[data-group="' + next.id + '"]');
-      Array.from(box.children).forEach(function (btn) {
-        if (btn._nd) info.overflow.push(btn._nd);
-      });
+      Array.from(box.children).forEach(function (btn) { if (btn._nd) overflow.push(btn._nd); });
       box.remove();
       order.splice(order.indexOf(next), 1);
     }
-    node.classList.toggle('has-overflow', info.overflow.length > 0);
+    dock.classList.toggle('has-overflow', overflow.length > 0);
   }
+
+  /* ---------------------------------------------------------------- trays */
 
   function closeSub() {
     if (!sub) return;
@@ -34348,15 +35251,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     setTimeout(function () { if (node.parentNode) node.remove(); }, 160);
   }
 
-  /**
-   * Put a tray next to an anchor, on screen, whatever the anchor is doing.
-   *
-   * The v9.1 version flipped above when there was no room below and then did
-   * not check that "above" had any room either, so a tall menu near the top of
-   * the window was drawn at a negative y and its first items were cut off by
-   * the edge of the screen. Now the side with more room wins, the tray is told
-   * how tall it may be, and the result is clamped both ways.
-   */
   function trayAt(anchor, kind) {
     closeSub();
     const node = el('div.sel-tray.sel-tray-' + kind, { dataset: { kind: kind } });
@@ -34369,24 +35263,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   function placeTray(node) {
     if (!node || !node._nd) return;
-    const anchor = node._nd.anchor;
+    const box = node._nd.anchor.getBoundingClientRect();
     const margin = 8;
-    const box = anchor.getBoundingClientRect();
     const vh = window.innerHeight;
     const below = vh - box.bottom - margin * 2;
     const above = box.top - margin * 2;
     const useBelow = below >= above || below >= 260;
-    const room = Math.max(140, Math.min(useBelow ? below : above, Math.round(vh * 0.7)));
-
+    const room = Math.max(140, Math.min(useBelow ? below : above, Math.round(vh * 0.72)));
     node.style.maxHeight = room + 'px';
     const h = Math.min(node.offsetHeight, room);
     const w = node.offsetWidth;
-
     let x = box.left + box.width / 2 - w / 2;
     x = Math.max(margin, Math.min(x, window.innerWidth - w - margin));
     let y = useBelow ? box.bottom + margin : box.top - h - margin;
     y = Math.max(margin, Math.min(y, vh - h - margin));
-
     node.style.left = Math.round(x) + 'px';
     node.style.top = Math.round(y) + 'px';
     node.style.visibility = '';
@@ -34401,12 +35291,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const b = el('button.sel-swatch', { type: 'button', title: label, 'aria-label': label });
       if (custom) { b.classList.add('is-custom'); b.style.setProperty('--hl-custom', value); }
       else b.setAttribute('data-hl', value);
+      if (highlightColour() === value) b.classList.add('is-on');
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
         F.highlight(value);
+        rememberLast(value);
         closeSub();
-        reposition();
+        refresh();
       });
       return b;
     };
@@ -34423,51 +35315,38 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
 
     const foot = el('div.sel-tray-foot');
-    const pick = el('button.sel-row', { type: 'button' });
-    pick.appendChild(N.icons.node('palette', { size: 15 }));
-    pick.appendChild(el('span', null, 'A colour of my own…'));
-    pick.addEventListener('mousedown', function (e) { e.preventDefault(); });
-    pick.addEventListener('click', function (e) {
-      e.preventDefault(); e.stopPropagation();
+    const row2 = function (icon, label, fn) {
+      const b = el('button.sel-row', { type: 'button' });
+      b.appendChild(N.icons.node(icon, { size: 15 }));
+      b.appendChild(el('span', null, label));
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); fn(); });
+      foot.appendChild(b);
+    };
+    row2('palette', 'A colour of my own…', function () {
       closeSub();
-      hide();
-      F.pickCustomColour();
+      F.pickCustomColour().then(function (hex) { if (hex) rememberLast(hex); refresh(); });
     });
-    foot.appendChild(pick);
-
-    const off = el('button.sel-row', { type: 'button' });
-    off.appendChild(N.icons.node('eraser', { size: 15 }));
-    off.appendChild(el('span', null, 'Remove this highlight'));
-    off.addEventListener('mousedown', function (e) { e.preventDefault(); });
-    off.addEventListener('click', function (e) {
-      e.preventDefault(); e.stopPropagation();
+    row2('eraser', 'Remove this highlight', function () {
       const current = currentHighlightColour();
-      if (current) F.highlight(current);          // toggling the same colour removes it
+      if (current) F.highlight(current);
       closeSub();
-      reposition();
+      refresh();
     });
-    foot.appendChild(off);
     tray.appendChild(foot);
     placeTray(tray);
   }
 
-  /** Which colour, if any, the selection is already highlighted in. */
-  function currentHighlightColour() {
-    const s = N.format.selection();
-    if (!s) return null;
-    const inner = /^==(?:((?:#[0-9a-fA-F]{3,8})|(?:[a-z]{3,7})):[ \t]*)?[\s\S]*==$/.exec(s.text);
-    if (inner) return (inner[1] || 'yellow').toLowerCase();
-    const before = s.t.value.slice(Math.max(0, s.start - 14), s.start);
-    const m = /==((?:#[0-9a-fA-F]{3,8}|[a-z]{3,7}):[ \t]*)?$/.exec(before);
-    if (m && s.t.value.slice(s.end, s.end + 2) === '==') {
-      return (m[1] ? m[1].replace(/:[ \t]*$/, '') : 'yellow').toLowerCase();
-    }
-    return null;
+  async function rememberLast(colour) {
+    try { await N.store.saveSettings({ lastHighlight: colour }); }
+    catch (err) { /* the colour still applied */ }
   }
 
-  function openMore(anchor, sel, overflow) {
+  function openMore(anchor) {
     const tray = trayAt(anchor, 'menu');
     const F = N.format;
+    const sel = lastSel || currentSelection() || { text: '' };
+
     const row = function (icon, label, fn, opts) {
       const o = opts || {};
       const b = el('button.sel-row' + (o.danger ? '.is-danger' : ''), { type: 'button' });
@@ -34477,7 +35356,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       b.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
         closeSub();
-        try { fn(); } catch (err) { console.error('[selection-bar]', err); }
+        try { fn(); } catch (err) { console.error('[selection]', err); }
         hide();
       });
       tray.appendChild(b);
@@ -34485,13 +35364,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     };
     const sep = function () { tray.appendChild(el('span.sel-row-sep')); };
 
-    /* Anything the toolbar could not fit comes first - it is the thing the
-       user was most likely reaching for. */
-    if (overflow && overflow.length) {
+    if (overflow.length) {
       overflow.forEach(function (item) { row(item.icon, item.label, item.fn); });
       sep();
     }
-
+    if (N.speak && N.speak.supported()) {
+      row('play', T('speak.readSelection', 'Read the selection aloud'), function () { N.speak.start(sel.text); });
+      row('play', T('speak.readNote', 'Read this note aloud'), function () { N.speak.start(); });
+      sep();
+    }
     row('type', 'Title Case', function () { F.transformCase('title'); });
     row('type', 'UPPERCASE', function () { F.transformCase('upper'); });
     row('type', 'lowercase', function () { F.transformCase('lower'); });
@@ -34508,99 +35389,68 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
     if (N.remind && N.remind.setFor) {
       row('clock', 'Remind me about this', function () {
-        const t = sel.text.trim().replace(/\s+/g, ' ').slice(0, 80);
+        const t = String(sel.text || '').trim().replace(/\s+/g, ' ').slice(0, 80);
         const noteId = N.store.state.activeNoteId;
         const n2 = noteId && N.store.state.notes.get(noteId);
         N.remind.setFor('note', noteId, t, n2 ? n2.folder : '');
       });
     }
-    row('copy', 'Copy', function () {
+    row('copy', T('act.copy', 'Copy'), function () {
       U.copyToClipboard(sel.text).then(function (ok) {
-        if (ok) N.toast.success('Copied.', { ms: 1800 });
+        if (ok) N.toast.success(T('act.copy', 'Copied.'), { ms: 1800 });
       });
     });
     sep();
     row('highlight', 'Remove every highlight in this note', function () { F.clearHighlights(); });
     row('eraser', 'Reset all formatting in this note', function () { F.resetNoteFormatting(); }, { danger: true });
-
     placeTray(tray);
   }
 
-  /* Re-measure without rebuilding, so a toggle does not make the bar blink. */
-  function reposition() {
-    const s = currentSelection();
-    if (!s || !bar) { return; }
-    const stats = bar.querySelector('.sel-stats');
+  /* --------------------------------------------------------- show and hide */
+
+  function refresh() {
+    const sel = currentSelection();
+    if (!sel) { hide(); return; }
+    lastSel = sel;
+    if (!dock) { show(); return; }
+    const stats = dock.querySelector('.sel-stats');
     const st = N.format.stats();
-    if (stats && st) stats.textContent = st.words + (st.words === 1 ? ' word' : ' words');
-    place(s);
+    if (stats && st) {
+      stats.textContent = st.words + (st.words === 1 ? ' word' : ' words');
+      stats.title = st.words + ' words, ' + st.chars + ' characters, about ' + st.minutes + ' min to read';
+    }
+    const hl = dock.querySelector('.sel-btn-hl');
+    if (hl) tintHighlight(hl);
+    dock.querySelectorAll('.sel-swatch').forEach(function (b) {
+      b.classList.toggle('is-on', (b.dataset.hl || '') === highlightColour());
+    });
     if (sub) placeTray(sub);
-  }
-
-  function place(sel) {
-    const pt = selectionPoint(sel);
-    const w = bar.offsetWidth || 120;
-    const h = bar.offsetHeight || 40;
-    const x = Math.max(8, Math.min(pt.x, window.innerWidth - w - 8));
-
-    /*
-     * The floor is the top of the text, not the top of the window. Selecting
-     * the first line of a note leaves room above the caret in absolute terms -
-     * but that room belongs to the note's own header, and a toolbar sitting on
-     * top of the title looks like a bug even though the arithmetic was right.
-     */
-    const pane = sel.ta.getBoundingClientRect();
-    let y = pt.y - h - 10;
-    if (y < pane.top + 4) y = pt.y + 26;         // no room: flip below the line
-
-    /*
-     * v9.2: clamped at BOTH ends, not just the bottom.
-     *
-     * pt.y is measured from the top of the text minus the textarea's scroll
-     * offset, so a selection that has been scrolled out of view above gives a
-     * negative y - and the bar was drawn off the top of the window, present in
-     * the DOM and impossible to press. Playwright's phrasing for it was
-     * "element is outside of the viewport", which is exactly what a user would
-     * have experienced as the toolbar simply not appearing.
-     */
-    y = Math.max(8, Math.min(y, window.innerHeight - h - 8));
-    bar.style.left = Math.round(x) + 'px';
-    bar.style.top = Math.round(y) + 'px';
   }
 
   function show() {
     const sel = currentSelection();
-    if (!sel) { hide(); return; }
-
-    /*
-     * v9.2: not while find and replace is open.
-     *
-     * Stepping through matches selects each one, which fires selectionchange,
-     * which brought the formatting bar up directly on top of the find bar's
-     * replace field. Two floating panels fighting over the same corner, one of
-     * them covering the thing you were typing into. The find bar wins: it is
-     * the one you deliberately opened.
-     */
+    const h = head();
+    if (!sel || !h) { hide(); return; }
     if (N.format && N.format.isOpenFind && N.format.isOpenFind()) { hide(); return; }
+    lastSel = sel;
 
     hide(true);
-    bar = build(sel);
-    document.body.appendChild(bar);
-    // Measured only once it is in the document: what fits depends on the real
-    // width the pinned tail leaves behind.
-    fitToWidth(bar);
-    place(sel);
-
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () { if (bar) bar.classList.add('is-in'); });
-    });
+    dock = build(sel);
+    h.appendChild(dock);
+    h.dataset.selecting = '1';
+    fitToWidth();
+    refresh();
+    requestAnimationFrame(function () { if (dock) dock.classList.add('is-in'); });
   }
 
   function hide(immediate) {
     clearTimeout(hideTimer);
     closeSub();
-    const node = bar;
-    bar = null;
+    const node = dock;
+    dock = null;
+    overflow = [];
+    const h = head();
+    if (h) delete h.dataset.selecting;
     if (!node) return;
     if (immediate) { node.remove(); return; }
     node.classList.remove('is-in');
@@ -34609,54 +35459,49 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   function schedule() {
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(show, 120);           // wait for the drag to settle
+    hideTimer = setTimeout(function () {
+      const sel = currentSelection();
+      if (sel) { if (dock) refresh(); else show(); }
+      else hide();
+    }, 110);
   }
 
   /* ---------------------------------------------------------------- init */
 
   function init() {
+    /*
+     * selectionchange on the document catches a drag, a double-tap, a
+     * shift-arrow and the OS's own handles. The editor may lose focus while
+     * the OS menu is up - on Android the textarea is blurred by the menu - so
+     * unlike v9.2 this does NOT require document.activeElement to be the
+     * textarea. That single condition is what used to make the toolbar
+     * disappear the moment the platform menu appeared.
+     */
     document.addEventListener('selectionchange', function () {
       const ta = textarea();
-      if (!ta || document.activeElement !== ta) {
-        // Keep the bar while a tray from it has focus, or opening a colour
-        // would close the thing that opened it.
-        if (!sub) hide();
-        return;
-      }
+      if (!ta) { hide(); return; }
+      if (N.store.state.activeView !== 'editor') { hide(); return; }
       schedule();
     });
+    // A tap in the editor with no selection puts the title row back.
+    document.addEventListener('pointerup', function () { setTimeout(schedule, 60); }, true);
+    document.addEventListener('keyup', function (e) {
+      if (e.key === 'Escape') { hide(); return; }
+      if (e.shiftKey || /^Arrow/.test(e.key) || e.key === 'a') schedule();
+    }, true);
     document.addEventListener('pointerdown', function (e) {
       if (sub && sub.contains(e.target)) return;
-      if (bar && bar.contains(e.target)) return;
-      if (bar || sub) hide();
+      if (dock && dock.contains(e.target)) return;
+      if (sub) closeSub();
     }, true);
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { if (sub) closeSub(); else hide(); }
-    });
-    /*
-     * v9.2: a scroll inside the tray is not a reason to close the tray.
-     *
-     * This listener is in the capture phase and had no idea where the scroll
-     * came from, so scrolling the overflow menu - which is exactly what a
-     * scrollable menu is for - destroyed the menu under the pointer. Anything
-     * originating inside the bar or the tray is now left alone; a scroll of the
-     * page or the editor still dismisses, because the selection has moved.
-     */
-    window.addEventListener('scroll', function (e) {
-      if (!bar && !sub) return;
-      const t = e.target;
-      if (t && t.nodeType === 1) {
-        if (bar && bar.contains(t)) return;
-        if (sub && sub.contains(t)) return;
-      }
-      hide();
-    }, true);
-    window.addEventListener('resize', function () { if (bar) hide(); });
-    // Keep the tray attached to its button when the window changes shape.
-    window.addEventListener('orientationchange', function () { if (bar) hide(); });
+    N.bus.on('note:active', function () { hide(); });
+    N.bus.on('i18n:changed', function () { if (dock) { hide(true); schedule(); } });
+    window.addEventListener('resize', function () { if (dock) { hide(true); schedule(); } });
   }
 
-  N.selectionBar = { init: init, show: show, hide: hide };
+  /* The old floating bar's name, kept so nothing that calls it has to change. */
+  N.selectionBar = { init: init, show: show, hide: hide, refresh: refresh,
+    highlightColour: highlightColour };
 })(window.NODALIS = window.NODALIS || {});
 
 /* ===== js/features/calendar.js ===== */
@@ -42364,6 +43209,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
    * OS one. Beside it a hex field, because people paste brand colours far more
    * often than they hunt for them on a wheel, and the two stay in step.
    */
+  /** The colour the highlight button will apply, and wears. */
+  function lastColour() {
+    const v = N.store.state.settings.lastHighlight;
+    if (!v) return 'yellow';
+    if (isHex(v)) return normaliseHex(v);
+    return HIGHLIGHTS.some(function (h) { return h.id === v; }) ? v : 'yellow';
+  }
+
+  async function rememberColour(colour) {
+    const clean = isHex(colour) ? normaliseHex(colour) : String(colour || 'yellow');
+    try { await N.store.saveSettings({ lastHighlight: clean }); } catch (err) { /* applied anyway */ }
+    return clean;
+  }
+
   function pickCustomColour(initial) {
     const startAt = normaliseHex(initial) || swatches()[0] || '#ffd23d';
     let hexField = null;
@@ -42438,8 +43297,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const clean = normaliseHex(chosen);
       if (!clean) return null;
       return rememberSwatch(clean).then(function () {
-        highlight(clean);
-        return clean;
+        return rememberColour(clean).then(function () {
+          highlight(clean);
+          return clean;
+        });
       });
     });
   }
@@ -42454,6 +43315,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     init: init, HIGHLIGHTS: HIGHLIGHTS,
     /* v9.2 */
     isHex: isHex, normaliseHex: normaliseHex, swatches: swatches,
+    lastColour: lastColour, rememberColour: rememberColour,
     rememberSwatch: rememberSwatch, forgetSwatch: forgetSwatch,
     pickCustomColour: pickCustomColour, clearHighlights: clearHighlights,
     resetNoteFormatting: resetNoteFormatting, stripFormatting: stripFormatting,
@@ -42513,7 +43375,27 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       pane.appendChild(bar);
     }
     if (!head || !head.parentNode) {
-      head = el('div.sticky-head', { 'aria-hidden': 'true' });
+      /*
+       * v9.3: RENAMED, AND THAT IS THE WHOLE BUG FIX.
+       *
+       * This element used to be built with the very class name that the sticky
+       * WALL uses for the header of a sticky note - a name that already existed
+       * in this stylesheet, with two rules attached to it. One of them:
+       *
+       *   @media (hover: none) { .sticky-head { opacity: 1 !important; } }
+       *
+       * On any touch device that pinned this bar permanently visible. Which is
+       * why opening a note with no heading showed the PREVIOUS note's heading,
+       * and why it only ever happened on a phone: the code was correctly
+       * removing the is-on class and an !important elsewhere was overruling it.
+       * The same sticky-note rule carries negative margins, which squashed the
+       * bar to eleven pixels and pushed it six pixels wider than its pane -
+       * the horizontal scrollbar that appeared with nothing to scroll.
+       *
+       * One rename, three symptoms gone. There is a lesson in it about picking
+       * class names in a single-file app, and it is now a comment.
+       */
+      head = el('div.note-crumb', { 'aria-hidden': 'true' });
       pane.appendChild(head);
     }
     return true;
@@ -42569,13 +43451,24 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       // The heading on the first visible line is not "above" you yet.
       if (m && i < firstVisible) found = { level: m[1].length, text: m[2].trim() };
     }
-    if (!found) { head.classList.remove('is-on'); return; }
+    /*
+     * v9.3: the TEXT is cleared too, not only the class.
+     *
+     * Belt and braces after the rename. If anything ever pins this bar visible
+     * again - a theme, a print rule, a future !important - what shows must at
+     * least be nothing rather than the last note's heading.
+     */
+    if (!found) {
+      head.classList.remove('is-on');
+      if (head.dataset.text) { head.dataset.text = ''; head.textContent = ''; }
+      return;
+    }
     const label = found.text.replace(/[*_`~]/g, '').slice(0, 90);
     if (head.dataset.text !== label) {
       head.dataset.text = label;
       head.textContent = '';
-      head.appendChild(el('span.sticky-head-level', null, '#'.repeat(found.level)));
-      head.appendChild(el('span.sticky-head-text', null, label));
+      head.appendChild(el('span.note-crumb-level', null, '#'.repeat(found.level)));
+      head.appendChild(el('span.note-crumb-text', null, label));
     }
     head.classList.add('is-on');
   }
@@ -42652,7 +43545,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const pv = previewPane();
     if (pv) pv.addEventListener('scroll', throttled, { passive: true });
 
-    N.bus.on('note:active', function () { setTimeout(update, 60); paintSoon(); });
+    N.bus.on('note:active', function () {
+      /* v9.3: blank it immediately - the new note may have no heading at all,
+         and until update() runs the old one would still be on screen. */
+      if (head) { head.classList.remove('is-on'); head.dataset.text = ''; head.textContent = ''; }
+      setTimeout(update, 60);
+      paintSoon();
+    });
     N.bus.on('preview:rendered', paintSoon);
     N.bus.on('vault:changed', paintSoon);
     N.bus.on('settings:changed', function () { paintSoon(); setTimeout(update, 30); });
@@ -42686,6 +43585,432 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     TAG_COLOURS: TAG_COLOURS,
   };
 })(window.NODALIS = window.NODALIS || {});
+
+/* ===== js/features/speak.js ===== */
+/* =========================================================================
+ * Nodalis - features/speak.js   (v9.3)
+ *
+ * Read a note, or a selection, out loud.
+ *
+ * ABOUT SAVING THE AUDIO, because it was asked for and the honest answer
+ * matters more than a feature that half-works:
+ *
+ *   The web platform does not expose the audio that speechSynthesis produces.
+ *   There is no stream to attach a MediaRecorder to - the sound is generated by
+ *   the operating system's voice engine and played straight to the output
+ *   device, deliberately, on every browser. So "speak this and save the mp3"
+ *   cannot be built here, and any code that claimed to would be producing
+ *   silence or lying about what it wrote.
+ *
+ *   What this module does instead: everything else that was asked for -
+ *   play, pause, resume, stop, a speed control, a voice picker, and it picks up
+ *   from where it left off rather than starting the note again. If you need a
+ *   file, the export menu will already give you the text, and your phone's own
+ *   screen recorder will capture the audio; both of those are real.
+ *
+ * WHY IT SPEAKS IN CHUNKS. Every engine has a length limit on one utterance -
+ * some cut off silently around a few hundred characters, some refuse entirely.
+ * A long note is split on sentence boundaries into pieces of at most CHUNK
+ * characters and queued one at a time, which also makes pause, resume and
+ * "where am I" work properly, because progress is measured in chunks rather
+ * than in a single opaque utterance.
+ * ========================================================================= */
+(function (N) {
+  'use strict';
+
+  const U = N && N.util;
+  if (!U || typeof U.el !== 'function') return;
+  const el = U.el;
+
+  const CHUNK = 220;
+  let chunks = [];
+  let at = 0;
+  let speaking = false;
+  let paused = false;
+  let panel = null;
+  let currentUtterance = null;
+  let voices = [];
+
+  function supported() {
+    return typeof window !== 'undefined' && 'speechSynthesis' in window &&
+      typeof window.SpeechSynthesisUtterance === 'function';
+  }
+
+  /*
+   * getVoices() is asynchronous in a way the specification does not admit to:
+   * on the first call it is very often empty, and the list arrives later
+   * through voiceschanged. Both paths are handled, and the absence of any
+   * voice at all is not fatal - the engine's default still speaks.
+   */
+  function loadVoices() {
+    if (!supported()) return [];
+    try { voices = window.speechSynthesis.getVoices() || []; }
+    catch (err) { voices = []; }
+    return voices;
+  }
+
+  function voiceList() { return voices.length ? voices : loadVoices(); }
+
+  function preferredVoice() {
+    const list = voiceList();
+    if (!list.length) return null;
+    const want = N.store.state.settings.speakVoice;
+    if (want) {
+      const exact = list.filter(function (v) { return v.voiceURI === want || v.name === want; })[0];
+      if (exact) return exact;
+    }
+    // Otherwise the best match for the interface language, then the default.
+    const lang = (N.i18n && N.i18n.current && N.i18n.current()) || 'en';
+    const byLang = list.filter(function (v) { return String(v.lang || '').toLowerCase().indexOf(lang) === 0; });
+    if (byLang.length) return byLang[0];
+    return list.filter(function (v) { return v.default; })[0] || list[0];
+  }
+
+  function rate() {
+    const v = Number(N.store.state.settings.speakRate);
+    return isFinite(v) && v >= 0.5 && v <= 2.5 ? v : 1;
+  }
+
+  /**
+   * Markdown read aloud is unpleasant - "hash hash Introduction, star star
+   * important star star". The markers come off, the words stay, and structure
+   * becomes pauses instead.
+   */
+  function toSpeech(markdown) {
+    return String(markdown || '')
+      .replace(/^---[\s\S]*?^---\s*$/m, '')                    // front matter
+      .replace(/```[\s\S]*?```/g, '. ')                        // code blocks
+      .replace(/^\s{0,3}#{1,6}\s+(.*)$/gm, '$1. ')             // headings become sentences
+      .replace(/!\[\[([^\]]*)\]\]/g, '')                       // embeds
+      .replace(/\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g, function (_, a, b) { return b || a; })
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')                    // images
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')                 // links keep their words
+      .replace(/==(?:(?:#[0-9a-fA-F]{3,8}|[a-z]{3,7}):[ \t]*)?([\s\S]*?)==/g, '$1')
+      .replace(/(\*\*\*|\*\*|\*|___|__|_|~~|`)/g, '')
+      .replace(/^\s*>\s?/gm, '')
+      .replace(/^\s*[-*+]\s+\[[ xX]\]\s+/gm, '')
+      .replace(/^\s*[-*+]\s+/gm, '')
+      .replace(/^\s*\d{1,9}[.)]\s+/gm, '')
+      .replace(/^\s*\|.*\|\s*$/gm, ' ')                        // tables read as noise
+      .replace(/^\s*[-*_]{3,}\s*$/gm, '. ')
+      .replace(/\n{2,}/g, '.\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+  }
+
+  /** Split into utterance-sized pieces, preferring sentence ends. */
+  function split(text) {
+    const out = [];
+    let rest = String(text || '').trim();
+    while (rest.length > CHUNK) {
+      let cut = -1;
+      const window_ = rest.slice(0, CHUNK);
+      [/[.!?][\s"')\]]*$/, /[.!?]\s/g, /[,;:]\s/g, /\s/g].some(function (re) {
+        if (re.global) {
+          let m, last = -1;
+          while ((m = re.exec(window_)) !== null) last = m.index + m[0].length;
+          if (last > 40) { cut = last; return true; }
+          return false;
+        }
+        return false;
+      });
+      if (cut <= 0) cut = window_.lastIndexOf(' ');
+      if (cut <= 0) cut = CHUNK;
+      out.push(rest.slice(0, cut).trim());
+      rest = rest.slice(cut).trim();
+    }
+    if (rest) out.push(rest);
+    return out.filter(Boolean);
+  }
+
+  /* ------------------------------------------------------------ speaking */
+
+  /**
+   * stop() also takes the controls away, because that is what pressing Stop
+   * means. start() passes keepPanel so restarting does not make the bar blink
+   * out and back in between one note and the next.
+   */
+  function stop(opts) {
+    speaking = false;
+    paused = false;
+    chunks = [];
+    at = 0;
+    currentUtterance = null;
+    try { window.speechSynthesis.cancel(); } catch (err) { /* nothing playing */ }
+    if (!opts || opts.keepPanel !== true) closePanel();
+    else paint();
+  }
+
+  function speakNext() {
+    if (!speaking || at >= chunks.length) {
+      if (speaking) {
+        speaking = false;
+        N.bus.emit('speak:done');
+        paint();
+        if (panel) closePanel();
+      }
+      return;
+    }
+    const piece = chunks[at];
+    const u = new window.SpeechSynthesisUtterance(piece);
+    /*
+     * Setting .voice throws outright if the object is not a real
+     * SpeechSynthesisVoice - and getVoices() has been known to hand back
+     * stale entries after a system voice is removed, on top of every
+     * platform's own quirks. An engine detail must never be able to take
+     * reading aloud down with an uncaught exception: the default voice is a
+     * perfectly good outcome, silence is not.
+     */
+    try {
+      const v = preferredVoice();
+      if (v) { u.voice = v; if (v.lang) u.lang = v.lang; }
+    } catch (err) {
+      console.warn('[speak] that voice was refused; using the default', err);
+    }
+    try { u.rate = rate(); u.pitch = 1; } catch (err) { /* clamped by the engine */ }
+    u.onend = function () {
+      if (!speaking) return;
+      at++;
+      paint();
+      speakNext();
+    };
+    u.onerror = function (e) {
+      // 'interrupted' and 'canceled' are what stop() produces; they are not faults.
+      if (e && (e.error === 'interrupted' || e.error === 'canceled')) return;
+      console.warn('[speak] utterance failed', e && e.error);
+      at++;
+      if (at < chunks.length) speakNext(); else stop();
+    };
+    currentUtterance = u;
+    try { window.speechSynthesis.speak(u); }
+    catch (err) { console.warn('[speak] refused', err); stop(); }
+  }
+
+  /**
+   * start(text) - or, with nothing passed, the selection if there is one and
+   * the whole note if there is not. That rule is what makes one button enough.
+   */
+  function start(text) {
+    if (!supported()) {
+      N.toast.warn('This browser cannot read text aloud.', { ms: 4000 });
+      return false;
+    }
+    let source = text;
+    if (source === undefined || source === null) {
+      const s = N.format && N.format.selection ? N.format.selection() : null;
+      if (s && s.text && s.text.trim()) source = s.text;
+      else {
+        const note = N.store.getNote(N.store.state.activeNoteId);
+        source = note ? note.content : '';
+      }
+    }
+    const speech = toSpeech(source);
+    if (!speech) {
+      N.toast.show('Nothing to read.', { kind: 'info', ms: 2200 });
+      return false;
+    }
+    stop({ keepPanel: true });
+    chunks = split(speech);
+    at = 0;
+    speaking = true;
+    paused = false;
+    loadVoices();
+    openPanel();
+    speakNext();
+    return true;
+  }
+
+  function pause() {
+    if (!speaking || paused) return;
+    try { window.speechSynthesis.pause(); paused = true; }
+    catch (err) { /* some engines refuse; fall back to a hard stop */ }
+    /*
+     * Android's engine ignores pause() on some versions and keeps talking. If
+     * the state did not take, cancel and remember the position so resume can
+     * re-speak the current chunk from its start - which is a far better outcome
+     * than a pause button that does nothing.
+     */
+    setTimeout(function () {
+      if (paused && !window.speechSynthesis.paused && window.speechSynthesis.speaking) {
+        try { window.speechSynthesis.cancel(); } catch (err) { /* fine */ }
+      }
+      paint();
+    }, 120);
+    paint();
+  }
+
+  function resume() {
+    if (!speaking || !paused) return;
+    paused = false;
+    if (window.speechSynthesis.paused) {
+      try { window.speechSynthesis.resume(); paint(); return; }
+      catch (err) { /* fall through to re-speaking */ }
+    }
+    speakNext();          // picks up at the chunk we were on
+    paint();
+  }
+
+  function toggle() {
+    if (!speaking) return start();
+    if (paused) return resume();
+    return pause();
+  }
+
+  async function setRate(v) {
+    const next = Math.min(2.5, Math.max(0.5, Number(v) || 1));
+    await N.store.saveSettings({ speakRate: next });
+    if (speaking) {
+      // Rate is fixed for an utterance once it starts, so the new speed takes
+      // effect from the current chunk - restart it rather than the whole note.
+      const keep = at;
+      try { window.speechSynthesis.cancel(); } catch (err) { /* fine */ }
+      at = keep;
+      paused = false;
+      speakNext();
+    }
+    paint();
+  }
+
+  async function setVoice(uri) {
+    await N.store.saveSettings({ speakVoice: uri || '' });
+    if (speaking) {
+      const keep = at;
+      try { window.speechSynthesis.cancel(); } catch (err) { /* fine */ }
+      at = keep;
+      speakNext();
+    }
+    paint();
+  }
+
+  /* --------------------------------------------------------- the controls */
+
+  const T = function (key, fallback) { return N.i18n ? N.i18n.t(key, fallback) : fallback; };
+
+  function closePanel() {
+    if (!panel) return;
+    const node = panel;
+    panel = null;
+    node.classList.remove('is-in');
+    setTimeout(function () { if (node.parentNode) node.remove(); }, 200);
+  }
+
+  function openPanel() {
+    if (panel) { paint(); return; }
+    const node = el('div.speak-bar', { role: 'group', 'aria-label': T('speak.speak', 'Read aloud') });
+
+    const btn = function (icon, label, fn, cls) {
+      const b = el('button.speak-btn' + (cls ? '.' + cls : ''), { type: 'button', title: label, 'aria-label': label });
+      b.appendChild(N.icons.node(icon, { size: 16 }));
+      b.addEventListener('click', function (e) { e.preventDefault(); fn(); });
+      return b;
+    };
+
+    node.appendChild(btn('pause', T('speak.pause', 'Pause'), toggle, 'speak-play'));
+    node.appendChild(btn('close', T('speak.stop', 'Stop'), stop));
+
+    const meter = el('div.speak-meter', { 'aria-hidden': 'true' });
+    meter.appendChild(el('span.speak-meter-fill'));
+    node.appendChild(meter);
+    node.appendChild(el('span.speak-count'));
+
+    const speeds = el('div.speak-speeds', { role: 'group', 'aria-label': T('speak.speed', 'Speed') });
+    [0.75, 1, 1.25, 1.5, 2].forEach(function (r) {
+      const b = el('button.speak-speed', { type: 'button', dataset: { rate: String(r) } }, r + '×');
+      b.addEventListener('click', function () { setRate(r); });
+      speeds.appendChild(b);
+    });
+    node.appendChild(speeds);
+
+    const list = voiceList();
+    if (list.length > 1) {
+      const sel = el('select.speak-voice', { 'aria-label': T('speak.voice', 'Voice') });
+      sel.appendChild(el('option', { value: '' }, T('speak.voice', 'Voice')));
+      list.slice(0, 40).forEach(function (v) {
+        sel.appendChild(el('option', { value: v.voiceURI || v.name }, v.name + ' (' + v.lang + ')'));
+      });
+      sel.value = N.store.state.settings.speakVoice || '';
+      sel.addEventListener('change', function () { setVoice(sel.value); });
+      node.appendChild(sel);
+    }
+
+    document.body.appendChild(node);
+    panel = node;
+    requestAnimationFrame(function () { node.classList.add('is-in'); });
+    paint();
+  }
+
+  function paint() {
+    if (!panel) return;
+    const play = panel.querySelector('.speak-play');
+    if (play) {
+      const label = !speaking ? T('speak.speak', 'Read aloud')
+        : paused ? T('speak.resume', 'Resume') : T('speak.pause', 'Pause');
+      play.title = label;
+      play.setAttribute('aria-label', label);
+      play.innerHTML = '';
+      play.appendChild(N.icons.node(!speaking || paused ? 'play' : 'pause', { size: 16 }));
+    }
+    const fill = panel.querySelector('.speak-meter-fill');
+    if (fill) {
+      const ratio = chunks.length ? Math.min(1, at / chunks.length) : 0;
+      fill.style.transform = 'scaleX(' + ratio.toFixed(3) + ')';
+    }
+    const count = panel.querySelector('.speak-count');
+    if (count) count.textContent = chunks.length ? (Math.min(at + 1, chunks.length) + ' / ' + chunks.length) : '';
+    panel.querySelectorAll('.speak-speed').forEach(function (b) {
+      b.classList.toggle('is-on', Number(b.dataset.rate) === rate());
+    });
+    panel.classList.toggle('is-paused', paused);
+  }
+
+  /* ------------------------------------------------------------------ init */
+
+  function init() {
+    if (!supported()) return;
+    loadVoices();
+    try {
+      window.speechSynthesis.onvoiceschanged = function () { loadVoices(); if (panel) { closePanel(); openPanel(); } };
+    } catch (err) { /* not offered everywhere */ }
+
+    // Leaving the app should not leave a voice talking to an empty room.
+    window.addEventListener('pagehide', stop);
+    N.bus.on('note:active', function () { if (speaking) stop(); });
+
+    if (N.commands && N.commands.registerMany) {
+      N.commands.registerMany([
+        { id: 'speak.note', title: 'Read this note aloud', group: 'Note', icon: 'play',
+          accel: 'Mod+Shift+Space',
+          when: function () { return !!N.store.state.activeNoteId; },
+          run: function () { start(); } },
+        { id: 'speak.selection', title: 'Read the selection aloud', group: 'Note', icon: 'play',
+          when: function () {
+            const s = N.format && N.format.selection ? N.format.selection() : null;
+            return !!(s && s.text && s.text.trim());
+          },
+          run: function () {
+            const s = N.format.selection();
+            start(s && s.text);
+          } },
+        { id: 'speak.stop', title: 'Stop reading aloud', group: 'Note', icon: 'close',
+          when: function () { return speaking; }, run: stop },
+        { id: 'speak.faster', title: 'Read aloud faster', group: 'Note', icon: 'play',
+          when: function () { return speaking; }, run: function () { setRate(rate() + 0.25); } },
+        { id: 'speak.slower', title: 'Read aloud slower', group: 'Note', icon: 'play',
+          when: function () { return speaking; }, run: function () { setRate(rate() - 0.25); } },
+      ]);
+    }
+  }
+
+  N.speak = {
+    init: init, supported: supported, start: start, stop: stop, pause: pause,
+    resume: resume, toggle: toggle, setRate: setRate, setVoice: setVoice,
+    rate: rate, voices: voiceList, toSpeech: toSpeech, split: split,
+    isSpeaking: function () { return speaking; },
+    isPaused: function () { return paused; },
+    progress: function () { return { at: at, total: chunks.length }; },
+  };
+})(window.NODALIS = window.NODALIS || {});
+
 
 /* ===== js/app.js ===== */
 /* =========================================================================
@@ -42824,6 +44149,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
       stage('applying theme', 0.5, 2, progress);
       try { N.theme.init(); } catch (err) { console.error('[nodalis] theme failed', err); }
+      /* v9.3: before the shell is wired, so nothing is drawn in the wrong
+         language and then swapped in front of the user. */
+      try { if (N.i18n) N.i18n.init(); } catch (err) { console.error('[nodalis] language failed', err); }
 
       stage('reconnecting your folder', 0.58, 3, progress);
       await withTimeout(restoreVault(), 8000, 'reconnecting your folder');
@@ -43026,8 +44354,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       ['history', N.history], ['writing', N.writing], ['github', N.github], ['capture', N.capture],
       ['related', N.related], ['intel', N.intel], ['intelExtra', N.intelExtra],
       ['remind', N.remind], ['calendar', N.calendar],
-      /* v9.1: format before selectionBar - the bar is a view onto it. */
-      ['format', N.format], ['reading', N.reading], ['selectionBar', N.selectionBar],
+      /* v9.1: format before selectionBar - the bar is a view onto it.
+         v9.3: speak before selectionBar too, so the toolbar can offer it. */
+      ['format', N.format], ['reading', N.reading], ['speak', N.speak],
+      ['selectionBar', N.selectionBar],
       // titles before trash and templates: both ask it to preview a name.
       ['linkcare', N.linkcare], ['titles', N.titles], ['trash', N.trash],
       ['templates', N.templates], ['health', N.health],
@@ -43187,6 +44517,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     bus.on('db:write-recovered', onStorageRecovered);
     bus.on('theme:applied', updateThemeIcon);
     bus.on('settings:changed', function () { rebuildNav(); persistLoaderHint(); });
+    bus.on('view:changed', translateSoon);
+    bus.on('i18n:changed', function () { rebuildNav(); translateSoon(); });
     bus.on('db:versionchange', function () {
       N.toast.warn('Nodalis was updated in another tab. Reload to continue safely.', {
         ms: 0, title: 'Reload needed',
@@ -43530,6 +44862,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     items.push({ separator: true });
     items.push({ label: "Today's daily note", icon: 'calendar', onClick: function () { N.daily.openToday(); } });
     items.push({ label: 'Scan a page (OCR)', icon: 'scan', onClick: function () { N.ocr.scanToNote(); } });
+    /* v9.3: reading aloud, one tap from the More sheet on any device. */
+    if (N.speak && N.speak.supported()) {
+      items.push({
+        label: N.speak.isSpeaking() ? 'Stop reading aloud' : 'Read this note aloud',
+        icon: N.speak.isSpeaking() ? 'close' : 'play',
+        description: 'Speed, pause and voice, in the bar that appears',
+        onClick: function () {
+          if (N.speak.isSpeaking()) N.speak.stop(); else N.speak.start();
+        },
+      });
+    }
+
     items.push({ label: 'Backlinks and outline', icon: 'link', onClick: function () {
       const app = document.getElementById('app');
       app.dataset.right = 'open';
@@ -43567,6 +44911,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   /* --------------------------------------------------------- global cmds */
+
+  /* v9.3: views build their own markup, so anything with data-i18n inside a
+     freshly rendered view needs the pass run over it again. */
+  function translateSoon() {
+    if (!N.i18n) return;
+    requestAnimationFrame(function () { N.i18n.apply(document); });
+  }
 
   function registerGlobalCommands() {
     N.commands.registerMany([
@@ -43779,12 +45130,58 @@ https://github.com/nodeca/pako/blob/main/LICENSE
    * the truth continuously: where the data is, and whether anything is
    * waiting to go out.
    */
+  /* ===================================================================== *
+   * v9.3: COMING BACK ONLINE IS AN EVENT WORTH ACTING ON.
+   *
+   * Everything already worked offline - the folder and IndexedDB do not care
+   * about the network - but a GitHub backup attempted while the connection was
+   * down simply failed and waited to be asked again. So the pattern was: lose
+   * signal, keep writing, regain signal, and nothing happens until you happen
+   * to remember to press Back up.
+   *
+   * Now the return of the network is a trigger. It is deliberately cautious:
+   *
+   *   - only when GitHub is actually connected, and only when there is
+   *     something outstanding (githubDirty), so it never pushes for the sake of
+   *     pushing and never spends a request it does not need to;
+   *   - after a settling delay, because 'online' fires the moment the interface
+   *     is up, which is several seconds before DNS is reliable on mobile data;
+   *   - once per return, guarded, so a flapping connection does not queue five
+   *     pushes; and
+   *   - quietly. It says what it did, once, and says nothing at all if it had
+   *     nothing to do.
+   * ===================================================================== */
+  let backOnlineTimer = null;
+  let autoSyncing = false;
+
+  async function syncOnReconnect() {
+    if (autoSyncing) return;
+    if (navigator.onLine === false) return;
+    if (!N.github || !N.github.isConnected || !N.github.isConnected()) return;
+    if (!N.store.state.settings.githubDirty) return;
+    autoSyncing = true;
+    try {
+      await N.github.push();
+      N.toast.success('Back online - your notes are backed up.', { ms: 4200, key: 'auto-sync' });
+    } catch (err) {
+      // Failing here is normal on a connection that is only half back. It will
+      // be tried again the next time the network returns, or by hand.
+      console.warn('[nodalis] the catch-up backup did not go through', err);
+    } finally {
+      autoSyncing = false;
+    }
+  }
+
   function watchConnectivity() {
     const paint = function () {
       const app = document.getElementById('app');
       if (app) app.dataset.network = navigator.onLine === false ? 'offline' : 'online';
       updateVaultStatus();
     };
+    window.addEventListener('online', function () {
+      clearTimeout(backOnlineTimer);
+      backOnlineTimer = setTimeout(function () { syncOnReconnect().catch(function () {}); }, 4000);
+    });
 
     window.addEventListener('offline', function () {
       paint();
@@ -43811,6 +45208,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       // Leaving the tab is the last safe moment to get everything on disk.
       try { N.editor.flushSave(); } catch (err) { /* editor may not be up */ }
       N.vault.flushNow();
+    });
+    /* v9.3: and returning to it is a good moment to catch up on a backup. */
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState !== 'visible') return;
+      clearTimeout(backOnlineTimer);
+      backOnlineTimer = setTimeout(function () { syncOnReconnect().catch(function () {}); }, 2500);
     });
   }
 
