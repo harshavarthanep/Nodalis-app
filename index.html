@@ -8688,6 +8688,24 @@ body[data-bullet-style] .prose ul ul ul > li:not(.task-item)::marker {
 .bullet-preview { display: flex; align-items: baseline; gap: var(--sp-3); min-width: 0; }
 .bullet-preview-mark { color: var(--text-3); flex: none; }
 
+
+/* ---------------------------------------------- the bullet style tray --- */
+.sel-row-mark {
+  flex: none; width: 22px; text-align: center;
+  font-size: 15px; line-height: 1; color: var(--text-2);
+}
+.sel-row-label { flex: 1 1 auto; }
+.sel-row.is-on { color: var(--accent); background: var(--accent-soft); }
+.sel-row.is-on .sel-row-mark { color: var(--accent); }
+.sel-row.is-on .icon { color: var(--accent); }
+.sel-row-done { color: var(--accent); font-weight: 600; }
+.sel-tray-note {
+  display: flex; align-items: flex-start; gap: 6px;
+  padding: 6px 8px 6px; margin-bottom: 2px;
+  font-size: 11.5px; line-height: 1.4; color: var(--text-3);
+}
+.sel-tray-note .icon { flex: none; margin-top: 1px; color: var(--text-3); }
+
 </style>
 </head>
 
@@ -36600,6 +36618,23 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       }, { keepOpen: false }));
     }
 
+    /* v9.7: bullet style, right here where the selection is - opens a tray
+       that stays open across picks so every style can be compared live
+       against the highlighted text before it is dismissed. */
+    if (N.theme && N.theme.bulletStyles && N.theme.setBulletStyle) {
+      const bulletBtn = el('button.sel-btn.is-bullets', {
+        type: 'button', title: T('fmt.bulletStyle', 'Bullet style'), 'aria-label': T('fmt.bulletStyle', 'Bullet style'),
+      });
+      bulletBtn.appendChild(N.icons.node('sliders', { size: 16 }));
+      bulletBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      bulletBtn.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (sub && sub.dataset.kind === 'bullets') { closeSub(); return; }
+        openBulletStyles(bulletBtn);
+      });
+      tail.appendChild(bulletBtn);
+    }
+
     const moreBtn = el('button.sel-btn.is-more', { type: 'button', title: T('fmt.more', 'More'), 'aria-label': T('fmt.more', 'More formatting') });
     moreBtn.appendChild(N.icons.node('more', { size: 16 }));
     moreBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
@@ -36811,6 +36846,67 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     sep();
     row('highlight', 'Remove every highlight in this note', function () { F.clearHighlights(); });
     row('eraser', 'Reset all formatting in this note', function () { F.resetNoteFormatting(); }, { danger: true });
+    placeTray(tray);
+  }
+
+  /* ------------------------------------------------- the bullet style tray
+   * v9.7: unlike every other row in this file, picking one of these does NOT
+   * close the tray. The whole point is to browse - click Star, look at the
+   * selection, click Diamond, look again - so on pick the tray is only
+   * rebuilt (to move the checkmark to the new style) and left open, until
+   * the trigger is clicked again, the tray is clicked outside of, or Escape
+   * is pressed - same as every other tray here.
+   *
+   * Nothing here ever touches the note text: setBulletStyle() sets the same
+   * app-wide rendering setting as Settings > Typography, so every list
+   * everywhere - not just this selection - redraws together. The file on
+   * disk still reads "- item" no matter which style is showing.
+   * ------------------------------------------------------------------- */
+  function buildBulletList() {
+    const list = el('div.sel-tray-menu');
+    if (!N.theme || !N.theme.bulletStyles) return list;
+    const here = (N.store.state.settings.bulletStyle || 'disc');
+    N.theme.bulletStyles().forEach(function (b) {
+      const row = el('button.sel-row', { type: 'button', dataset: { bulletId: b.id } });
+      if (b.id === here) row.classList.add('is-on');
+      row.appendChild(el('span.sel-row-mark', null, b.mark));
+      row.appendChild(el('span.sel-row-label', null, b.label));
+      if (b.id === here) row.appendChild(N.icons.node('check-small', { size: 14 }));
+      row.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      row.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        N.theme.setBulletStyle(b.id);
+        N.toast.success(b.mark + '  ' + b.label, { ms: 1400, key: 'bullet' });
+        refreshBulletList();
+      });
+      list.appendChild(row);
+    });
+    return list;
+  }
+
+  function refreshBulletList() {
+    if (!sub || sub.dataset.kind !== 'bullets') return;
+    const old = sub.querySelector('.sel-tray-menu');
+    const fresh = buildBulletList();
+    if (old) old.replaceWith(fresh); else sub.insertBefore(fresh, sub.firstChild);
+    placeTray(sub);
+  }
+
+  function openBulletStyles(anchor) {
+    const tray = trayAt(anchor, 'bullets');
+    tray.appendChild(buildBulletList());
+    const foot = el('div.sel-tray-foot');
+    const note = el('div.sel-tray-note');
+    note.appendChild(N.icons.node('info', { size: 13 }));
+    note.appendChild(el('span', null, 'Your files are not changed — this only changes how bullets are drawn.'));
+    foot.appendChild(note);
+    const doneRow = el('button.sel-row.sel-row-done', { type: 'button' });
+    doneRow.appendChild(N.icons.node('check', { size: 14 }));
+    doneRow.appendChild(el('span', null, T('act.done', 'Done')));
+    doneRow.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    doneRow.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); closeSub(); });
+    foot.appendChild(doneRow);
+    tray.appendChild(foot);
     placeTray(tray);
   }
 
