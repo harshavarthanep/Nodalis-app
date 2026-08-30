@@ -8689,6 +8689,252 @@ body[data-bullet-style] .prose ul ul ul > li:not(.task-item)::marker {
 .bullet-preview-mark { color: var(--text-3); flex: none; }
 
 
+/* =========================================================================
+ * v9.6-L — THE LOADING SCREEN (optional)
+ *
+ * Replaces the node-lattice sequence with something quieter and, more to the
+ * point, HONEST: every moving part on this screen is reporting real state.
+ * The five bars are the five boot steps and they light as those steps land;
+ * the meter is the actual ratio; the caption is the actual step name. There
+ * is no decorative motion pretending to be progress.
+ *
+ * Built entirely from theme tokens, so it is correct in all six themes and in
+ * both light and dark without a single per-theme rule. The old .loader-stage
+ * / .loader-svg / .loader-wave rules earlier in this stylesheet still exist
+ * and now simply match nothing.
+ * ========================================================================= */
+
+.loader {
+  gap: 0;
+  perspective: 1200px;
+}
+
+/* The ground: a faint grid that drifts one cell over half a minute. Slow
+   enough that you never catch it moving, present enough that the card has
+   something to sit on. */
+.loader-grid {
+  position: absolute;
+  inset: -40px;
+  background-image:
+    linear-gradient(to right, var(--loader-rule) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--loader-rule) 1px, transparent 1px);
+  background-size: 34px 34px;
+  opacity: 0.55;
+  animation: loader-drift 34s linear infinite;
+  pointer-events: none;
+}
+@keyframes loader-drift { to { transform: translate3d(34px, 34px, 0); } }
+
+.loader {
+  --loader-rule: color-mix(in srgb, var(--text-0) 9%, transparent);
+  --loader-ink: var(--text-0);
+  --loader-dim: var(--text-3);
+}
+
+/* The card. A hard offset block behind it rather than a soft shadow — the
+   whole screen is hairlines and right angles, and a blurred drop shadow would
+   be the only soft thing on it. */
+.loader-card {
+  /* .loader is a centred flex column, and text-align inherits through it.
+     Everything inside the card is a left-aligned column. */
+  text-align: left;
+  position: relative;
+  width: min(440px, calc(100vw - 48px));
+  padding: 26px 28px 24px;
+  background: var(--bg-0);
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--r-md, 8px);
+  animation: loader-card-in 620ms cubic-bezier(0.16, 0.84, 0.3, 1) both;
+}
+.loader-card::after {
+  content: '';
+  position: absolute;
+  inset: 8px -9px -9px 8px;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--r-md, 8px);
+  z-index: -1;
+  opacity: 0.5;
+  animation: loader-shadow-in 620ms cubic-bezier(0.16, 0.84, 0.3, 1) 90ms both;
+}
+@keyframes loader-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes loader-shadow-in {
+  from { opacity: 0; transform: translate(-8px, -8px); }
+  to   { opacity: 0.5; transform: none; }
+}
+
+/* -- the head row: mark, wordmark, and the five step bars ---------------- */
+.loader-head { display: flex; align-items: center; gap: 12px; }
+.loader-mark { flex: none; color: var(--accent); display: block; }
+.loader-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--loader-ink);
+}
+
+/*
+ * THE FIVE BARS ARE THE FIVE BOOT STEPS.
+ *
+ * A bar that has not been reached breathes on a staggered loop, so the screen
+ * is alive while the database is opening. The moment its step lands it snaps
+ * to full height, takes the accent, and stops moving. By the time the app
+ * appears all five are lit and still — the animation has finished because the
+ * work has, not because a timer expired.
+ */
+.loader-bars { flex: none; display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+.loader-bars i {
+  display: block;
+  width: 3px;
+  height: 30%;
+  border-radius: 1px;
+  background: var(--loader-dim);
+  transform-origin: 50% 100%;
+  animation: loader-breathe 1.5s var(--ease-in-out, ease-in-out) infinite;
+  animation-delay: calc(var(--i) * 110ms);
+  transition: height 260ms var(--ease-out), background 260ms var(--ease-out);
+}
+.loader-bars i.is-lit {
+  height: 100%;
+  background: var(--accent);
+  animation: none;
+}
+@keyframes loader-breathe {
+  0%, 100% { transform: scaleY(0.55); opacity: 0.5; }
+  50%      { transform: scaleY(1.5);  opacity: 1; }
+}
+
+.loader-rule { height: 1px; background: var(--border); margin: 16px 0 14px; }
+
+.loader-sub {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--loader-dim);
+}
+
+/* -- the meter ---------------------------------------------------------- */
+.loader-meter {
+  position: relative;
+  height: 5px;
+  margin: 16px 0 10px;
+  background: var(--bg-2, var(--bg-1));
+  border-radius: 999px;
+  overflow: hidden;
+}
+.loader-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 420ms cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+/* A light that travels the filled part — the one purely decorative thing
+   here, and it stops the moment the bar is full. */
+.loader-meter-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent-on, #fff) 55%, transparent), transparent);
+  transform: translateX(-100%);
+  animation: loader-sheen 1.6s var(--ease-in-out, ease-in-out) infinite;
+}
+.loader-meter.is-full .loader-meter-fill::after { animation: none; opacity: 0; }
+@keyframes loader-sheen { to { transform: translateX(200%); } }
+
+.loader-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--loader-dim);
+}
+/* The old loader's own .loader-step rule sets text-align: center, and a
+   direct rule beats the card's inherited left. Stated explicitly here. */
+.loader-step { text-align: left; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loader-pct { flex: none; font-variant-numeric: tabular-nums; color: var(--text-2); }
+
+/* -- what the app actually promises, under the card --------------------- */
+.loader-claims {
+  margin-top: 22px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-3) 80%, transparent);
+  text-align: center;
+  animation: loader-claims-in 700ms var(--ease-out) 320ms both;
+}
+.loader-claims span { white-space: nowrap; }
+.loader-claims i { font-style: normal; opacity: 0.45; margin: 0 8px; }
+@keyframes loader-claims-in { from { opacity: 0; } to { opacity: 1; } }
+
+.loader-version {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--text-3) 55%, transparent);
+  text-align: center;
+}
+
+.loader-skip {
+  position: absolute;
+  right: 18px;
+  bottom: calc(16px + var(--safe-bottom, 0px));
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 8px 12px;
+  border-radius: var(--r-sm, 6px);
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.loader-skip:hover { color: var(--text-0); background: var(--bg-1); }
+
+/* -- the exit ----------------------------------------------------------- */
+/* Kept short and square: the card recedes a little and the grid opens out,
+   while the app rises to meet it. No blur — nothing else on this screen is
+   soft, and a blur here would be the one effect that looks bolted on. */
+.loader.is-done { animation: loader-out 420ms cubic-bezier(0.55, 0, 0.35, 1) forwards; pointer-events: none; }
+.loader.is-done .loader-card { animation: loader-card-out 380ms cubic-bezier(0.55, 0, 0.35, 1) forwards; }
+.loader.is-done .loader-grid { animation: loader-grid-out 420ms var(--ease-out) forwards; }
+.loader.is-done::after { display: none; }
+@keyframes loader-out { to { opacity: 0; visibility: hidden; } }
+@keyframes loader-card-out { to { opacity: 0; transform: translateZ(-90px) scale(0.97); } }
+@keyframes loader-grid-out { to { opacity: 0; transform: scale(1.06); } }
+
+@media (max-width: 480px) {
+  .loader-card { padding: 22px 20px 20px; }
+  .loader-name { font-size: 19px; }
+  .loader-claims { font-size: 9px; letter-spacing: 0.1em; padding: 0 16px; line-height: 1.8; }
+  .loader-claims i { margin: 0 5px; }
+}
+
+[data-animations='none'] .loader-grid,
+[data-animations='none'] .loader-card,
+[data-animations='none'] .loader-card::after,
+[data-animations='none'] .loader-bars i,
+[data-animations='none'] .loader-meter-fill::after,
+[data-animations='none'] .loader-claims { animation: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-grid, .loader-card, .loader-card::after,
+  .loader-bars i, .loader-meter-fill::after, .loader-claims { animation: none !important; }
+  .loader.is-done { animation: none; opacity: 0; visibility: hidden; }
+}
+
+
 /* ---------------------------------------------- the bullet style tray --- */
 .sel-row-mark {
   flex: none; width: 22px; text-align: center;
@@ -16557,6 +16803,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   let root = null;
   let barFill = null;
   let stepLine = null;
+  /* v9.6-L: the card's own parts. */
+  let bars = null;
+  let meter = null;
+  let pctLine = null;
   let finished = false;
   let skipHandlers = [];
   let startedAt = 0;
@@ -16567,95 +16817,92 @@ https://github.com/nodeca/pako/blob/main/LICENSE
    * over the top of it. finish() now waits for the sequence to actually
    * finish. Anyone in a hurry presses Skip, taps, or hits a key.
    */
-  const SEQUENCE_MS = 3250;   // the shockwave finishes at ~3.47s; the exit rides its tail
+  const SEQUENCE_MS = 1900;   // v9.6-L: long enough to read the card, short enough not to be a toll
   const MIN_VISIBLE_MS = 900;    // floor when the sequence is cut short
 
+  /* ===================================================================== *
+   * v9.6-L: THE LOADING SCREEN.
+   *
+   * The brief for this screen was "simple, premium, and worth looking at".
+   * The way it earns that is by not lying: every moving part is reporting
+   * real state. Five bars, one per boot step, lit as each step actually
+   * lands. A meter showing the actual ratio. A caption naming the actual
+   * step. Nothing here is a timer pretending to be progress, which is what
+   * most loading screens are and what makes them feel cheap.
+   *
+   * Everything is drawn from theme tokens, so the same markup is correct in
+   * all six themes and in both light and dark with no per-theme rules.
+   * ===================================================================== */
   function build() {
     root = el('div.loader#loader', { role: 'status', 'aria-live': 'polite', 'aria-label': 'Loading Nodalis' });
+    root.appendChild(el('div.loader-grid', { 'aria-hidden': 'true' }));
 
-    // The theme's own texture, behind everything. Pure CSS per theme; the
-    // element just gives it somewhere to live.
-    root.appendChild(el('div.loader-texture', { 'aria-hidden': 'true' }));
+    const card = el('div.loader-card');
 
-    const stage = el('div.loader-stage');
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('class', 'loader-svg');
-    svg.setAttribute('viewBox', '0 0 190 175');
-
-    // links first so nodes paint over their ends
-    LINKS.forEach(function (pair, i) {
-      const a = NODES[pair[0]], b = NODES[pair[1]];
-      const line = document.createElementNS(NS, 'line');
-      line.setAttribute('class', 'loader-link');
-      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
-      line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
-      const len = Math.hypot(b.x - a.x, b.y - a.y);
-      line.style.setProperty('--len', len.toFixed(1));
-      line.style.setProperty('--i', i);
-      svg.appendChild(line);
-    });
-
-    NODES.forEach(function (n, i) {
-      const c = document.createElementNS(NS, 'circle');
-      c.setAttribute('class', 'loader-node');
-      c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', n.r);
-      c.style.setProperty('--i', i);
-      c.style.setProperty('--r0', n.r);
-      c.style.setProperty('--fx', n.from[0] + 'px');
-      c.style.setProperty('--fy', n.from[1] + 'px');
-      svg.appendChild(c);
-    });
-
-    // the mark that blooms once the lattice contracts
-    const core = document.createElementNS(NS, 'path');
-    core.setAttribute('class', 'loader-core');
-    core.setAttribute('d', markPath());
-    svg.appendChild(core);
-
-    const ring = document.createElementNS(NS, 'circle');
-    ring.setAttribute('class', 'loader-ring');
-    ring.setAttribute('cx', 88); ring.setAttribute('cy', 84); ring.setAttribute('r', 34);
-    svg.appendChild(ring);
-
-    // The detonation, inserted BEFORE the svg so the mark stays on top of its
-    // own shockwave. Sized in vmax by CSS, so each ring crosses the whole
-    // screen rather than the 190px stage.
-    const flash = el('div.loader-flash', { 'aria-hidden': 'true' });
-    stage.appendChild(flash);
-    ['a', 'b', 'c'].forEach(function (key, i) {
-      const w = el('div.loader-wave', { 'aria-hidden': 'true' });
-      w.dataset.wave = key;
-      w.style.setProperty('--i', i);
-      stage.appendChild(w);
-    });
-
-    stage.appendChild(svg);
-    root.appendChild(stage);
-
-    const word = el('div.loader-word', { 'aria-hidden': 'true' });
-    'Nodalis'.split('').forEach(function (ch, i) {
-      const span = el('span', null, ch);
-      span.style.setProperty('--i', i);
-      word.appendChild(span);
-    });
-    root.appendChild(word);
-
-    root.appendChild(el('div.loader-tagline', null, 'Your knowledge, connected.'));
+    const head = el('div.loader-head');
+    const mark = document.createElementNS(NS, 'svg');
+    mark.setAttribute('class', 'loader-mark');
     /*
-     * The version, on the one screen everybody sees. This app ships as a single
-     * file you patch in place, so "which version is this?" has to be answerable
-     * by looking at it - otherwise there is no way to tell whether a fix you
-     * applied is in the file you are actually running.
+     * markPath() draws the hexagon at (88,84) with r=26 - coordinates from the
+     * old 190x175 stage. "62 58 52 52" is the exact square that frames it, so
+     * the same path can be reused here without touching markPath() itself.
      */
-    root.appendChild(el('div.loader-version', null, (N.versionLabel ? N.versionLabel() : '')));
+    mark.setAttribute('viewBox', '62 58 52 52');
+    mark.setAttribute('width', '22');
+    mark.setAttribute('height', '22');
+    mark.setAttribute('fill', 'none');
+    mark.setAttribute('stroke', 'currentColor');
+    mark.setAttribute('stroke-width', '1.7');
+    mark.setAttribute('stroke-linejoin', 'round');
+    mark.setAttribute('stroke-linecap', 'round');
+    const markPathEl = document.createElementNS(NS, 'path');
+    markPathEl.setAttribute('d', markPath());
+    mark.appendChild(markPathEl);
+    head.appendChild(mark);
+    head.appendChild(el('div.loader-name', null, 'Nodalis'));
 
-    const bar = el('div.loader-bar');
-    barFill = el('div.loader-bar-fill');
-    bar.appendChild(barFill);
-    root.appendChild(bar);
+    /* One bar per entry in STEPS, so the two can never drift apart. */
+    bars = el('div.loader-bars', { 'aria-hidden': 'true' });
+    STEPS.forEach(function (_, i) {
+      const bar = el('i');
+      bar.style.setProperty('--i', i);
+      bars.appendChild(bar);
+    });
+    head.appendChild(bars);
+    card.appendChild(head);
 
+    card.appendChild(el('div.loader-rule', { 'aria-hidden': 'true' }));
+    card.appendChild(el('div.loader-sub', null, 'Local-first markdown notes'));
+
+    meter = el('div.loader-meter');
+    barFill = el('div.loader-meter-fill');
+    meter.appendChild(barFill);
+    card.appendChild(meter);
+
+    const foot = el('div.loader-foot');
     stepLine = el('div.loader-step', null, STEPS[0]);
-    root.appendChild(stepLine);
+    pctLine = el('div.loader-pct', null, '0%');
+    foot.appendChild(stepLine);
+    foot.appendChild(pctLine);
+    card.appendChild(foot);
+
+    root.appendChild(card);
+
+    /*
+     * The three claims are the three things Nodalis actually does differently,
+     * and all three are verifiable by the person reading them: there is no
+     * server to upload to, no account to make, and the files are on their disk.
+     * A loading screen is the one moment everybody looks at the product rather
+     * than their notes - worth spending on the truth rather than a slogan.
+     */
+    const claims = el('div.loader-claims', { 'aria-hidden': 'true' });
+    ['No upload', 'No account', 'Your files, your disk'].forEach(function (text, i) {
+      if (i) claims.appendChild(el('i', null, '//'));
+      claims.appendChild(el('span', null, text));
+    });
+    root.appendChild(claims);
+
+    root.appendChild(el('div.loader-version', null, (N.versionLabel ? N.versionLabel() : '')));
 
     const skip = el('button.loader-skip', { type: 'button' }, 'Skip');
     skip.addEventListener('click', function (e) { e.stopPropagation(); requestSkip(); });
@@ -16715,8 +16962,22 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   /** progress(0..1, optionalStepIndexOrText) */
   function progress(ratio, step) {
     if (!root) return;
-    const pct = U.clamp(ratio, 0, 1) * 100;
+    const clamped = U.clamp(ratio, 0, 1);
+    const pct = clamped * 100;
     if (barFill) barFill.style.width = pct.toFixed(0) + '%';
+    if (pctLine) pctLine.textContent = pct.toFixed(0) + '%';
+    if (meter) meter.classList.toggle('is-full', clamped >= 0.999);
+    /*
+     * Light one bar per completed step. Derived from the ratio rather than
+     * from the step argument, because callers pass a step name as often as an
+     * index - and the ratio is the one thing every caller supplies.
+     */
+    if (bars) {
+      const lit = Math.round(clamped * bars.children.length);
+      for (let i = 0; i < bars.children.length; i++) {
+        bars.children[i].classList.toggle('is-lit', i < lit);
+      }
+    }
     if (stepLine) {
       const text = typeof step === 'number' ? STEPS[U.clamp(step, 0, STEPS.length - 1)] : step;
       if (text && stepLine.textContent !== text) stepLine.textContent = text;
@@ -16759,6 +17020,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         const cleanup = function () {
           if (root && root.parentNode) root.parentNode.removeChild(root);
           root = null; barFill = null; stepLine = null;
+          bars = null; meter = null; pctLine = null;
           N.bus.emit('loader:done');
           resolve();
         };
