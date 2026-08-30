@@ -9083,6 +9083,70 @@ body[data-bullet-style] .prose ul ul ul > li:not(.task-item)::marker {
 
 
 /* =========================================================================
+ * v9.9 — THE THREE-DOT BUTTON, AND THE MOBILE MENU'S ICONS
+ * ========================================================================= */
+
+/* -- the three-dot button, in every theme --------------------------------
+ * v9.6 put these on :root. The THEMES declare --text-0/1/2/3 on BODY, so a
+ * var(--text-1) evaluated at :root resolves against the :root defaults and
+ * then never moves again - it was frozen at the light-mode ink, #4a4438, in
+ * all six dark themes. Measured from rendered pixels on a sidebar row:
+ *
+ *     nodalis/dark 1.26   notion/dark 1.24   nothing/dark 1.26
+ *     slate/dark   1.26   aurora/dark 1.27   terminal/dark 1.29
+ *
+ * against a 3.0 floor for a UI glyph - which is the "sometimes I cannot see
+ * it" that was reported. Declaring them on BODY is the whole fix: the same
+ * var() now resolves against whichever theme is on.
+ *
+ * Still the two numbers to tune, and still the only two:
+ *   --dot-size      dot diameter, as the stroke width in a 24-unit viewBox
+ *   --dot-strength  the resting ink
+ */
+body {
+  --dot-size: 2.8;
+  --dot-strength: var(--text-1);
+  --dot-strength-hover: var(--text-0);
+}
+
+/*
+ * The second half of "sometimes I cannot see it": the row's actions rest at
+ * 45% opacity, which even over correct ink lands at ~2.2 contrast. 0.68 is
+ * the value that puts ALL TWELVE theme/mode pairs over the 3.0 floor -
+ * measured, the worst of them (notion light) sits at 3.09 - while still
+ * reading as secondary next to the note's title. Touch devices, which have
+ * no hover to reveal anything with, stay at 1.
+ */
+.tree-row-actions { opacity: 0.68; }
+.tree-row:hover .tree-row-actions,
+.tree-row:focus-within .tree-row-actions { opacity: 1; }
+@media (hover: none) { .tree-row-actions { opacity: 1; } }
+
+/* -- the mobile menu: icon and label on the same line ---------------------
+ * .sheet-item .icon sets align-self:flex-start, and align-self on the CHILD
+ * beats align-items on the row. So the v9.4 rule that centres single-line
+ * rows only ever centred the label, and the icon stayed pinned to the top of
+ * a 46px row: measured 5px above the label's centre in English, 3px in
+ * Tamil, on every row of the More sheet.
+ *
+ * A row WITH a description is a different case and was already right - there
+ * the icon belongs on the first line, not in the middle of a two-line block.
+ */
+.sheet-item:not(:has(.sheet-item-desc)) > .icon {
+  align-self: center;
+  margin-top: 0;
+}
+
+/* -- reading aloud -------------------------------------------------------- */
+.speak-count { min-width: 34px; text-align: right; }
+/* The meter is the one part of this bar that reports live state; give it
+   room to be read as a bar rather than a hairline. */
+.speak-meter { height: 4px; }
+.speak-meter-fill { transition: transform 120ms linear; }
+[data-animations='none'] .speak-meter-fill { transition: none; }
+
+
+/* =========================================================================
  * v9.9-L — THE LOADING SCREEN
  *
  * Namespaced .nd9- throughout so none of the v9.6-L card rules can reach it;
@@ -37633,7 +37697,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
     if (N.speak && N.speak.supported()) {
       row('play', T('speak.readSelection', 'Read the selection aloud'), function () { N.speak.start(sel.text); });
-      row('play', T('speak.readNote', 'Read this note aloud'), function () { N.speak.start(); });
+      row('play', T('speak.readNote', 'Read this note aloud'), function () { N.speak.startNote(); });
       sep();
     }
     row('type', 'Title Case', function () { F.transformCase('title'); });
@@ -46072,6 +46136,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   let panel = null;
   let currentUtterance = null;
   let voices = [];
+  /* v9.9: progress is counted in characters, so it can move inside one
+     utterance instead of only between utterances. */
+  let spokenInChunk = 0;
+  let charsBefore = [];
+  let totalChars = 0;
 
   function supported() {
     return typeof window !== 'undefined' && 'speechSynthesis' in window &&
@@ -46093,19 +46162,180 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   function voiceList() { return voices.length ? voices : loadVoices(); }
 
-  function preferredVoice() {
+  /* ===================================================================== *
+   * v9.9: IT READS WHAT IS WRITTEN, IN THE LANGUAGE IT IS WRITTEN IN.
+   *
+   * Until now one voice was chosen for the whole note, and it was chosen
+   * from the INTERFACE language - so a Tamil note read with an en-US
+   * interface got an en-US voice trying to pronounce Tamil, which is the
+   * letter salad that was reported.
+   *
+   * The note is split into runs by SCRIPT instead. Latin is a script like
+   * any other here, so a note that mixes Tamil and English becomes Tamil
+   * runs and English runs, each spoken by a voice that matches it, in
+   * order. Nothing to choose and nothing to configure: what is written is
+   * what decides.
+   *
+   * Script is not language - Devanagari carries Hindi and Marathi, Arabic
+   * carries Urdu and Persian - so this maps a script to the language most
+   * likely meant by it and lets the engine's own matching do the rest. It
+   * is a better guess than "whatever the menus are in", which is what it
+   * replaces, and it never has to be right for the text to be readable.
+   *
+   * WHAT IT CANNOT DO: synthesise a language the device has no voice for.
+   * That is the operating system's business, not the page's. Where a voice
+   * is missing it is named, once, with how to install one - which is worth
+   * more than silence and far more than a wrong voice.
+   * ===================================================================== */
+  const LANG_SCRIPTS = [
+    /* kana before Han: Japanese uses both, Chinese only the latter */
+    ['ja', /[぀-ゟ゠-ヿ]/],
+    ['ko', /[가-힯ᄀ-ᇿ㄰-㆏]/],
+    ['zh', /[一-鿿㐀-䶿]/],
+    ['ta', /[஀-௿]/],
+    ['hi', /[ऀ-ॿ]/],
+    ['bn', /[ঀ-৿]/],
+    ['pa', /[਀-੿]/],
+    ['gu', /[઀-૿]/],
+    ['or', /[଀-୿]/],
+    ['te', /[ఀ-౿]/],
+    ['kn', /[ಀ-೿]/],
+    ['ml', /[ഀ-ൿ]/],
+    ['si', /[඀-෿]/],
+    ['th', /[฀-๿]/],
+    ['lo', /[຀-໿]/],
+    ['my', /[က-႟]/],
+    ['ka', /[Ⴀ-ჿ]/],
+    ['am', /[ሀ-፿]/],
+    ['km', /[ក-៿]/],
+    ['he', /[֐-׿]/],
+    ['ar', /[؀-ۿݐ-ݿﭐ-﷿]/],
+    ['el', /[Ͱ-Ͽ]/],
+    ['ru', /[Ѐ-ӿ]/],
+    ['hy', /[԰-֏]/],
+    /* last, so every script above claims its own characters first */
+    ['latin', /[A-Za-zÀ-ɏ]/],
+  ];
+
+  const LANG_NAMES = {
+    ja: 'Japanese', ko: 'Korean', zh: 'Chinese', ta: 'Tamil', hi: 'Hindi',
+    bn: 'Bengali', pa: 'Punjabi', gu: 'Gujarati', or: 'Odia', te: 'Telugu',
+    kn: 'Kannada', ml: 'Malayalam', si: 'Sinhala', th: 'Thai', lo: 'Lao',
+    my: 'Burmese', ka: 'Georgian', am: 'Amharic', km: 'Khmer', he: 'Hebrew',
+    ar: 'Arabic', el: 'Greek', ru: 'Russian', hy: 'Armenian', latin: 'English',
+  };
+
+  function langName(code) { return LANG_NAMES[code] || String(code || '').toUpperCase(); }
+
+  /** The language of one character, or null for spaces, digits and punctuation. */
+  function langOfChar(ch) {
+    for (let i = 0; i < LANG_SCRIPTS.length; i++) {
+      if (LANG_SCRIPTS[i][1].test(ch)) return LANG_SCRIPTS[i][0];
+    }
+    return null;
+  }
+
+  /**
+   * Split text into consecutive same-language runs.
+   *
+   * Neutral characters - spaces, digits, punctuation - belong to whichever
+   * run is being built, which is what keeps "2,000" and a full stop with the
+   * sentence they came from instead of ending it.
+   */
+  function languageRuns(text) {
+    const s = String(text || '');
+    const runs = [];
+    let cur = null;        // the language of the run being built
+    let buf = '';
+    let pending = '';      // neutrals waiting to learn which run they are in
+
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      const l = langOfChar(ch);
+      if (l === null) { pending += ch; continue; }
+      if (!buf) { cur = l; buf = pending + ch; pending = ''; continue; }
+      if (l === cur) { buf += pending + ch; pending = ''; continue; }
+      runs.push({ lang: cur, text: buf });
+      cur = l; buf = pending + ch; pending = '';
+    }
+    if (buf) runs.push({ lang: cur, text: buf + pending });
+    else if (pending.trim() && runs.length) runs[runs.length - 1].text += pending;
+
+    /*
+     * A stray word of one language inside another - a product name in a
+     * Tamil sentence - is not worth changing voice twice for. Runs shorter
+     * than this are folded into the run before them.
+     */
+    const merged = [];
+    runs.forEach(function (r) {
+      const prev = merged[merged.length - 1];
+      if (prev && r.text.trim().length < 4) { prev.text += r.text; return; }
+      if (prev && prev.lang === r.lang) { prev.text += r.text; return; }
+      merged.push({ lang: r.lang, text: r.text });
+    });
+    return merged.filter(function (r) { return r.text.trim(); });
+  }
+
+  /** Every voice whose language matches, local ones first. */
+  function voicesForLang(code) {
+    const list = voiceList();
+    const c = String(code || '').toLowerCase();
+    if (!c || !list.length) return [];
+    const norm = function (v) { return String(v.lang || '').toLowerCase().replace(/_/g, '-'); };
+    const hit = list.filter(function (v) {
+      const n = norm(v);
+      return n === c || n.indexOf(c + '-') === 0;
+    });
+    /* A local voice does not need the network and does not go quiet offline. */
+    return hit.filter(function (v) { return v.localService; }).concat(
+           hit.filter(function (v) { return !v.localService; }));
+  }
+
+  /**
+   * The voice for one run. Latin honours the voice you picked by hand,
+   * because that is the one people actually set; every other script is
+   * matched to its own language, because a hand-picked English voice
+   * reading Tamil is the bug this replaces.
+   */
+  function voiceForLang(code) {
     const list = voiceList();
     if (!list.length) return null;
-    const want = N.store.state.settings.speakVoice;
-    if (want) {
-      const exact = list.filter(function (v) { return v.voiceURI === want || v.name === want; })[0];
-      if (exact) return exact;
+    if (!code || code === 'latin') {
+      const want = N.store.state.settings.speakVoice;
+      if (want) {
+        const exact = list.filter(function (v) { return v.voiceURI === want || v.name === want; })[0];
+        if (exact) return exact;
+      }
+      const ui = String((N.i18n && N.i18n.current && N.i18n.current()) || 'en').toLowerCase();
+      const byUi = voicesForLang(ui)[0];
+      if (byUi) return byUi;
+      return list.filter(function (v) { return v.default; })[0] || list[0];
     }
-    // Otherwise the best match for the interface language, then the default.
-    const lang = (N.i18n && N.i18n.current && N.i18n.current()) || 'en';
-    const byLang = list.filter(function (v) { return String(v.lang || '').toLowerCase().indexOf(lang) === 0; });
-    if (byLang.length) return byLang[0];
-    return list.filter(function (v) { return v.default; })[0] || list[0];
+    return voicesForLang(code)[0] || null;
+  }
+
+  /** Which of these languages this device cannot speak. */
+  function missingVoices(plan) {
+    const seen = {};
+    const missing = [];
+    (plan || []).forEach(function (piece) {
+      const code = piece.lang;
+      if (!code || code === 'latin' || seen[code]) return;
+      seen[code] = true;
+      if (!voicesForLang(code).length) missing.push(code);
+    });
+    return missing;
+  }
+
+  /** Runs, then each run cut into utterance-sized pieces that keep its language. */
+  function planChunks(text) {
+    const plan = [];
+    languageRuns(text).forEach(function (run) {
+      split(run.text).forEach(function (piece) {
+        plan.push({ text: piece, lang: run.lang });
+      });
+    });
+    return plan;
   }
 
   function rate() {
@@ -46177,6 +46407,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     paused = false;
     chunks = [];
     at = 0;
+    spokenInChunk = 0;
+    charsBefore = [];
+    totalChars = 0;
     currentUtterance = null;
     try { window.speechSynthesis.cancel(); } catch (err) { /* nothing playing */ }
     if (!opts || opts.keepPanel !== true) closePanel();
@@ -46187,6 +46420,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (!speaking || at >= chunks.length) {
       if (speaking) {
         speaking = false;
+        spokenInChunk = 0;
         N.bus.emit('speak:done');
         paint();
         if (panel) closePanel();
@@ -46194,7 +46428,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       return;
     }
     const piece = chunks[at];
-    const u = new window.SpeechSynthesisUtterance(piece);
+    const u = new window.SpeechSynthesisUtterance(piece.text);
     /*
      * Setting .voice throws outright if the object is not a real
      * SpeechSynthesisVoice - and getVoices() has been known to hand back
@@ -46204,15 +46438,40 @@ https://github.com/nodeca/pako/blob/main/LICENSE
      * perfectly good outcome, silence is not.
      */
     try {
-      const v = preferredVoice();
+      const v = voiceForLang(piece.lang);
       if (v) { u.voice = v; if (v.lang) u.lang = v.lang; }
+      else if (piece.lang && piece.lang !== 'latin') {
+        /* No installed voice for it. Naming the language anyway lets an
+           engine that resolves languages itself have a go, and costs
+           nothing where it cannot. */
+        u.lang = piece.lang;
+      }
     } catch (err) {
       console.warn('[speak] that voice was refused; using the default', err);
     }
     try { u.rate = rate(); u.pitch = 1; } catch (err) { /* clamped by the engine */ }
+
+    /*
+     * v9.9: PROGRESS THAT MOVES.
+     *
+     * It used to be counted in whole utterances, and a short note is one
+     * utterance - so the bar sat at 0 and then jumped to 1 with nothing in
+     * between, which is what "it does not show any progress" was. boundary
+     * fires as the engine reaches each word, so the bar can follow the
+     * voice. Engines that do not fire it fall back to the old per-chunk
+     * stepping rather than to a timer pretending to be progress.
+     */
+    spokenInChunk = 0;
+    u.onboundary = function (e) {
+      if (!speaking || currentUtterance !== u) return;
+      const i = e && typeof e.charIndex === 'number' ? e.charIndex : 0;
+      spokenInChunk = Math.max(0, Math.min(piece.text.length, i));
+      paint();
+    };
     u.onend = function () {
-      if (!speaking) return;
+      if (!speaking || currentUtterance !== u) return;
       at++;
+      spokenInChunk = 0;
       paint();
       speakNext();
     };
@@ -46221,6 +46480,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (e && (e.error === 'interrupted' || e.error === 'canceled')) return;
       console.warn('[speak] utterance failed', e && e.error);
       at++;
+      spokenInChunk = 0;
       if (at < chunks.length) speakNext(); else stop();
     };
     currentUtterance = u;
@@ -46230,7 +46490,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /**
    * start(text) - or, with nothing passed, the selection if there is one and
-   * the whole note if there is not. That rule is what makes one button enough.
+   * the whole note if there is not. That rule is what makes the toolbar's
+   * play button one button; startNote() is for the places that say "this
+   * NOTE" and must mean it.
    */
   function start(text) {
     if (!supported()) {
@@ -46252,14 +46514,59 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       return false;
     }
     stop({ keepPanel: true });
-    chunks = split(speech);
+    loadVoices();
+    chunks = planChunks(speech);
+    if (!chunks.length) {
+      N.toast.show('Nothing to read.', { kind: 'info', ms: 2200 });
+      return false;
+    }
+    /* Precomputed so progress is one subtraction per boundary event. */
+    charsBefore = [];
+    totalChars = 0;
+    chunks.forEach(function (c) { charsBefore.push(totalChars); totalChars += c.text.length; });
     at = 0;
+    spokenInChunk = 0;
     speaking = true;
     paused = false;
-    loadVoices();
     openPanel();
+    reportMissingVoices(chunks);
     speakNext();
     return true;
+  }
+
+  /**
+   * The whole note, whatever is highlighted. "Read this note aloud" that
+   * reads three highlighted words instead is not a smaller version of the
+   * feature, it is the wrong one.
+   */
+  function startNote() {
+    const note = N.store.getNote(N.store.state.activeNoteId);
+    if (!note) { N.toast.show('Open a note first.', { kind: 'info', ms: 2200 }); return false; }
+    return start(note.content);
+  }
+
+  /**
+   * Said once per set of languages, not once per note, because the answer is
+   * the same every time and the second telling is nagging.
+   */
+  let warnedFor = '';
+  function reportMissingVoices(plan) {
+    let missing;
+    try { missing = missingVoices(plan); }
+    catch (err) { return; }
+    if (!missing.length) { warnedFor = ''; return; }
+    const key = missing.slice().sort().join(',');
+    if (key === warnedFor) return;
+    warnedFor = key;
+    const names = missing.map(langName);
+    const list = names.length === 1 ? names[0]
+      : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    N.toast.warn(
+      'No ' + list + ' voice is installed, so those parts will not sound right. ' +
+      'Windows: Settings → Time & language → Speech → Add voices. ' +
+      'Android: Settings → System → Languages → Text-to-speech.',
+      { ms: 8000, key: 'speak-voice' }
+    );
   }
 
   function pause() {
@@ -46392,13 +46699,19 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       play.innerHTML = '';
       play.appendChild(N.icons.node(!speaking || paused ? 'play' : 'pause', { size: 16 }));
     }
-    const fill = panel.querySelector('.speak-meter-fill');
-    if (fill) {
-      const ratio = chunks.length ? Math.min(1, at / chunks.length) : 0;
-      fill.style.transform = 'scaleX(' + ratio.toFixed(3) + ')';
+    /*
+     * v9.9: measured in CHARACTERS SPOKEN, not utterances finished, so a
+     * one-utterance note has a bar that moves instead of a bar that waits.
+     */
+    let ratio = 0;
+    if (totalChars > 0) {
+      if (at >= chunks.length) ratio = 1;
+      else ratio = Math.min(1, ((charsBefore[at] || 0) + spokenInChunk) / totalChars);
     }
+    const fill = panel.querySelector('.speak-meter-fill');
+    if (fill) fill.style.transform = 'scaleX(' + ratio.toFixed(4) + ')';
     const count = panel.querySelector('.speak-count');
-    if (count) count.textContent = chunks.length ? (Math.min(at + 1, chunks.length) + ' / ' + chunks.length) : '';
+    if (count) count.textContent = totalChars ? Math.round(ratio * 100) + '%' : '';
     panel.querySelectorAll('.speak-speed').forEach(function (b) {
       b.classList.toggle('is-on', Number(b.dataset.rate) === rate());
     });
@@ -46423,7 +46736,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         { id: 'speak.note', title: 'Read this note aloud', group: 'Note', icon: 'play',
           accel: 'Mod+Shift+Space',
           when: function () { return !!N.store.state.activeNoteId; },
-          run: function () { start(); } },
+          /* v9.9: the WHOLE note, whatever happens to be highlighted. */
+          run: function () { startNote(); } },
         { id: 'speak.selection', title: 'Read the selection aloud', group: 'Note', icon: 'play',
           when: function () {
             const s = N.format && N.format.selection ? N.format.selection() : null;
@@ -46444,7 +46758,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   N.speak = {
-    init: init, supported: supported, start: start, stop: stop, pause: pause,
+    init: init, supported: supported, start: start, startNote: startNote,
+    languageRuns: languageRuns, planChunks: planChunks, voiceForLang: voiceForLang,
+    missingVoices: missingVoices, langName: langName,
+    stop: stop, pause: pause,
     resume: resume, toggle: toggle, setRate: setRate, setVoice: setVoice,
     rate: rate, voices: voiceList, toSpeech: toSpeech, split: split,
     isSpeaking: function () { return speaking; },
