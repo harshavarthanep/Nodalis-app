@@ -9525,6 +9525,94 @@ body {
   .note-crumb { max-width: 45vw; }
 }
 
+
+/* =========================================================================
+ * v10.1.0 — THE FOLDER PATH, THE MENUS, AND THE HEADING BAR
+ * ========================================================================= */
+
+/* -- 1. the folder path, in its own namespace ----------------------------
+ * v10.0 called this .note-crumb. The app already had a .note-crumb - the
+ * sticky current-heading bar - so every segment inherited its
+ * position:absolute and z-index:39 and they all stacked in one place.
+ * Measured: six segments, all reporting the same 21px rect. Renamed to
+ * .nd-path, which nothing else in the file touches.
+ */
+.nd-path {
+  display: flex; align-items: center; flex-wrap: nowrap;
+  gap: 1px; min-width: 0;
+  padding: var(--sp-2) var(--sp-6) 0;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  overflow: hidden;
+}
+.nd-path[hidden] { display: none; }
+.nd-path-seg {
+  flex: 0 1 auto; min-width: 0;
+  border: 0; background: transparent; cursor: pointer;
+  padding: 2px 5px; border-radius: var(--r-sm, 6px);
+  color: inherit; font: inherit; line-height: 1.5;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.nd-path-seg:hover { background: var(--bg-2); color: var(--text-1); }
+.nd-path-seg.is-here { color: var(--text-2); cursor: default; flex-shrink: 0; }
+.nd-path-seg.is-here:hover { background: transparent; color: var(--text-2); }
+/* The ellipsis that stands in for the collapsed middle. */
+.nd-path-more { flex: none; font-variant-numeric: tabular-nums; }
+.nd-path-more:hover { background: var(--bg-2); color: var(--accent); }
+.nd-path-sep { opacity: 0.45; flex: none; user-select: none; padding: 0 1px; }
+@media (max-width: 760px) {
+  .nd-path { padding: var(--sp-2) var(--sp-5) 0; font-size: 11px; }
+}
+
+/* -- 2. the sticky heading bar loses the glass ---------------------------
+ * backdrop-filter over scrolling text is the murk. A near-solid surface
+ * with a hairline under it is what the rest of the app's chrome does, and
+ * it stays legible over anything.
+ */
+.note-crumb {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: color-mix(in srgb, var(--bg-editor, var(--bg-0)) 96%, var(--text-0)) !important;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+/* -- 3. one shape, one ceiling, for every menu ---------------------------
+ * The old cap was min(80vh, 660px). On a mobile browser with a dynamic
+ * toolbar, vh is the LARGEST the viewport ever gets - so 80vh can be taller
+ * than what is actually on screen, which is how a Delete row ended up
+ * somewhere you could not reach it. JS now hands over the visualViewport
+ * measurement; this is the ceiling it may never exceed.
+ *
+ * The folder menu was the one that felt right: compact, aligned, every
+ * label readable. These numbers are that menu's, applied to all of them.
+ */
+.menu {
+  max-height: min(var(--menu-max, 520px), 62vh, 520px) !important;
+  min-width: 208px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* A menu that scrolls says so, at whichever end still has rows. */
+.menu.is-scrollable { box-shadow: var(--shadow-lg), inset 0 -26px 18px -18px rgba(0, 0, 0, 0.5); }
+.menu.is-scrollable.is-at-end { box-shadow: var(--shadow-lg); }
+/* Rows keep their full text and a single height, so two menus opened a
+   second apart do not look like two different products. */
+.menu-item {
+  min-height: 34px;
+  height: auto;
+  align-items: center;
+}
+.menu-item-label {
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.menu-item.has-desc { min-height: 44px; }
+.menu-head { position: sticky; top: 0; z-index: 1; background: var(--bg-panel); }
+/* Complex scripts need the extra line but not a 42px fixed box. */
+html[data-script='complex'] .menu-item { min-height: 38px; height: auto; }
+
 </style>
 </head>
 
@@ -10002,9 +10090,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 (function (N) {
   'use strict';
 
-  N.version = '9.3.0';
+  N.version = '10.1.0';
   N.versionName = 'v9.3';
-  N.built = '2026-08-29';
+  N.built = '2026-09-02';
 
   /** "v8.0.0" - what goes on screen. */
   N.versionLabel = function () { return 'v' + N.version; };
@@ -16964,18 +17052,29 @@ https://github.com/nodeca/pako/blob/main/LICENSE
      *   3. mark it .is-scrollable when even that is not enough, which is what
      *      turns on the visible scrollbar and the bottom shading.
      */
+    /*
+     * v10.1: MEASURE WHAT IS ON SCREEN, NOT WHAT COULD BE.
+     *
+     * `vh` is the viewport at its LARGEST - a mobile browser with a dynamic
+     * toolbar reports the tall value even while the toolbar is covering the
+     * bottom of the page. So a menu capped at 80vh could be taller than the
+     * visible area, and its last row - Delete, on the note menu - ended up
+     * somewhere no amount of scrolling the page would reach. visualViewport
+     * is the part actually being looked at.
+     */
+    const vvis = window.visualViewport;
+    const visH = vvis ? Math.max(220, Math.min(vh, (vvis.offsetTop || 0) + vvis.height)) : vh;
     const roomBelow = (o.anchor && o.anchor.getBoundingClientRect)
-      ? vh - o.anchor.getBoundingClientRect().bottom - 4 - pad
-      : vh - (o.y === undefined ? 0 : o.y) - pad;
+      ? visH - o.anchor.getBoundingClientRect().bottom - 4 - pad
+      : visH - (o.y === undefined ? 0 : o.y) - pad;
     const roomAbove = (o.anchor && o.anchor.getBoundingClientRect)
       ? o.anchor.getBoundingClientRect().top - 4 - pad
-      : (o.y === undefined ? vh : o.y) - pad;
+      : (o.y === undefined ? visH : o.y) - pad;
     const openUp = (o.anchor && o.anchor.getBoundingClientRect)
       ? (rect.height > roomBelow && roomAbove > roomBelow)
       : false;
-    const room = Math.max(160, openUp ? roomAbove : Math.max(roomBelow, roomAbove, vh - 2 * pad));
-    menu.style.setProperty('--menu-max', Math.round(Math.min(room, vh - 2 * pad)) + 'px');
-
+    const room = Math.max(160, openUp ? roomAbove : Math.max(roomBelow, roomAbove, visH - 2 * pad));
+    menu.style.setProperty('--menu-max', Math.round(Math.min(room, visH - 2 * pad)) + 'px');
     /* Re-measure: --menu-max may have changed the height we are about to place. */
     const sized = menu.getBoundingClientRect();
     const mh = sized.height;
@@ -30051,7 +30150,25 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     activeSection = id;
     const target = document.getElementById('settings-' + id);
     if (target && body) {
-      const top = target.offsetTop - 8;
+      /*
+       * v10.1: offsetTop - 8 put the heading BEHIND the sticky tab strip on
+       * a phone, so the first thing on screen was the description and it
+       * read as "it landed too far down". Offset by whatever the sticky
+       * strip actually measures, plus a little air above the heading.
+       */
+      const nav = body.querySelector('.settings-nav');
+      let stuck = 0;
+      if (nav && getComputedStyle(nav).position === 'sticky') {
+        stuck = Math.round(nav.getBoundingClientRect().height) || 0;
+      }
+      /*
+       * Measured from RECTS, not offsetTop. offsetTop is relative to the
+       * nearest positioned ancestor - here .settings-layout, not the scroll
+       * container - so subtracting the sticky height from it still left the
+       * heading 16px behind the tab strip. Measured, then fixed.
+       */
+      const top = Math.max(0, body.scrollTop +
+        (target.getBoundingClientRect().top - body.getBoundingClientRect().top) - stuck - 14);
       body.scrollTo({ top: top, behavior: N.store.state.settings.animations === 'none' ? 'auto' : 'smooth' });
     }
     markActive(id);
@@ -47071,20 +47188,33 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /* ----------------------------------------------------- the breadcrumb */
 
-  function crumbHost() {
+  /* ------------------------------------------------------- the folder path
+   * NOTE ON THE CLASS NAMES: this is .nd-path, not .note-crumb. The app
+   * already owns .note-crumb for the sticky current-heading bar, and v10.0
+   * collided with it - every segment inherited position:absolute and
+   * z-index:39 and they stacked in a single 21px spot. Present in the DOM,
+   * correct text, invisible. Do not rename these back.
+   */
+  function pathHost() {
     const head = document.querySelector('#view-editor .editor-head') || document.querySelector('.editor-head');
     if (!head || !head.parentNode) return null;
-    let host = document.getElementById('note-crumbs');
+    let host = document.getElementById('nd-note-path');
     if (!host) {
-      host = el('div.note-crumbs#note-crumbs', { 'aria-label': 'Where this note lives' });
+      host = el('div.nd-path#nd-note-path', { 'aria-label': 'Where this note lives' });
       head.parentNode.insertBefore(host, head);
     }
+    /* v10.0 left one of these behind under the old name. */
+    const stale = document.getElementById('note-crumbs');
+    if (stale && stale.parentNode) stale.parentNode.removeChild(stale);
     return host;
   }
 
+  /* Clicking the ellipsis opens the middle out, for this note only. */
+  let pathExpanded = false;
+
   function refreshCrumbs() {
     let host;
-    try { host = crumbHost(); } catch (err) { return; }
+    try { host = pathHost(); } catch (err) { return; }
     if (!host) return;
     if (!on('showNoteCrumbs')) { host.hidden = true; U.clear(host); return; }
 
@@ -47094,32 +47224,52 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     U.clear(host);
     const parts = String(note.folder || '').split('/').filter(Boolean);
 
-    const crumb = function (label, onClick, here) {
-      const b = el('button.note-crumb' + (here ? '.is-here' : ''), {
-        type: 'button', title: label,
-      }, label);
+    const seg = function (label, onClick, cls) {
+      const b = el('button.nd-path-seg' + (cls ? '.' + cls : ''), { type: 'button', title: label }, label);
       if (onClick) b.addEventListener('click', onClick);
       else b.disabled = true;
       return b;
     };
-    const sep = function () { return el('span.note-crumb-sep', { 'aria-hidden': 'true' }, '/'); };
+    const sep = function () { return el('span.nd-path-sep', { 'aria-hidden': 'true' }, '/'); };
+    const jump = function (folder) {
+      return function () {
+        try { if (N.sidebar && N.sidebar.expandTo) N.sidebar.expandTo(folder); } catch (err) {}
+      };
+    };
 
-    host.appendChild(crumb('All notes', function () {
-      try { N.app.setView('editor'); if (N.sidebar && N.sidebar.expandTo) N.sidebar.expandTo(''); } catch (err) {}
-    }));
+    host.appendChild(seg('All notes', jump('')));
 
-    let walked = '';
+    /*
+     * Notion does not print eleven levels; it prints the ends and hides the
+     * middle behind an ellipsis. Three or fewer folders all fit, so they all
+     * show. More than that and the middle collapses to a button.
+     */
+    const KEEP_TAIL = 2;
+    const walk = [];
+    let acc = '';
     parts.forEach(function (part) {
-      walked = walked ? walked + '/' + part : part;
-      const target = walked;
+      acc = acc ? acc + '/' + part : part;
+      walk.push({ name: part, path: acc });
+    });
+
+    let shown = walk;
+    if (walk.length > 3 && !pathExpanded) {
+      shown = [walk[0], { ellipsis: walk.length - 1 - KEEP_TAIL }].concat(walk.slice(-KEEP_TAIL));
+    }
+
+    shown.forEach(function (item) {
       host.appendChild(sep());
-      host.appendChild(crumb(part, function () {
-        try { if (N.sidebar && N.sidebar.expandTo) N.sidebar.expandTo(target); } catch (err) {}
-      }));
+      if (item.ellipsis) {
+        const more = seg('…', function () { pathExpanded = true; refreshCrumbs(); }, 'nd-path-more');
+        more.title = item.ellipsis + ' more folder' + (item.ellipsis === 1 ? '' : 's') + ' — click to show';
+        host.appendChild(more);
+        return;
+      }
+      host.appendChild(seg(item.name, jump(item.path)));
     });
 
     host.appendChild(sep());
-    host.appendChild(crumb(N.store.noteTitle(note), null, true));
+    host.appendChild(seg(N.store.noteTitle(note), null, 'is-here'));
     host.hidden = false;
   }
 
