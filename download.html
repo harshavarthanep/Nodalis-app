@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Download Nodalis — Windows, Android, iPhone</title>
+<meta name="description" content="Download Nodalis for Windows and Android, or add it to your iPhone. Free, offline, your notes as plain markdown.">
+<link rel="icon" href="icons/icon.svg">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f2e9; --card: #fffdf8; --ink: #1f1d2b; --muted: #6b6878;
+    --line: #e7e0d0; --accent: #6c5ce7; --accent-ink: #ffffff; --soft: #ece8ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { color-scheme: dark;
+      --bg: #16161d; --card: #1f1f29; --ink: #f1eff8; --muted: #a9a6b8;
+      --line: #2e2d3b; --accent: #8b7ff0; --accent-ink: #ffffff; --soft: #2a2740; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0); }
+  main { max-width: 980px; margin: 0 auto; padding: 56px 20px 72px; }
+  header { text-align: center; margin-bottom: 40px; }
+  header img { width: 72px; height: 72px; }
+  h1 { font-size: clamp(28px, 5vw, 42px); margin: 14px 0 8px; letter-spacing: -0.02em; }
+  header p { color: var(--muted); margin: 0 auto; max-width: 560px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+  .card.mine { border-color: var(--accent); box-shadow: 0 0 0 3px var(--soft); }
+  .tag { align-self: flex-start; font-size: 12px; font-weight: 600; color: var(--accent);
+    background: var(--soft); padding: 3px 10px; border-radius: 999px; visibility: hidden; }
+  .card.mine .tag { visibility: visible; }
+  .card h2 { margin: 0; font-size: 21px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .btn { display: inline-flex; justify-content: center; align-items: center; gap: 8px;
+    background: var(--accent); color: var(--accent-ink); text-decoration: none; font-weight: 600;
+    padding: 12px 16px; border-radius: 12px; margin-top: auto; }
+  .btn:hover { filter: brightness(1.08); }
+  .link { color: var(--accent); font-size: 14px; text-decoration: none; text-align: center; }
+  .link:hover { text-decoration: underline; }
+  ol { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; }
+  .note { margin-top: 36px; font-size: 14px; color: var(--muted); text-align: center; }
+  .note a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icons/icon.svg" alt="">
+    <h1>Get Nodalis</h1>
+    <p>Your knowledge, connected — as a real app on your computer and phone. Free, works offline, no account.</p>
+  </header>
+
+  <div class="grid">
+    <section class="card" id="windows">
+      <span class="tag">Recommended for you</span>
+      <h2>Windows</h2>
+      <p>Windows 10 and 11. Installs with Start-menu and desktop shortcuts.</p>
+      <a class="btn" href="https://github.com/harshavarthanep/Nodalis-apps/releases/latest/download/Nodalis-Setup.exe">Download for Windows</a>
+      <a class="link" href="https://github.com/harshavarthanep/Nodalis-apps/releases/latest/download/Nodalis-Portable.exe">or the portable version (no install)</a>
+    </section>
+
+    <section class="card" id="android">
+      <span class="tag">Recommended for you</span>
+      <h2>Android</h2>
+      <p>Android 6 and newer. Open the file after it downloads and allow “Install unknown apps” when your phone asks.</p>
+      <a class="btn" href="https://github.com/harshavarthanep/Nodalis-apps/releases/latest/download/Nodalis.apk">Download for Android</a>
+    </section>
+
+    <section class="card" id="ios">
+      <span class="tag">Recommended for you</span>
+      <h2>iPhone &amp; iPad</h2>
+      <p>Add Nodalis to your Home Screen — it opens full-screen and works offline.</p>
+      <ol>
+        <li>Open the app link below in <strong>Safari</strong></li>
+        <li>Tap the <strong>Share</strong> button</li>
+        <li>Tap <strong>Add to Home Screen</strong></li>
+      </ol>
+      <a class="btn" href="https://harshavarthanep.github.io/Nodalis-apps/">Open Nodalis in Safari</a>
+    </section>
+  </div>
+
+  <p class="note">Windows may show “Windows protected your PC” the first time — click <em>More info</em> → <em>Run anyway</em>.
+    All versions: <a href="https://github.com/harshavarthanep/Nodalis-apps/releases">release history</a>.</p>
+</main>
+<script>
+  (function () {
+    var ua = navigator.userAgent;
+    var id = /android/i.test(ua) ? 'android'
+      : (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) ? 'ios'
+      : /Windows/i.test(ua) ? 'windows' : null;
+    if (!id) return;
+    var card = document.getElementById(id);
+    card.classList.add('mine');
+    card.parentNode.insertBefore(card, card.parentNode.firstChild);
+  })();
+</script>
+</body>
+</html>

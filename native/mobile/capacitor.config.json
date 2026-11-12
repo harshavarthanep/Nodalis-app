@@ -1,0 +1,12 @@
+{
+  "appId": "com.h24creationz.nodalis",
+  "appName": "Nodalis",
+  "webDir": "www",
+  "backgroundColor": "#f6f2e9",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "auto"
+  },
+  "ios": {
+    "contentInset": "never"
+  }
+}
