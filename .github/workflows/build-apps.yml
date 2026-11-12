@@ -1,0 +1,143 @@
+# Builds the Nodalis Windows app and Android app from index.html in the
+# repository root, then publishes them as a GitHub Release.
+#
+# HOW TO RUN: GitHub -> Actions tab -> "Build Nodalis apps" -> Run workflow
+#             -> type the version (for example 1.0.0) -> Run.
+
+name: Build Nodalis apps
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version number, like 1.0.0 (must be higher than the last one)"
+        required: true
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows app (.exe)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: native/desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install tools
+        run: npm install
+
+      - name: Set version
+        run: npm pkg set version=${{ inputs.version }}
+
+      - name: Build installer and portable app
+        run: npm run build:win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            native/desktop/dist/Nodalis-Setup.exe
+            native/desktop/dist/Nodalis-Portable.exe
+          if-no-files-found: error
+
+  android:
+    name: Android app (.apk)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install tools
+        run: npm install
+
+      - name: Create the Android project from index.html
+        run: |
+          npm run prepare-www
+          npx cap add android
+          npx @capacitor/assets generate --android \
+            --iconBackgroundColor '#faf6ed' --iconBackgroundColorDark '#16161d' \
+            --splashBackgroundColor '#faf6ed' --splashBackgroundColorDark '#16161d'
+          npx cap sync android
+
+      - name: Set version and storage permission
+        run: |
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i -E "s/versionName \"[^\"]*\"/versionName \"${{ inputs.version }}\"/" android/app/build.gradle
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
+
+      - name: Build and sign the APK
+        working-directory: native/mobile/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          chmod +x gradlew
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+            ./gradlew assembleRelease --no-daemon
+            "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+            "$BT/apksigner" sign --ks release.keystore --ks-key-alias "$KS_ALIAS" \
+              --ks-pass env:KS_PASS --key-pass env:KS_PASS --out ../Nodalis.apk aligned.apk
+            "$BT/apksigner" verify ../Nodalis.apk
+            rm -f release.keystore
+          else
+            echo "::warning::Signing secrets not set - building a TEST apk. Add the 3 secrets (see native/README-APPS.md)."
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk ../Nodalis.apk
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: native/mobile/Nodalis.apk
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Nodalis ${{ inputs.version }}
+          make_latest: true
+          files: |
+            out/windows/Nodalis-Setup.exe
+            out/windows/Nodalis-Portable.exe
+            out/android/Nodalis.apk
+          body: |
+            ## Nodalis ${{ inputs.version }}
+
+            **Windows** - `Nodalis-Setup.exe` installs Nodalis with Start-menu and desktop shortcuts.
+            `Nodalis-Portable.exe` runs without installing.
+
+            **Android** - `Nodalis.apk`. Open it on your phone and allow "Install unknown apps" when asked.
+
+            **iPhone / iPad** - open https://harshavarthanep.github.io/Nodalis-apps/ in Safari,
+            tap Share, then "Add to Home Screen".
