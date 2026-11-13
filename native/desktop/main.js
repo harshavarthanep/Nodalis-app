@@ -2,7 +2,8 @@
 // Loads the same Nodalis index.html as the website, from inside the app,
 // so it works fully offline. Notes folder access, themes, canvas, graph,
 // GitHub sync and exports all behave like they do in Chrome / Edge.
-const { app, BrowserWindow, shell, session } = require('electron');
+const { app, BrowserWindow, shell, session, Menu } = require('electron');
+const IS_MAC = process.platform === 'darwin';
 const path = require('path');
 
 const APP_ID = 'com.h24creationz.nodalis';
@@ -29,6 +30,7 @@ function createWindow() {
     backgroundColor: '#f6f2e9',
     show: false,
     autoHideMenuBar: true,
+    icon: process.platform === 'linux' ? path.join(__dirname, 'build', 'icon.png') : undefined,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -37,7 +39,7 @@ function createWindow() {
     },
   });
 
-  win.removeMenu();
+  if (!IS_MAC) win.removeMenu();
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
 
   // Links to websites open in the user's normal browser, not in the app.
@@ -70,7 +72,22 @@ app.on('second-instance', () => {
   win.focus();
 });
 
+// macOS needs a real menu bar, otherwise Cmd+C / Cmd+V / Cmd+Q do nothing.
+function macMenu() {
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { role: 'appMenu' },
+    { role: 'editMenu' },
+    { label: 'View', submenu: [
+      { role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' },
+      { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' },
+      { role: 'togglefullscreen' },
+    ] },
+    { role: 'windowMenu' },
+  ]));
+}
+
 app.whenReady().then(() => {
+  if (IS_MAC) macMenu();
   // A local, single-user app: allow what Nodalis asks for
   // (folder access, notifications, clipboard).
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => callback(true));
@@ -78,4 +95,6 @@ app.whenReady().then(() => {
   createWindow();
 });
 
-app.on('window-all-closed', () => app.quit());
+// macOS apps stay open with no windows until Cmd+Q; Windows and Linux quit.
+app.on('window-all-closed', () => { if (!IS_MAC) app.quit(); });
+app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

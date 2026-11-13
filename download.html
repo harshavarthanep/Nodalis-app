@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nodalis — Your knowledge, connected · Free for Windows, macOS, Linux, Android &amp; iPhone</title>
+<meta name="description" content="Nodalis is a free, offline-first notes app: linked markdown notes, a knowledge graph, canvas, tasks, calendar and database. Download for Windows, macOS, Linux and Android, or try it online.">
+<meta property="og:title" content="Nodalis — Your knowledge, connected">
+<meta property="og:description" content="Free, offline notes with a knowledge graph, canvas, tasks and calendar. Windows, macOS, Linux, Android, iPhone and web.">
+<meta property="og:image" content="media/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f6f3ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14131b" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/icon.svg">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f6f3ec; --bg2:#efe9dc; --card:#fffdf8; --ink:#1b1926; --muted:#6a6779; --line:#e6dfcf;
+  --accent:#6c5ce7; --accent2:#4f6bff; --soft:#ece8ff; --ok:#1f9d63;
+  --shadow:0 30px 70px -28px rgba(60,40,140,.35),0 10px 26px -12px rgba(40,30,90,.18);
+  --grad:linear-gradient(90deg,#3f63ff,#7b55f3 55%,#a855f7);
+  --radius:20px;
+}
+@media (prefers-color-scheme:dark){
+  :root{ color-scheme:dark;
+    --bg:#14131b; --bg2:#1b1a24; --card:#1f1e2a; --ink:#f2f0f8; --muted:#a6a3b8; --line:#2f2d3d;
+    --accent:#8b7ff0; --accent2:#7b8cff; --soft:#2a2742; --ok:#3ccf8e;
+    --shadow:0 30px 70px -28px rgba(0,0,0,.7),0 10px 26px -12px rgba(0,0,0,.5);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:calc(76px + env(safe-area-inset-top,0px))}
+html,body{overflow-x:clip}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;-webkit-font-smoothing:antialiased}
+img{max-width:100%;height:auto;display:block}
+a{color:inherit}
+code{font-size:.9em;background:var(--bg2);padding:1px 6px;border-radius:6px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent2)}
+h1,h2,h3{letter-spacing:-.03em;line-height:1.08;margin:0}
+h2{font-size:clamp(30px,4.4vw,48px)}
+.lead{color:var(--muted);font-size:clamp(17px,1.8vw,20px);max-width:640px}
+section{padding:88px 0}
+.center{text-align:center}.center .lead{margin-left:auto;margin-right:auto}
+
+.glow{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:-1}
+.glow i{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55}
+.glow i:nth-child(1){width:520px;height:520px;background:#c8bfff;left:-120px;top:-80px}
+.glow i:nth-child(2){width:480px;height:480px;background:#ffcfe3;right:-120px;top:120px}
+.glow i:nth-child(3){width:420px;height:420px;background:#c2dcff;left:40%;top:420px}
+@media (prefers-color-scheme:dark){.glow i{opacity:.18}}
+
+header{position:sticky;top:0;z-index:20;padding-top:env(safe-area-inset-top,0px);background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.nav{display:flex;align-items:center;gap:18px;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;text-decoration:none;letter-spacing:-.02em}
+.logo img{width:30px;height:30px}
+.nav nav{display:flex;gap:4px;margin-left:auto}
+.nav nav a{text-decoration:none;color:var(--muted);font-weight:550;font-size:15px;padding:8px 12px;border-radius:10px}
+.nav nav a:hover{color:var(--ink);background:var(--bg2)}
+@media (max-width:820px){.nav nav{display:none}.nav .btn{margin-left:auto}}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;border:0;cursor:pointer;font:inherit;font-weight:700;text-decoration:none;border-radius:14px;padding:13px 20px;transition:transform .15s,box-shadow .2s,background .2s,opacity .2s;white-space:nowrap}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--grad);color:#fff;box-shadow:0 14px 30px -12px rgba(90,80,240,.7)}
+.btn-primary:hover{box-shadow:0 18px 38px -12px rgba(90,80,240,.85)}
+.btn-ghost{background:var(--card);color:var(--ink);box-shadow:0 0 0 1px var(--line) inset}
+.btn-ghost:hover{background:var(--bg2)}
+.btn-sm{padding:9px 14px;border-radius:11px;font-size:14px}
+.btn .meta{font-weight:550;opacity:.8;font-size:.86em}
+.btn[disabled]{opacity:.5;cursor:not-allowed;box-shadow:none}
+.btn.is-loading{pointer-events:none}
+.spin{display:inline-block;width:17px;height:17px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;animation:spin .7s linear infinite;flex:none;vertical-align:-3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.skel{display:inline-block;width:54px;height:.9em;border-radius:6px;vertical-align:-1px;background:linear-gradient(90deg,rgba(255,255,255,.15),rgba(255,255,255,.45),rgba(255,255,255,.15));background-size:200% 100%;animation:sh 1.2s infinite}
+.btn-ghost .skel{background:linear-gradient(90deg,var(--line),var(--bg2),var(--line));background-size:200% 100%}
+@keyframes sh{to{background-position:-200% 0}}
+
+.hero{position:relative;padding:72px 0 40px;isolation:isolate}
+.hero-grid{display:grid;grid-template-columns:1.02fr 1.1fr;gap:48px;align-items:center}
+.hero h1{font-size:clamp(42px,6.4vw,76px);margin:16px 0 18px}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin:30px 0 14px}
+.hero-meta{color:var(--muted);font-size:14px}
+.hero-meta a{color:var(--accent2);font-weight:600;text-decoration:none}
+.devices{position:relative;padding:0 40px 50px 0}
+.win{border-radius:14px;overflow:hidden;background:var(--card);box-shadow:var(--shadow),0 0 0 1px var(--line)}
+.win .bar{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;background:var(--bg2);font-size:12px;font-weight:600;color:var(--muted)}
+.win .bar img{width:15px;height:15px}
+.win .bar span:last-child{margin-left:auto;letter-spacing:12px;opacity:.6}
+.phone{position:absolute;right:0;bottom:0;width:27%;min-width:120px;border-radius:30px;background:#121117;padding:7px;box-shadow:var(--shadow)}
+.phone img{border-radius:24px}
+@media (max-width:900px){.hero-grid{grid-template-columns:1fr}.devices{max-width:620px}}
+
+.platforms{display:flex;flex-wrap:wrap;gap:10px 26px;justify-content:center;color:var(--muted);font-weight:600;font-size:15px;padding:26px 22px 0}
+.platforms span{display:flex;align-items:center;gap:8px}
+.platforms svg{width:18px;height:18px}
+
+.video{margin-top:38px;border-radius:22px;overflow:hidden;box-shadow:var(--shadow),0 0 0 1px var(--line);background:#000;aspect-ratio:16/9}
+.video video{width:100%;height:100%;display:block}
+
+.why{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:44px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px}
+.why .card h3{font-size:19px;margin:14px 0 8px;letter-spacing:-.02em}
+.why .card p{margin:0;color:var(--muted);font-size:15px;line-height:1.55}
+.ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--soft);color:var(--accent);flex:none}
+.ico svg{width:22px;height:22px}
+@media (max-width:1000px){.why{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.why{grid-template-columns:1fr}}
+
+.feature{display:grid;grid-template-columns:1fr 1.25fr;gap:56px;align-items:center;margin-top:72px}
+.feature.flip .ftext{order:2}
+.feature h3{font-size:clamp(26px,3.2vw,36px);margin:10px 0 12px}
+.feature p{color:var(--muted);margin:0 0 14px}
+.feature ul{margin:0;padding:0;list-style:none}
+.feature li{padding:6px 0 6px 28px;position:relative}
+.feature li::before{content:"";position:absolute;left:4px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--grad)}
+.shot{position:relative}
+.shot .phone{width:24%;right:-14px;bottom:-26px}
+@media (max-width:900px){.feature{grid-template-columns:1fr;gap:26px}.feature.flip .ftext{order:0}.shot .phone{right:4px}}
+
+.themes{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:40px}
+.themes figure{margin:0}
+.themes img{border-radius:14px;box-shadow:0 0 0 1px var(--line),0 16px 30px -18px rgba(0,0,0,.4)}
+.themes figcaption{text-align:center;color:var(--muted);font-size:14px;font-weight:600;margin-top:10px}
+@media (max-width:800px){.themes{grid-template-columns:repeat(2,1fr)}}
+
+.dl-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:16px}
+.release{font-size:14px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 14px;display:flex;gap:8px;align-items:center}
+.release b{color:var(--ink)}
+.release a{color:var(--accent2);font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.dl{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px}
+.os{display:flex;flex-direction:column;gap:12px;position:relative;transition:box-shadow .2s,border-color .2s}
+.os.mine{border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
+.os .tag{position:absolute;top:16px;right:16px;font-size:12px;font-weight:700;color:var(--accent);background:var(--soft);padding:3px 10px;border-radius:999px;display:none}
+.os.mine .tag{display:block}
+.os .top{display:flex;align-items:center;gap:12px}
+.os h3{font-size:21px}
+.req{font-size:14px;color:var(--muted);margin:0}
+.os .btns{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.os .btns .btn{width:100%}
+.os details{font-size:14px;color:var(--muted)}
+.os summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.os ol{margin:8px 0 0;padding-left:20px}
+@media (max-width:1000px){.dl{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:620px){.dl{grid-template-columns:1fr}}
+
+.faq{max-width:820px;margin:40px auto 0}
+.faq details{border-bottom:1px solid var(--line);padding:18px 4px}
+.faq summary{cursor:pointer;font-weight:700;font-size:17px;list-style:none;display:flex;justify-content:space-between;gap:16px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-size:22px;color:var(--accent);line-height:1}
+.faq details[open] summary::after{content:"–"}
+.faq p{color:var(--muted);margin:10px 0 0}
+
+.final{text-align:center;background:var(--card);border:1px solid var(--line);border-radius:28px;padding:56px 24px;position:relative;overflow:hidden;isolation:isolate}
+footer{padding:36px 0 calc(40px + env(safe-area-inset-bottom,0px));color:var(--muted);font-size:14px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between}
+footer a{color:var(--muted)}
+
+.sheet-bg{position:fixed;inset:0;background:rgba(15,12,30,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:50;display:none;align-items:flex-end;justify-content:center;padding:16px}
+.sheet-bg.open{display:flex}
+@media (min-width:640px){.sheet-bg{align-items:center}}
+.sheet{width:min(520px,100%);background:var(--card);border-radius:24px;padding:26px;box-shadow:var(--shadow);border:1px solid var(--line);animation:up .28s cubic-bezier(.2,.8,.2,1);margin-bottom:env(safe-area-inset-bottom,0px)}
+@keyframes up{from{transform:translateY(24px);opacity:0}}
+.sheet h3{font-size:22px;margin:12px 0 4px}
+.sheet .file{display:flex;align-items:center;gap:12px;background:var(--bg2);border-radius:14px;padding:12px 14px;margin:14px 0 16px;font-size:14px}
+.sheet .file b{display:block;color:var(--ink);font-size:15px;word-break:break-all}
+.sheet .state{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px}
+.sheet ol{color:var(--muted);padding-left:20px;margin:6px 0 18px;font-size:15px}
+.sheet .row{display:flex;gap:10px;flex-wrap:wrap}
+.sheet .row .btn{flex:1}
+.check{width:22px;height:22px;border-radius:50%;background:var(--ok);display:grid;place-items:center;color:#fff;font-size:13px;flex:none}
+.small{font-size:13px;color:var(--muted)}
+.small a{color:var(--accent2)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="#top"><img src="icons/icon.svg" alt="">Nodalis</a>
+    <nav>
+      <a href="#demo">Demo</a><a href="#why">Why Nodalis</a><a href="#features">Features</a><a href="#download">Download</a><a href="#faq">FAQ</a>
+    </nav>
+    <a class="btn btn-ghost btn-sm" data-try href="./">Try online</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="glow"><i></i><i></i><i></i></div>
+    <div class="wrap hero-grid">
+      <div>
+        <div class="eyebrow">Free · Offline · No account</div>
+        <h1>Your knowledge,<br><span class="grad">connected.</span></h1>
+        <p class="lead">Nodalis is a calm home for your notes, tasks and ideas — and the links between them. Plain markdown files, a living knowledge graph, an endless canvas and a planner, on every device you own.</p>
+        <div class="cta">
+          <button class="btn btn-primary" id="hero-dl" data-platform="windows" data-asset="0"><span class="lbl">Download</span> <span class="meta"></span></button>
+          <a class="btn btn-ghost" data-try href="./">Try online — no install</a>
+        </div>
+        <div class="hero-meta"><span id="hero-req"></span> · <a href="#download">Other platforms</a></div>
+      </div>
+      <div class="devices">
+        <div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-note-read.jpg" alt="A Nodalis note with links, a callout and a checklist" width="1600" height="1000" fetchpriority="high"></div>
+        <div class="phone"><img src="media/m-note.jpg" alt="The same note on a phone" width="600" height="1299"></div>
+      </div>
+    </div>
+    <div class="wrap platforms" aria-label="Available on">
+      <span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.4v7.1H3zm0 13 7.5 1.1v-7H3zM11.5 4.3 21 3v8.5h-9.5zm0 15.4L21 21v-8.4h-9.5z"/></svg>Windows</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg>macOS</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></svg>Linux</span>
+      <span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 9h12v8a2 2 0 0 1-2 2h-1v3h-2v-3h-2v3H9v-3H8a2 2 0 0 1-2-2zm-3 0h2v7H3zm16 0h2v7h-2zM7.5 8a4.5 4.5 0 0 1 9 0z"/></svg>Android</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>iPhone &amp; iPad</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Web</span>
+    </div>
+  </section>
+
+  <section id="demo">
+    <div class="wrap center">
+      <div class="eyebrow">See it in action</div>
+      <h2 style="margin-top:12px">Nodalis in <span class="grad">30 seconds.</span></h2>
+      <div class="video">
+        <video controls playsinline preload="none" poster="media/nodalis-demo-poster.jpg" width="1280" height="720">
+          <source src="media/nodalis-demo.mp4" type="video/mp4">
+        </video>
+      </div>
+    </div>
+  </section>
+
+  <section id="why" style="padding-top:20px">
+    <div class="wrap">
+      <div class="center">
+        <div class="eyebrow">Why Nodalis</div>
+        <h2 style="margin:12px 0 14px">Everything you think,<br><span class="grad">in one calm place.</span></h2>
+        <p class="lead">No subscriptions, no lock-in, no account. Just a fast, beautiful app that keeps your ideas yours.</p>
+      </div>
+      <div class="why">
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zm0 0h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z"/></svg></div><h3>Free, for real</h3><p>Every feature, on every device, at no cost. No trial, no ads, no paywall.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 14h8M8 18h5"/></svg></div><h3>Your files, your rules</h3><p>Notes are plain markdown files in a folder you choose — readable by any app, and Obsidian-compatible.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5.2-2.8M19 13a10 10 0 0 0-2-1.6M12 20h.01"/></svg></div><h3>Works offline</h3><p>No internet? No problem. Everything runs on your device, instantly.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="5" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="19" r="2"/><path d="m6 6 4 4m4 0 4-4M6 18l4-4m4 0 4 4"/></svg></div><h3>Linked thinking</h3><p>Type <code>[[</code> to link notes. Backlinks and a live graph show how ideas connect.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div><h3>All in one</h3><p>Notes, tasks, canvas, calendar, sticky wall, database views and daily notes — no app switching.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div><h3>Private sync</h3><p>Back up and sync through your own GitHub. Nobody else ever sees your notes.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="14" height="11" rx="2"/><rect x="16" y="9" width="6" height="11" rx="1.5"/><path d="M6 19h6"/></svg></div><h3>Every device</h3><p>Windows, macOS, Linux, Android, iPhone and the web — the same app everywhere.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 1 0 0 20c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a6 6 0 0 0 6-6C22 6 17.5 2 12 2z"/></svg></div><h3>Make it yours</h3><p>Six themes in light or dark, your own accent colour and fonts.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" style="padding-top:20px">
+    <div class="wrap">
+      <div class="feature">
+        <div class="ftext">
+          <div class="eyebrow">Knowledge graph</div>
+          <h3>Watch your ideas <span class="grad">connect.</span></h3>
+          <p>Every link becomes a line. Clusters appear on their own, forgotten notes resurface, and you can jump anywhere in a click.</p>
+          <ul><li>Links and backlinks update themselves</li><li>Graph of everything, or just around one note</li><li>Tags, orphans and related notes</li></ul>
+        </div>
+        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-graph-dark.jpg" alt="Knowledge graph in dark mode" loading="lazy" width="1600" height="1000"></div></div>
+      </div>
+      <div class="feature flip">
+        <div class="ftext">
+          <div class="eyebrow">Canvas &amp; sticky wall</div>
+          <h3>Think on an <span class="grad">endless canvas.</span></h3>
+          <p>Drop notes, cards and stickies on a board, draw the connections and sketch freely. Quick capture catches a thought before it’s gone.</p>
+          <ul><li>Live note cards — never out of date</li><li>Sticky notes, checklists and sketches</li><li>Export a board as an image</li></ul>
+        </div>
+        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-canvas.jpg" alt="Canvas board with notes, cards and stickies" loading="lazy" width="1600" height="1000"></div><div class="phone"><img src="media/m-canvas.jpg" alt="" loading="lazy" width="600" height="1299"></div></div>
+      </div>
+      <div class="feature">
+        <div class="ftext">
+          <div class="eyebrow">Tasks &amp; planning</div>
+          <h3>Tasks straight <span class="grad">from your notes.</span></h3>
+          <p>Write a checklist anywhere and it shows up in Tasks — with due dates, priorities, a calendar and a priority matrix to decide what matters.</p>
+          <ul><li>Today, upcoming and overdue at a glance</li><li>Calendar with daily notes</li><li>Reminders and a gentle daily review</li></ul>
+        </div>
+        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-tasks.jpg" alt="Tasks view" loading="lazy" width="1600" height="1000"></div><div class="phone"><img src="media/m-tasks.jpg" alt="" loading="lazy" width="600" height="1299"></div></div>
+      </div>
+      <div class="feature flip">
+        <div class="ftext">
+          <div class="eyebrow">Database</div>
+          <h3>Any folder becomes <span class="grad">a database.</span></h3>
+          <p>Note properties turn into columns. Switch between table, board, gallery and calendar views — like Notion, but with plain files.</p>
+          <ul><li>Filter, sort and group</li><li>Save views you use often</li><li>Export to PDF, Word, HTML or image</li></ul>
+        </div>
+        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-db-board.jpg" alt="Database board view" loading="lazy" width="1600" height="1000"></div></div>
+      </div>
+
+      <div class="center" style="margin-top:90px">
+        <div class="eyebrow">Make it yours</div>
+        <h2 style="margin-top:12px">Six themes. <span class="grad">Light or dark.</span></h2>
+      </div>
+      <div class="themes">
+        <figure><img src="media/theme-nodalis-dark.jpg" alt="" loading="lazy" width="900" height="563"><figcaption>Paper, dark</figcaption></figure>
+        <figure><img src="media/theme-nothing-dark.jpg" alt="" loading="lazy" width="900" height="563"><figcaption>Nothing</figcaption></figure>
+        <figure><img src="media/theme-terminal-dark.jpg" alt="" loading="lazy" width="900" height="563"><figcaption>Terminal</figcaption></figure>
+        <figure><img src="media/theme-aurora-light.jpg" alt="" loading="lazy" width="900" height="563"><figcaption>Aurora</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap">
+      <div class="dl-head">
+        <div>
+          <div class="eyebrow">Download</div>
+          <h2 style="margin-top:12px">Get Nodalis <span class="grad">free.</span></h2>
+        </div>
+        <div class="release" id="release"><span class="spin" style="width:13px;height:13px;border-width:2px"></span> Checking the latest version…</div>
+      </div>
+      <div class="dl" id="dl-grid"></div>
+    </div>
+  </section>
+
+  <section id="faq" style="padding-top:20px">
+    <div class="wrap">
+      <div class="center"><div class="eyebrow">FAQ</div><h2 style="margin-top:12px">Questions, <span class="grad">answered.</span></h2></div>
+      <div class="faq">
+        <details><summary>Is Nodalis really free?</summary><p>Yes. Every feature on every platform is free, with no account, no ads and no trial period.</p></details>
+        <details><summary>Where are my notes stored?</summary><p>On your device. On a computer you can point Nodalis at any folder and every note is saved as a plain <code>.md</code> file you can open with any editor. You can also keep an automatic backup in your own private GitHub repository.</p></details>
+        <details><summary>Do I need the internet?</summary><p>No. Nodalis works fully offline. You only need a connection to sync with GitHub, or the first time you read text from an image (OCR).</p></details>
+        <details><summary>Can I move between devices?</summary><p>Yes. Turn on GitHub sync in Settings on each device, or export a backup <code>.zip</code> and import it on the other device.</p></details>
+        <details><summary>Windows or macOS says the app is from an unknown developer. Is it safe?</summary><p>Yes — the warning appears because Nodalis is not yet signed with a paid publisher certificate. On Windows choose <b>More info → Run anyway</b>. On a Mac open <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b> next to Nodalis.</p></details>
+        <details><summary>Why is there no App Store download for iPhone?</summary><p>Apple only allows iPhone apps through the App Store. Until Nodalis is listed there, add it to your Home Screen from Safari — it opens full-screen and works offline like an app.</p></details>
+        <details><summary>How do I update?</summary><p>Download the latest version from this page and install it over the old one. Your notes stay exactly where they are.</p></details>
+        <details><summary>I already use Obsidian. Can I switch?</summary><p>Yes. Point Nodalis at your existing vault folder — notes, folders and <code>[[links]]</code> come straight across.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:10px">
+    <div class="wrap">
+      <div class="final">
+        <div class="glow"><i></i><i></i><i></i></div>
+        <h2>Start connecting <span class="grad">your ideas.</span></h2>
+        <p class="lead" style="margin:14px auto 26px">Free on every device. No account needed.</p>
+        <div class="cta" style="justify-content:center;margin:0">
+          <button class="btn btn-primary" id="final-dl" data-platform="windows" data-asset="0"><span class="lbl">Download</span> <span class="meta"></span></button>
+          <a class="btn btn-ghost" data-try href="./">Try online</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© <span id="yr"></span> Nodalis · Made by Harsha Varthan E P · H24 Creationz</span>
+    <span><a href="https://github.com/harshavarthanep/Nodalis-apps/releases">All releases</a> · <a data-try href="./">Open the web app</a></span>
+  </div>
+</footer>
+
+<div class="sheet-bg" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="sheet">
+    <div class="state" id="sheet-state" aria-live="polite"></div>
+    <h3 id="sheet-title">Nodalis</h3>
+    <div class="file"><img src="icons/icon.svg" alt="" width="34" height="34"><div><b id="sheet-file"></b><span id="sheet-size" class="small"></span></div></div>
+    <div class="small" style="font-weight:700;color:var(--ink)">Next steps</div>
+    <ol id="sheet-steps"></ol>
+    <div class="row">
+      <a class="btn btn-ghost" data-try href="./">Try online meanwhile</a>
+      <button class="btn btn-primary" id="sheet-close">Done</button>
+    </div>
+    <p class="small" style="margin:14px 0 0">Download didn’t start? <a id="sheet-retry" href="#">Click here to try again</a>.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ======= edit these if the repository or web-app address ever changes ======= */
+  var REPO = 'harshavarthanep/Nodalis-apps';
+  var TRY_URL = './';                       /* the Nodalis web app (index.html) */
+  /* ============================================================================ */
+  var LATEST = 'https://github.com/' + REPO + '/releases/latest/download/';
+
+  var P = {
+    windows: { name: 'Windows', icon: 'win', req: 'Windows 10 or later · 64-bit',
+      files: [{ label: 'Download installer', asset: 'Nodalis-Setup.exe' }, { label: 'Portable — no install', asset: 'Nodalis-Portable.exe' }],
+      steps: ['Open <b>Nodalis-Setup.exe</b> from your Downloads.', 'If Windows shows “Windows protected your PC”, click <b>More info → Run anyway</b>.', 'Follow the installer — Nodalis appears in the Start menu and on your desktop.'] },
+    mac: { name: 'macOS', icon: 'mac', req: 'macOS 11 Big Sur or later · Apple silicon &amp; Intel',
+      files: [{ label: 'Download for Mac', asset: 'Nodalis-Mac.dmg' }, { label: 'Download .zip instead', asset: 'Nodalis-Mac.zip' }],
+      steps: ['Open <b>Nodalis-Mac.dmg</b> and drag Nodalis into <b>Applications</b>.', 'Open Nodalis from Applications.', 'If macOS says it can’t check the developer, open <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>. You only need to do this once.'] },
+    linux: { name: 'Linux', icon: 'linux', req: '64-bit · Ubuntu 20.04, Debian 11, Fedora 36 or later',
+      files: [{ label: 'Download AppImage', asset: 'Nodalis-Linux.AppImage' }, { label: 'Download .deb — Ubuntu / Debian', asset: 'Nodalis-Linux.deb' }],
+      steps: ['<b>AppImage:</b> right-click the file → Properties → allow it to run as a program, then double-click it (or run <code>chmod +x Nodalis-Linux.AppImage</code>).', '<b>.deb:</b> double-click to install, or run <code>sudo apt install ./Nodalis-Linux.deb</code>.', 'Find Nodalis in your app menu.'] },
+    android: { name: 'Android', icon: 'android', req: 'Android 6.0 or later',
+      files: [{ label: 'Download APK', asset: 'Nodalis.apk' }],
+      steps: ['Open <b>Nodalis.apk</b> from your notifications or Downloads.', 'If asked, allow your browser to <b>install unknown apps</b>.', 'Tap <b>Install</b>, then open Nodalis.'] },
+    ios: { name: 'iPhone & iPad', icon: 'ios', req: 'iOS &amp; iPadOS 16 or later · Safari', web: true,
+      steps: ['Open Nodalis in <b>Safari</b>.', 'Tap the <b>Share</b> button.', 'Tap <b>Add to Home Screen</b> — Nodalis now opens full-screen and works offline.'] },
+    web: { name: 'Web', icon: 'web', req: 'Current Chrome, Edge, Firefox or Safari', web: true,
+      steps: ['Open the web app — nothing to install.', 'In Chrome or Edge you can also <b>install</b> it from the address bar to get its own window.'] }
+  };
+  var ICONS = {
+    win: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.4v7.1H3zm0 13 7.5 1.1v-7H3zM11.5 4.3 21 3v8.5h-9.5zm0 15.4L21 21v-8.4h-9.5z"/></svg>',
+    mac: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg>',
+    linux: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></svg>',
+    android: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 9h12v8a2 2 0 0 1-2 2h-1v3h-2v-3h-2v3H9v-3H8a2 2 0 0 1-2-2zm-3 0h2v7H3zm16 0h2v7h-2zM7.5 8a4.5 4.5 0 0 1 9 0z"/></svg>',
+    ios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>',
+    web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>'
+  };
+
+  /* ---------- which device is the visitor on? ---------- */
+  var ua = navigator.userAgent;
+  var plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+  var mine = /android/i.test(ua) ? 'android'
+    : (/iPad|iPhone|iPod/.test(ua) || (/Mac/.test(plat) && navigator.maxTouchPoints > 1)) ? 'ios'
+    : (/Win/i.test(plat) || /Windows/i.test(ua)) ? 'windows'
+    : (/Mac/i.test(plat) || /Macintosh/.test(ua)) ? 'mac'
+    : /Linux|X11|CrOS/i.test(plat + ' ' + ua) ? 'linux' : 'web';
+
+  /* ---------- latest release: version, date, file sizes ---------- */
+  var release = null, releaseFailed = false;
+  function fmtSize(b) { return b >= 1e6 ? Math.round(b / 1e6) + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB'; }
+  function asset(name) {
+    if (!release) return releaseFailed ? { url: LATEST + name, size: null, ok: true } : null;   /* null = still loading */
+    var a = (release.assets || []).filter(function (x) { return x.name === name; })[0];
+    return a ? { url: a.browser_download_url, size: a.size, ok: true } : { ok: false };
+  }
+  function metaFor(a) { return !a ? '<span class="skel"></span>' : (a.ok ? (a.size ? fmtSize(a.size) : '') : 'Coming soon'); }
+
+  var grid = document.getElementById('dl-grid');
+  var order = ['windows', 'mac', 'linux', 'android', 'ios', 'web'];
+  order.sort(function (a, b) { return (b === mine) - (a === mine); });
+
+  function renderCards() {
+    grid.innerHTML = order.map(function (id) {
+      var p = P[id];
+      var btns = p.web
+        ? '<a class="btn btn-primary" data-try href="' + TRY_URL + '">' + (id === 'ios' ? 'Open in Safari' : 'Open the web app') + '</a>'
+        : p.files.map(function (f, i) {
+            var a = asset(f.asset);
+            return '<button class="btn ' + (i ? 'btn-ghost' : 'btn-primary') + '" data-platform="' + id + '" data-asset="' + i + '"' + (a && !a.ok ? ' disabled' : '') + '>' +
+              '<span class="lbl">' + f.label + '</span> <span class="meta">' + metaFor(a) + '</span></button>';
+          }).join('');
+      return '<div class="card os' + (id === mine ? ' mine' : '') + '" id="os-' + id + '">' +
+        '<span class="tag">Your device</span>' +
+        '<div class="top"><div class="ico">' + ICONS[p.icon] + '</div><h3>' + p.name + '</h3></div>' +
+        '<p class="req">' + p.req + '</p>' +
+        '<div class="btns">' + btns + '</div>' +
+        '<details><summary>How to install</summary><ol>' + p.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol></details>' +
+        '</div>';
+    }).join('');
+  }
+
+  function renderHero() {
+    var p = P[mine];
+    ['hero-dl', 'final-dl'].forEach(function (id) {
+      var b = document.getElementById(id);
+      b.dataset.platform = mine; b.dataset.asset = '0';
+      if (p.web) {
+        b.querySelector('.lbl').textContent = mine === 'ios' ? 'Add to iPhone' : 'Open the web app';
+        b.querySelector('.meta').textContent = ''; b.disabled = false; return;
+      }
+      var a = asset(p.files[0].asset);
+      b.querySelector('.lbl').textContent = 'Download for ' + p.name;
+      b.querySelector('.meta').innerHTML = metaFor(a);
+      b.disabled = !!(a && !a.ok);
+    });
+    document.getElementById('hero-req').innerHTML = p.req;
+  }
+
+  function renderRelease() {
+    var el = document.getElementById('release');
+    if (release) {
+      var d = new Date(release.published_at || release.created_at);
+      el.innerHTML = '<span class="dot"></span> Latest <b>' + (release.name || release.tag_name) + '</b> · ' +
+        d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) +
+        ' · <a href="' + release.html_url + '">What’s new</a>';
+    } else {
+      el.innerHTML = '<a href="https://github.com/' + REPO + '/releases">See all releases</a>';
+    }
+  }
+
+  renderCards(); renderHero();
+  fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+    .then(function (j) { release = j; })
+    .catch(function () { releaseFailed = true; })
+    .then(function () { renderCards(); renderHero(); renderRelease(); });
+
+  /* ---------- download with clear feedback ---------- */
+  var sheet = document.getElementById('sheet');
+  var stateEl = document.getElementById('sheet-state');
+  var lastUrl = '', timers = [];
+  function startDownload(btn) {
+    var id = btn.dataset.platform, p = P[id];
+    if (p.web) { location.href = TRY_URL; return; }
+    var f = p.files[+btn.dataset.asset || 0];
+    var a = asset(f.asset) || { url: LATEST + f.asset, size: null, ok: true };
+    if (!a.ok) return;
+
+    var label = btn.querySelector('.lbl'), meta = btn.querySelector('.meta');
+    var oldLabel = label.innerHTML, oldMeta = meta.innerHTML;
+    btn.classList.add('is-loading'); btn.setAttribute('aria-busy', 'true');
+    label.innerHTML = '<span class="spin"></span>'; meta.textContent = 'Preparing your download…';
+
+    lastUrl = a.url;
+    document.getElementById('sheet-title').textContent = 'Nodalis for ' + p.name;
+    document.getElementById('sheet-file').textContent = f.asset;
+    document.getElementById('sheet-size').textContent = (a.size ? fmtSize(a.size) + ' · ' : '') + 'from GitHub Releases';
+    document.getElementById('sheet-steps').innerHTML = p.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('');
+    stateEl.innerHTML = '<span class="spin"></span><span>Starting your download…</span>';
+    sheet.classList.add('open');
+    timers.forEach(clearTimeout); timers = [];
+
+    /* GitHub sends the file as an attachment, so this page stays open */
+    timers.push(setTimeout(function () { window.location.href = a.url; }, 350));
+    timers.push(setTimeout(function () {
+      stateEl.innerHTML = '<span class="check">✓</span><span>Your download has started — check your Downloads.</span>';
+      label.innerHTML = '✓'; meta.textContent = 'Downloading';
+    }, 1800));
+    timers.push(setTimeout(function () {
+      btn.classList.remove('is-loading'); btn.removeAttribute('aria-busy');
+      label.innerHTML = oldLabel; meta.innerHTML = oldMeta;
+    }, 6000));
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-platform]');
+    if (b && !b.disabled) startDownload(b);
+  });
+  document.getElementById('sheet-retry').addEventListener('click', function (e) { e.preventDefault(); if (lastUrl) window.location.href = lastUrl; });
+  function closeSheet() { sheet.classList.remove('open'); }
+  document.getElementById('sheet-close').addEventListener('click', closeSheet);
+  sheet.addEventListener('click', function (e) { if (e.target === sheet) closeSheet(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+
+  document.querySelectorAll('[data-try]').forEach(function (a) { a.href = TRY_URL; });
+  document.getElementById('yr').textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>

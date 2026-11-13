@@ -3,14 +3,19 @@
   "productName": "Nodalis",
   "version": "1.0.0",
   "description": "Nodalis - your knowledge, connected",
-  "author": "Harsha Varthan E P (H24 Creationz)",
+  "author": {
+    "name": "Harsha Varthan E P (H24 Creationz)",
+    "email": "harshavarthanep@users.noreply.github.com"
+  },
   "license": "UNLICENSED",
   "private": true,
   "main": "main.js",
   "scripts": {
     "prepare-www": "node ../shared/prepare-www.mjs www",
     "start": "npm run prepare-www && electron .",
-    "build:win": "npm run prepare-www && electron-builder --win --publish never"
+    "build:win": "npm run prepare-www && electron-builder --win --publish never",
+    "build:mac": "npm run prepare-www && electron-builder --mac --publish never",
+    "build:linux": "npm run prepare-www && electron-builder --linux --publish never"
   },
   "devDependencies": {
     "electron": "^37.2.0",
@@ -20,13 +25,31 @@
     "appId": "com.h24creationz.nodalis",
     "productName": "Nodalis",
     "copyright": "Copyright (c) H24 Creationz",
-    "files": ["main.js", "www/**/*", "package.json"],
-    "directories": { "output": "dist", "buildResources": "build" },
+    "files": [
+      "main.js",
+      "www/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
     "win": {
       "icon": "build/icon.png",
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
@@ -42,6 +65,64 @@
     },
     "portable": {
       "artifactName": "Nodalis-Portable.${ext}"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "minimumSystemVersion": "11.0",
+      "artifactName": "Nodalis-Mac.${ext}"
+    },
+    "dmg": {
+      "title": "Nodalis",
+      "artifactName": "Nodalis-Mac.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Office",
+      "synopsis": "Notes, tasks, canvas and a knowledge graph",
+      "description": "Nodalis - your knowledge, connected. Linked markdown notes, tasks, canvas, calendar and a knowledge graph. Works offline.",
+      "maintainer": "Harsha Varthan E P <harshavarthanep@users.noreply.github.com>",
+      "executableName": "nodalis",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "syncDesktopName": true
+    },
+    "appImage": {
+      "artifactName": "Nodalis-Linux.${ext}"
+    },
+    "deb": {
+      "artifactName": "Nodalis-Linux.${ext}"
     }
-  }
+  },
+  "homepage": "https://harshavarthanep.github.io/Nodalis-apps/",
+  "desktopName": "nodalis.desktop"
 }
