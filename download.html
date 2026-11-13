@@ -462,13 +462,23 @@ footer a{color:var(--muted)}
     document.getElementById('hero-req').innerHTML = p.req;
   }
 
+  // function renderRelease() {
+  //   var el = document.getElementById('release');
+  //   if (release) {
+  //     var d = new Date(release.published_at || release.created_at);
+  //     el.innerHTML = '<span class="dot"></span> Latest <b>' + (release.name || release.tag_name) + '</b> · ' +
+  //       d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) +
+  //       ' · <a href="' + release.html_url + '">What’s new</a>';
+  //   } else {
+  //     el.innerHTML = '<a href="https://github.com/' + REPO + '/releases">See all releases</a>';
+  //   }
+  // }
   function renderRelease() {
     var el = document.getElementById('release');
     if (release) {
       var d = new Date(release.published_at || release.created_at);
       el.innerHTML = '<span class="dot"></span> Latest <b>' + (release.name || release.tag_name) + '</b> · ' +
-        d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) +
-        ' · <a href="' + release.html_url + '">What’s new</a>';
+        d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
     } else {
       el.innerHTML = '<a href="https://github.com/' + REPO + '/releases">See all releases</a>';
     }
