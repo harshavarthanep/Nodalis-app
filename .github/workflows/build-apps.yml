@@ -1,8 +1,11 @@
-# Builds the Nodalis Windows app and Android app from index.html in the
-# repository root, then publishes them as a GitHub Release.
+# Builds the Nodalis apps for Windows, macOS, Linux and Android from
+# index.html in the repository root, then publishes them as a GitHub Release.
 #
 # HOW TO RUN: GitHub -> Actions tab -> "Build Nodalis apps" -> Run workflow
 #             -> type the version (for example 1.0.0) -> Run.
+# About 10 minutes later the files are at:
+#   https://github.com/harshavarthanep/Nodalis-apps/releases/latest
+# and the download links on your website always point to the newest one.
 
 name: Build Nodalis apps
 
@@ -46,6 +49,68 @@ jobs:
           path: |
             native/desktop/dist/Nodalis-Setup.exe
             native/desktop/dist/Nodalis-Portable.exe
+          if-no-files-found: error
+
+  mac:
+    name: macOS app (.dmg)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: native/desktop
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install tools
+        run: npm install
+
+      - name: Set version
+        run: npm pkg set version=${{ inputs.version }}
+
+      - name: Build for Apple silicon and Intel Macs
+        run: npm run build:mac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: |
+            native/desktop/dist/Nodalis-Mac.dmg
+            native/desktop/dist/Nodalis-Mac.zip
+          if-no-files-found: error
+
+  linux:
+    name: Linux app (.AppImage, .deb)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native/desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install tools
+        run: npm install
+
+      - name: Set version
+        run: npm pkg set version=${{ inputs.version }}
+
+      - name: Build AppImage and .deb
+        run: npm run build:linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            native/desktop/dist/Nodalis-Linux.AppImage
+            native/desktop/dist/Nodalis-Linux.deb
           if-no-files-found: error
 
   android:
@@ -102,7 +167,7 @@ jobs:
             "$BT/apksigner" verify ../Nodalis.apk
             rm -f release.keystore
           else
-            echo "::warning::Signing secrets not set - building a TEST apk. Add the 3 secrets (see native/README-APPS.md)."
+            echo "::warning::Signing secrets not set - building a TEST apk. Phones cannot update it to the next version. Add the 3 secrets (see native/README-APPS.md)."
             ./gradlew assembleDebug --no-daemon
             cp app/build/outputs/apk/debug/app-debug.apk ../Nodalis.apk
           fi
@@ -115,7 +180,7 @@ jobs:
 
   release:
     name: Publish release
-    needs: [windows, android]
+    needs: [windows, mac, linux, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -130,12 +195,20 @@ jobs:
           files: |
             out/windows/Nodalis-Setup.exe
             out/windows/Nodalis-Portable.exe
+            out/mac/Nodalis-Mac.dmg
+            out/mac/Nodalis-Mac.zip
+            out/linux/Nodalis-Linux.AppImage
+            out/linux/Nodalis-Linux.deb
             out/android/Nodalis.apk
           body: |
             ## Nodalis ${{ inputs.version }}
 
             **Windows** - `Nodalis-Setup.exe` installs Nodalis with Start-menu and desktop shortcuts.
             `Nodalis-Portable.exe` runs without installing.
+
+            **macOS** - `Nodalis-Mac.dmg` (Apple silicon and Intel). Open it and drag Nodalis to Applications.
+
+            **Linux** - `Nodalis-Linux.AppImage` runs anywhere (make it executable), or install `Nodalis-Linux.deb` on Ubuntu / Debian.
 
             **Android** - `Nodalis.apk`. Open it on your phone and allow "Install unknown apps" when asked.
 
