@@ -95,8 +95,12 @@ header{position:sticky;top:0;z-index:20;padding-top:env(safe-area-inset-top,0px)
 .platforms span{display:flex;align-items:center;gap:8px}
 .platforms svg{width:18px;height:18px}
 
-.video{margin-top:38px;border-radius:22px;overflow:hidden;box-shadow:var(--shadow),0 0 0 1px var(--line);background:#000;aspect-ratio:16/9}
-.video video{width:100%;height:100%;display:block}
+.video{margin-top:38px;border-radius:22px;overflow:hidden;box-shadow:var(--shadow),0 0 0 1px var(--line);background:#000;aspect-ratio:16/9;position:relative;transition:max-width .3s}
+.video video{width:100%;height:100%;display:block;object-fit:cover}
+.vtabs{display:flex;gap:8px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+.vtabs button{font:inherit;font-size:14px;font-weight:650;color:var(--muted);background:var(--card);border:0;box-shadow:0 0 0 1px var(--line) inset;border-radius:999px;padding:8px 16px;cursor:pointer}
+.vtabs button[aria-pressed="true"]{color:#fff;background:var(--accent);box-shadow:none}
+.video.vert{aspect-ratio:9/16;max-width:420px;margin-left:auto;margin-right:auto}
 
 .why{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:44px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px}
@@ -116,7 +120,20 @@ header{position:sticky;top:0;z-index:20;padding-top:env(safe-area-inset-top,0px)
 .feature li::before{content:"";position:absolute;left:4px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--grad)}
 .shot{position:relative}
 .shot .phone{width:24%;right:-14px;bottom:-26px}
+.win img,.phone img{width:100%;height:auto}
 @media (max-width:900px){.feature{grid-template-columns:1fr;gap:26px}.feature.flip .ftext{order:0}.shot .phone{right:4px}}
+/* phones & small tablets: laptop and phone sit in one tidy frame, nothing hangs off the edge */
+@media (max-width:640px){
+  .devices,.shot{padding:0 6% 16% 0;max-width:none}
+  .devices .phone,.shot .phone{width:31%;min-width:0;right:0;bottom:0;padding:4px;border-radius:20px}
+  .devices .phone img,.shot .phone img{border-radius:16px}
+  .win{border-radius:10px}
+  .win .bar{height:24px;padding:0 9px;font-size:10.5px;gap:6px}
+  .win .bar img{width:12px;height:12px}
+  .win .bar span:last-child{letter-spacing:7px}
+  .feature{margin-top:56px}
+  .themes{gap:10px}
+}
 
 .themes{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:40px}
 .themes figure{margin:0}
@@ -203,8 +220,8 @@ footer a{color:var(--muted)}
         <div class="hero-meta"><span id="hero-req"></span> · <a href="#download">Other platforms</a></div>
       </div>
       <div class="devices">
-        <div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-note-read.jpg" alt="A Nodalis note with links, a callout and a checklist" width="1600" height="1000" fetchpriority="high"></div>
-        <div class="phone"><img src="media/m-note.jpg" alt="The same note on a phone" width="600" height="1299"></div>
+        <div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-note-read.jpg" alt="A Nodalis note with links, a callout and a checklist" width="2560" height="1600" fetchpriority="high"></div>
+        <div class="phone"><img src="media/m-note.jpg" alt="The same note on a phone" width="1170" height="2532"></div>
       </div>
     </div>
     <div class="wrap platforms" aria-label="Available on">
@@ -221,10 +238,15 @@ footer a{color:var(--muted)}
     <div class="wrap center">
       <div class="eyebrow">See it in action</div>
       <h2 style="margin-top:12px">Nodalis in <span class="grad">30 seconds.</span></h2>
-      <div class="video">
-        <video controls playsinline preload="none" poster="media/nodalis-demo-poster.jpg" width="1280" height="720">
+      <div class="video" id="video">
+        <video id="demo-video" autoplay muted loop playsinline controls preload="auto" poster="media/nodalis-demo-poster.jpg" width="1920" height="1080">
           <source src="media/nodalis-demo.mp4" type="video/mp4">
         </video>
+      </div>
+      <div class="vtabs" role="group" aria-label="Choose a video">
+        <button type="button" aria-pressed="true" data-v="media/nodalis-demo.mp4" data-p="media/nodalis-demo-poster.jpg">30-second tour</button>
+        <button type="button" aria-pressed="false" data-v="media/nodalis-demo-full.mp4" data-p="media/nodalis-demo-poster.jpg">Full demo</button>
+        <button type="button" aria-pressed="false" data-v="media/nodalis-demo-phone.mp4" data-p="media/nodalis-demo-phone-poster.jpg" data-vert>Phone view</button>
       </div>
     </div>
   </section>
@@ -258,7 +280,7 @@ footer a{color:var(--muted)}
           <p>Every link becomes a line. Clusters appear on their own, forgotten notes resurface, and you can jump anywhere in a click.</p>
           <ul><li>Links and backlinks update themselves</li><li>Graph of everything, or just around one note</li><li>Tags, orphans and related notes</li></ul>
         </div>
-        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-graph-dark.jpg" alt="Knowledge graph in dark mode" loading="lazy" width="1600" height="1000"></div></div>
+        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-graph-dark.jpg" alt="Knowledge graph in dark mode" loading="lazy" width="2560" height="1600"></div></div>
       </div>
       <div class="feature flip">
         <div class="ftext">
@@ -267,7 +289,7 @@ footer a{color:var(--muted)}
           <p>Drop notes, cards and stickies on a board, draw the connections and sketch freely. Quick capture catches a thought before it’s gone.</p>
           <ul><li>Live note cards — never out of date</li><li>Sticky notes, checklists and sketches</li><li>Export a board as an image</li></ul>
         </div>
-        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-canvas.jpg" alt="Canvas board with notes, cards and stickies" loading="lazy" width="1600" height="1000"></div><div class="phone"><img src="media/m-canvas.jpg" alt="" loading="lazy" width="600" height="1299"></div></div>
+        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-canvas.jpg" alt="Canvas board with notes, cards and stickies" loading="lazy" width="2560" height="1600"></div><div class="phone"><img src="media/m-canvas.jpg" alt="" loading="lazy" width="1170" height="2532"></div></div>
       </div>
       <div class="feature">
         <div class="ftext">
@@ -276,7 +298,7 @@ footer a{color:var(--muted)}
           <p>Write a checklist anywhere and it shows up in Tasks — with due dates, priorities, a calendar and a priority matrix to decide what matters.</p>
           <ul><li>Today, upcoming and overdue at a glance</li><li>Calendar with daily notes</li><li>Reminders and a gentle daily review</li></ul>
         </div>
-        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-tasks.jpg" alt="Tasks view" loading="lazy" width="1600" height="1000"></div><div class="phone"><img src="media/m-tasks.jpg" alt="" loading="lazy" width="600" height="1299"></div></div>
+        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-tasks.jpg" alt="Tasks view" loading="lazy" width="2560" height="1600"></div><div class="phone"><img src="media/m-tasks.jpg" alt="" loading="lazy" width="1170" height="2532"></div></div>
       </div>
       <div class="feature flip">
         <div class="ftext">
@@ -285,7 +307,7 @@ footer a{color:var(--muted)}
           <p>Note properties turn into columns. Switch between table, board, gallery and calendar views — like Notion, but with plain files.</p>
           <ul><li>Filter, sort and group</li><li>Save views you use often</li><li>Export to PDF, Word, HTML or image</li></ul>
         </div>
-        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-db-board.jpg" alt="Database board view" loading="lazy" width="1600" height="1000"></div></div>
+        <div class="shot"><div class="win"><div class="bar"><img src="icons/icon.svg" alt="">Nodalis<span>– ▢ ✕</span></div><img src="media/shot-db-board.jpg" alt="Database board view" loading="lazy" width="2560" height="1600"></div></div>
       </div>
 
       <div class="center" style="margin-top:90px">
@@ -293,10 +315,10 @@ footer a{color:var(--muted)}
         <h2 style="margin-top:12px">Six themes. <span class="grad">Light or dark.</span></h2>
       </div>
       <div class="themes">
-        <figure><img src="media/theme-nodalis-dark.jpg" alt="" loading="lazy" width="900" height="563"><figcaption>Paper, dark</figcaption></figure>
-        <figure><img src="media/theme-nothing-dark.jpg" alt="" loading="lazy" width="900" height="563"><figcaption>Nothing</figcaption></figure>
-        <figure><img src="media/theme-terminal-dark.jpg" alt="" loading="lazy" width="900" height="563"><figcaption>Terminal</figcaption></figure>
-        <figure><img src="media/theme-aurora-light.jpg" alt="" loading="lazy" width="900" height="563"><figcaption>Aurora</figcaption></figure>
+        <figure><img src="media/theme-nodalis-dark.jpg" alt="" loading="lazy" width="1800" height="1125"><figcaption>Paper, dark</figcaption></figure>
+        <figure><img src="media/theme-nothing-dark.jpg" alt="" loading="lazy" width="1800" height="1125"><figcaption>Nothing</figcaption></figure>
+        <figure><img src="media/theme-terminal-dark.jpg" alt="" loading="lazy" width="1800" height="1125"><figcaption>Terminal</figcaption></figure>
+        <figure><img src="media/theme-aurora-light.jpg" alt="" loading="lazy" width="1800" height="1125"><figcaption>Aurora</figcaption></figure>
       </div>
     </div>
   </section>
@@ -377,11 +399,11 @@ footer a{color:var(--muted)}
   var LATEST = 'https://github.com/' + REPO + '/releases/latest/download/';
 
   var P = {
-    windows: { name: 'Windows', icon: 'win', req: 'Windows 10 or later · 64-bit',
-      files: [{ label: 'Download installer', asset: 'Nodalis-Setup.exe' }, { label: 'Portable — no install', asset: 'Nodalis-Portable.exe' }],
-      steps: ['Open <b>Nodalis-Setup.exe</b> from your Downloads.', 'If Windows shows “Windows protected your PC”, click <b>More info → Run anyway</b>.', 'Follow the installer — Nodalis appears in the Start menu and on your desktop.'] },
+    windows: { name: 'Windows', icon: 'win', req: 'Windows 10 or later · 64-bit, Intel, AMD &amp; ARM',
+      files: [{ label: 'Download installer', asset: 'Nodalis-Setup.exe' }, { label: 'Portable — no install', asset: 'Nodalis-Portable.exe' }, { label: 'Windows on ARM', asset: 'Nodalis-Setup-arm64.exe' }],
+      steps: ['Open <b>Nodalis-Setup.exe</b> from your Downloads. On an ARM-based Windows PC use the <b>Windows on ARM</b> installer instead — it runs natively, at full speed.', 'If Windows shows “Windows protected your PC”, click <b>More info → Run anyway</b>.', 'Follow the installer — Nodalis appears in the Start menu and on your desktop.'] },
     mac: { name: 'macOS', icon: 'mac', req: 'macOS 11 Big Sur or later · Apple silicon &amp; Intel',
-      files: [{ label: 'Download for Mac', asset: 'Nodalis-Mac.dmg' }, { label: 'Download .zip instead', asset: 'Nodalis-Mac.zip' }],
+      files: [{ label: 'Download for Mac', asset: 'Nodalis-Mac.dmg' }],
       steps: ['Open <b>Nodalis-Mac.dmg</b> and drag Nodalis into <b>Applications</b>.', 'Open Nodalis from Applications.', 'If macOS says it can’t check the developer, open <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>. You only need to do this once.'] },
     linux: { name: 'Linux', icon: 'linux', req: '64-bit · Ubuntu 20.04, Debian 11, Fedora 36 or later',
       files: [{ label: 'Download AppImage', asset: 'Nodalis-Linux.AppImage' }, { label: 'Download .deb — Ubuntu / Debian', asset: 'Nodalis-Linux.deb' }],
@@ -411,6 +433,13 @@ footer a{color:var(--muted)}
     : (/Win/i.test(plat) || /Windows/i.test(ua)) ? 'windows'
     : (/Mac/i.test(plat) || /Macintosh/.test(ua)) ? 'mac'
     : /Linux|X11|CrOS/i.test(plat + ' ' + ua) ? 'linux' : 'web';
+  /* Windows on ARM: browsers often report x64, so ask the browser directly where it can */
+  var armWin = mine === 'windows' && /\barm/i.test(ua);
+  if (mine === 'windows' && navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+    navigator.userAgentData.getHighEntropyValues(['architecture']).then(function (v) {
+      if (v && /arm/i.test(v.architecture || '')) { armWin = true; renderHero(); }
+    }).catch(function () {});
+  }
 
   /* ---------- latest release: version, date, file sizes ---------- */
   var release = null, releaseFailed = false;
@@ -447,15 +476,15 @@ footer a{color:var(--muted)}
   }
 
   function renderHero() {
-    var p = P[mine];
+    var p = P[mine], idx = armWin ? 2 : 0;
     ['hero-dl', 'final-dl'].forEach(function (id) {
       var b = document.getElementById(id);
-      b.dataset.platform = mine; b.dataset.asset = '0';
+      b.dataset.platform = mine; b.dataset.asset = String(idx);
       if (p.web) {
         b.querySelector('.lbl').textContent = mine === 'ios' ? 'Add to iPhone' : 'Open the web app';
         b.querySelector('.meta').textContent = ''; b.disabled = false; return;
       }
-      var a = asset(p.files[0].asset);
+      var a = asset(p.files[idx].asset);
       b.querySelector('.lbl').textContent = 'Download for ' + p.name;
       b.querySelector('.meta').innerHTML = metaFor(a);
       b.disabled = !!(a && !a.ok);
@@ -540,6 +569,22 @@ footer a{color:var(--muted)}
 
   document.querySelectorAll('[data-try]').forEach(function (a) { a.href = TRY_URL; });
   document.getElementById('yr').textContent = new Date().getFullYear();
+
+  /* ---------- demo video: plays by itself (muted); three versions ---------- */
+  var vid = document.getElementById('demo-video'), vbox = document.getElementById('video');
+  [].forEach.call(document.querySelectorAll('.vtabs button'), function (b) {
+    b.addEventListener('click', function () {
+      [].forEach.call(document.querySelectorAll('.vtabs button'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      vbox.classList.toggle('vert', b.hasAttribute('data-vert'));
+      vid.poster = b.dataset.p; vid.src = b.dataset.v; vid.muted = true; vid.play().catch(function () {});
+    });
+  });
+  /* play while on screen, pause when scrolled away (saves data and battery) */
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (es) {
+      es.forEach(function (x) { if (x.isIntersecting) vid.play().catch(function () {}); else vid.pause(); });
+    }, { threshold: .3 }).observe(vbox);
+  }
 })();
 </script>
 </body>
